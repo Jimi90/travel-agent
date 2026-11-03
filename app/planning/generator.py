@@ -145,6 +145,11 @@ def _t(s: str) -> time | None:
         return None
 
 
+def _iata(code: str) -> str | None:
+    c = (code or "").strip().upper()
+    return c if len(c) == 3 and c.isalpha() else None
+
+
 def _money(v: float) -> Decimal:
     return Decimal(str(round(max(0.0, float(v or 0)), 2)))
 
@@ -269,6 +274,7 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
         transports.append(TransportSegment(
             mode=t.mode, origin=place_of(t.from_place), destination=place_of(t.to_place), depart=dep, arrive=arr,
             carrier=t.carrier or None, cost=_money(t.est_price_chf), via=[v for v in t.via if v],
+            origin_code=_iata(t.from_code), destination_code=_iata(t.to_code),
             estimated=True, search_url=url, note=t.note or None))
     transports.sort(key=lambda x: x.depart)
     for a, b in zip(transports, transports[1:]):

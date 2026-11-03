@@ -48,6 +48,14 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   reasoning_effort) werden bei 400 weggelassen. Limit/Fehler → nächster Anbieter (`_Skip`), Meldung nennt jeden Grund.
   Claude über `client.beta.messages.parse`, `fallbacks="default"` bei Opus/Sonnet 5.5, Websuche nur Claude, Kostenbremse
   nur für Claude. Schlüssel: `store.key(provider)`, `data/keys.json` (chmod 600) vor `.env`; `key_info()` nur letzte 4 Zeichen.
+- `app/bookings.py` (1.3.0) Buchungsbestätigung (Foto oder Mailtext) → KI liest `BookingExtract` → `propose()` ordnet
+  im Code zu (gleiche Art + Datum + ähnlicher Ort/Name/IATA, sonst neu) → Vorschau mit Plausibilitätsprüfung, gemerkt
+  unter Kennung (`store` «import») → erst «Übernehmen» schreibt ein ChangeSet (`UpdateStay`/`UpdateTransport`/`AddTransport`/
+  `AddStay`/`AddActivity`). Fremdwährung nur als Hinweis (kein falscher CHF-Betrag).
+- `app/prices.py` (1.3.0) SerpApi: `google_flights` (type=2 einfach, adults=2, CHF, gl=ch, stops nach Randbedingung) und
+  `google_hotels`; Feldnamen aus Doku/Fremdprojekten (serpapi.com aus der Cloud gesperrt). 6 Std. Zwischenspeicher, jede
+  Suche als Kosten-Zeile `model=serpapi` gezählt (Gratis 250/Monat). Übernehmen nur per gemerkter Kennung + Index, nie mit
+  Daten aus dem Browser; übernommene Preise bleiben «Vorschlag». Flughafen-Codes an `TransportSegment.origin_code/destination_code`.
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -60,13 +68,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (28 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (30 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.2.0)
+## Stand (03.11.2026, Version 1.3.0)
+- 1.3.0: Buchung importieren + echte Preise (SerpApi). Im Testmodus und mit nachgebildeten Antworten geprüft; echte
+  SerpApi-Antworten und wie gut Gemini Bestätigungen liest, nur auf dem NAS prüfbar.
 - 1.2.0: Gemini + Groq gratis mit Aufgabenteilung und gegenseitiger Reserve; Profil → KI. Mit nachgebildetem Server
   getestet (`tests/test_llm.py`), echte Gemini-/Groq-Antworten (Planqualität, JSON-Treue, Limits) nur auf dem NAS prüfbar.
 - 1.1.0: Profil aufgeräumt (iPhone-Stil), Länderauswahl mit Suche. Mit Playwright bei 390 px hell/dunkel geprüft.
@@ -75,6 +85,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   markieren, Aufträge mit Entwürfen, Rückgängig, Foto-Übersetzung, Nachrichten, Kosten. Im Testmodus geprüft.
 - Nicht prüfbar aus der Cloud: echte Claude-Antworten (Qualität, Dauer, Kosten pro Plan), echte Open-Meteo-Antworten
   (Format nach Doku nachgebildet), ob iOS beim Foto die Kamera anbietet, Docker-Start auf dem NAS.
-- Bewusst nicht gebaut: echte Hotel-/Flug-Verfügbarkeit (Booking.com-API nur für Partner; Flug-APIs offen) → Suchlinks.
+- Keine Buchungs-APIs (Booking.com nur für Partner, Amadeus Self-Service seit 17.7.2026 abgeschaltet): Suchlinks,
+  echte Preise über SerpApi, Buchung von Hand, dann Bestätigung importieren.
   Transport-Ausfälle erkennt Kompass nicht selbst (keine freie Datenquelle) → man meldet sie mit «Fällt aus …».
 - Ideen: Push-Mitteilung aufs iPhone bei Umplanung (z. B. ntfy), Tagesvorschau am Vorabend.

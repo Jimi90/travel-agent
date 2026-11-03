@@ -11,7 +11,7 @@ def _env(name, default=None):
 DATA_DIR = Path(_env("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "kompass.db"
 PORT = int(_env("PORT", "8000"))
-APP_VERSION = "1.2.0"  # von Hand erhöhen
+APP_VERSION = "1.3.0"  # von Hand erhöhen
 APP_BUILD = _env("APP_BUILD", "entwicklung")[:7]  # von GitHub gesetzt
 APP_PASSWORD = _env("APP_PASSWORD", "")  # Pflicht, mindestens 16 Zeichen
 
@@ -45,6 +45,9 @@ FREE_PROVIDERS = {
 }
 # Höchstens so viel USD pro 24 Stunden für KI-Aufrufe
 DAILY_BUDGET_USD = float(_env("DAILY_BUDGET_USD", "3"))
+
+# --- Echte Preise (SerpApi: Google Flights / Google Hotels), Gratis-Tarif 250 Suchen/Monat ---
+SERPAPI_API_KEY = _env("SERPAPI_API_KEY", "")
 
 # --- Morgen-Wettercheck ---
 CHECK_TIME = _env("CHECK_TIME", "06:30")  # Ortszeit am Aufenthaltsort

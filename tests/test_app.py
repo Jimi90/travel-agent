@@ -194,6 +194,42 @@ class AppTest(unittest.TestCase):
         self.assertEqual(info["settings"]["model"], "claude-haiku-5-5")
         code, n = self.call("GET", "/api/notices")
         self.assertTrue(any(x["kind"] == "umplanung" for x in n["notices"]))
+        # --- Buchung importieren: Vorschau, dann übernehmen (Testmodus: Hinflug + erstes Hotel)
+        code, r = self.call("POST", f"/api/trips/{tid}/import", {"text": "Kurz"})
+        self.assertEqual(code, 400)
+        code, r = self.call("POST", f"/api/trips/{tid}/import", {"text": "Buchungsbestätigung Flug und Hotel …" * 2})
+        pv = r["preview"]
+        self.assertTrue(pv["can_apply"], pv)
+        self.assertEqual(len(pv["lines"]), 2)
+        self.assertEqual(service.sm().get(tid).stays[0].confirmed, False)  # Vorschau ändert nichts
+        code, d = self.call("POST", f"/api/trips/{tid}/import/apply", {"token": pv["token"]})
+        self.assertTrue(d["ok"], d.get("error"))
+        it = service.sm().get(tid)
+        fl = next(t for t in it.transports if t.mode == "flug")
+        self.assertEqual((fl.estimated, fl.booking.reference, fl.depart.hour, fl.number), (False, "ABC123", 6, "TA 123"))
+        self.assertFalse(fl.note)  # Hinweis «Schätzung» ist weg
+        self.assertEqual((it.stays[0].name, it.stays[0].confirmed), ("Hotel Testpalast", True))
+        self.assertIn("EUR", it.stays[0].note)  # Fremdwährung nur als Hinweis, kein falscher CHF-Betrag
+        self.assertEqual(self.call("POST", f"/api/trips/{tid}/import/apply", {"token": pv["token"]})[0], 404)
+
+        # --- Echte Preise (Testmodus): Rückflug und zweites Hotel übernehmen
+        back = [t for t in it.transports if t.mode == "flug"][-1]
+        code, pr = self.call("POST", f"/api/trips/{tid}/prices", {"target": "verbindung", "item_id": back.id})
+        self.assertEqual(code, 200, pr)
+        self.assertEqual(len(pr["options"]), 2)
+        code, d = self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": pr["token"], "index": 1})
+        self.assertEqual(d["outcome"]["status"], "angewendet", d["outcome"])
+        back2 = next(t for t in service.sm().get(tid).transports if t.id == back.id)
+        self.assertEqual((back2.depart.hour, back2.via, float(back2.cost)), (12, ["Madrid"], 268.0))
+        self.assertTrue(back2.estimated)  # bleibt Vorschlag, bis gebucht
+        stay2 = service.sm().get(tid).stays[1]
+        code, pr = self.call("POST", f"/api/trips/{tid}/prices", {"target": "unterkunft", "item_id": stay2.id})
+        self.assertEqual(pr["options"][-1]["over_budget"], False)
+        code, d = self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": pr["token"], "index": 0})
+        self.assertEqual(service.sm().get(tid).stays[1].cost, pr["options"][0]["total"])
+        self.assertEqual(self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": "falsch", "index": 0})[0], 404)
+        code, info = self.call("GET", "/api/info")
+        self.assertGreaterEqual(info["prices"]["month"], 2)
         self.assertEqual(self.call("DELETE", f"/api/trips/{tid}")[0], 200)
 
 

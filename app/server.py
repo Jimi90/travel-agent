@@ -15,8 +15,8 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, config, drafting, llm, service, store, vision
-from .models import Household, SetConfirmed, SetFixed, SetTripStatus
+from . import auth, bookings, config, drafting, llm, prices, service, store, vision
+from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
 
@@ -90,6 +90,7 @@ def info() -> dict:
     return {"version": config.APP_VERSION, "build": config.APP_BUILD, "fake": config.FAKE_MODE,
             "settings": s, "models": config.MODELS, "keys": store.key_info(), "ai": llm.available(),
             "free_models": {k: v["model"] for k, v in config.FREE_PROVIDERS.items()},
+            "prices": {"available": prices.available(), "month": prices.month_usage(), "free_quota": 250},
             "spent_24h": round(store.spent_since(24), 4), "spent_30d": round(store.spent_since(24 * 30), 4),
             "budget_usd": config.DAILY_BUDGET_USD, "unread": store.unread(),
             "categories": {k.value: v for k, v in CATEGORY_LABELS.items()}}
@@ -153,7 +154,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.headers.get(auth.CSRF_HEADER) != "1":
                 self._send(403, {"error": "Anfrage nicht erlaubt."})
                 return False
-            limit = MAX_IMAGE_BODY if path == "/api/vision" else MAX_BODY
+            limit = MAX_IMAGE_BODY if path == "/api/vision" or path.endswith("/import") else MAX_BODY
             if int(self.headers.get("Content-Length") or 0) > limit:
                 self._send(413, {"error": "Anfrage zu gross."})
                 return False
@@ -303,6 +304,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise BadRequest("Der Schlüssel enthält Leerzeichen – bitte genau kopieren.")
             if key and prov == "anthropic" and not key.startswith("sk-"):
                 raise BadRequest("Das sieht nicht wie ein Claude-Schlüssel aus (beginnt mit «sk-»).")
+            if key and prov == "serpapi" and not re.fullmatch(r"[0-9a-fA-F]{32,128}", key):
+                raise BadRequest("Das sieht nicht wie ein SerpApi-Schlüssel aus (lange Zahlen-/Buchstabenfolge).")
             if key and prov == "groq" and not key.startswith("gsk_"):
                 raise BadRequest("Das sieht nicht wie ein Groq-Schlüssel aus (beginnt mit «gsk_»).")
             store.save_key(prov, key)
@@ -333,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
                 store.put("fav_dest", str(item["id"]), keep)
             return self._send(200, {"saved": list(store.all_of("fav_dest").values())})
 
-        if m := re.fullmatch(rf"/api/trips/({ID})/(\w[\w-]*)", p):
+        if m := re.fullmatch(rf"/api/trips/({ID})/(\w[\w-]*(?:/apply)?)", p):
             return self._trip_post(m.group(1), m.group(2), body)
         if m := re.fullmatch(rf"/api/actions/({ID})", p):
             status = body.get("status")
@@ -395,6 +398,69 @@ class Handler(BaseHTTPRequestHandler):
             op = SetConfirmed(target=body.get("target"), item_id=str(body.get("item_id") or ""),
                               confirmed=bool(body.get("confirmed")), reference=_text(body.get("reference"), 60) or None)
             out = service.change(trip_id, [op], "Als gebucht markiert" if op.confirmed else "Buchung zurückgesetzt")
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "import":
+            img = str(body.get("image") or "")
+            text = _text(body.get("text"), 20000) if body.get("text") else ""
+            if not img and len(text) < 20:
+                raise BadRequest("Bitte ein Foto der Bestätigung wählen oder den Mailtext einfügen.")
+            if img and str(body.get("media_type") or "image/jpeg") not in vision.MEDIA:
+                raise BadRequest("Bitte ein Foto (JPEG, PNG oder WebP) wählen.")
+            ext = bookings.extract(img or None, str(body.get("media_type") or "image/jpeg"), text, trip_id)
+            if not ext.items:
+                return self._send(200, {"preview": {"lines": [], "warnings": ["Keine Buchung erkannt."],
+                                                    "problems": [], "can_apply": False, "summary": ext.summary}})
+            return self._send(200, {"preview": bookings.preview(it, ext, service.local_now(it))})
+        if action == "import/apply":
+            data, ops = bookings.pending(str(body.get("token") or ""))
+            if data["trip_id"] != trip_id:
+                raise KeyError(trip_id)
+            res = sm.apply(ChangeSet(itinerary_id=trip_id, base_version=data["version"], operations=ops,
+                                     reason=f"Buchung importiert: {data['summary'][:120]}", actor="nutzer",
+                                     acknowledged_locked=data.get("ack", [])),
+                           store.household().constraints.model_copy(update={"budget_total_max": None}),
+                           service.local_now(it))
+            store.delete("import", str(body.get("token")))
+            ok = res.status.value == "angewendet"
+            err = "" if ok else ("Der Plan wurde inzwischen geändert – bitte nochmals importieren."
+                                 if res.status.value == "konflikt" else "; ".join(p.message for p in res.problems))
+            return self._send(200, {"ok": ok, "error": err, **trip_detail(trip_id)})
+        if action == "prices":
+            target, item_id = body.get("target"), str(body.get("item_id") or "")
+            try:
+                if target == "verbindung":
+                    seg = next(t for t in it.transports if t.id == item_id)
+                    res = prices.flights(seg, store.household().constraints.max_stops, trip_id)
+                elif target == "unterkunft":
+                    stay = next(x for x in it.stays if x.id == item_id)
+                    night = match(store.household()).budget_per_night
+                    res = prices.hotels(stay, float(night) if night else None, trip_id)
+                else:
+                    raise BadRequest("Unbekanntes Ziel.")
+            except StopIteration:
+                raise KeyError(item_id)
+            except prices.PriceError as e:
+                return self._send(502, {"error": str(e)})
+            res["token"] = prices.remember(target, trip_id, item_id, res)
+            res["month"] = prices.month_usage()
+            return self._send(200, res)
+        if action == "prices/apply":
+            data, opt = prices.picked(str(body.get("token") or ""), _int(body.get("index"), 0, 50, "Angebot"))
+            if data["trip_id"] != trip_id:
+                raise KeyError(trip_id)
+            if data["kind"] == "verbindung":
+                op = UpdateTransport(segment_id=data["item_id"], depart=datetime.fromisoformat(opt["depart"]),
+                                     arrive=datetime.fromisoformat(opt["arrive"]), carrier=opt["carrier"] or None,
+                                     number=opt["number"] or None, via=opt["via"], cost=round(opt["price"], 2),
+                                     search_url=data.get("url"), note=f"Preis laut Google Flights am {date.today():%d.%m.%Y}")
+                reason = f"Flug aus echten Preisen übernommen ({opt['carrier']}, CHF {opt['price']:.0f})"
+            else:
+                total = opt["total"] or 0
+                op = UpdateStay(stay_id=data["item_id"], name=opt["name"], cost=round(total, 2),
+                                search_url=opt.get("link"),
+                                note=f"CHF {opt['night']:.0f}/Nacht laut Google Hotels am {date.today():%d.%m.%Y}")
+                reason = f"Unterkunft aus echten Preisen übernommen ({opt['name']})"
+            out = service.change(trip_id, [op], reason)
             return self._send(200, {"outcome": out, **trip_detail(trip_id)})
         if action == "favorite":
             if store.get("fav", trip_id):

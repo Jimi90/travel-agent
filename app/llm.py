@@ -28,7 +28,7 @@ T = TypeVar("T", bound=BaseModel)
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5"}
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
 WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
-HEAVY = {"reiseplan", "zielvorschlaege", "bild_uebersetzen"}
+HEAVY = {"reiseplan", "zielvorschlaege", "bild_uebersetzen", "buchung_lesen"}
 LABEL = {"claude": "Claude", "gemini": "Gemini", "groq": "Groq"}
 
 

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from ..models import (
     AddActivity, AddStay, Activity, DayPlan, ExtendStay, Itinerary, MoveActivity, RemoveActivity, ReplaceActivity,
-    SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule,
+    SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule, UpdateStay, UpdateTransport, AddTransport,
 )
 from ..models.itinerary import Booking
 from ..models.changes import PlanOperation
@@ -99,6 +99,39 @@ def _apply_one(itin: Itinerary, op: PlanOperation) -> None:
             item.booking = Booking(provider="eigene Buchung", reference=op.reference[:60])
         elif not op.confirmed:
             item.booking = None
+    elif isinstance(op, UpdateStay):
+        stay = next((x for x in itin.stays if x.id == op.stay_id), None)
+        if stay is None:
+            raise PlanOperationError("Unterkunft nicht gefunden")
+        for f in ("name", "check_in", "check_out", "cost", "search_url", "note"):
+            v = getattr(op, f)
+            if v is not None:
+                setattr(stay, f, v)
+        if stay.check_out <= stay.check_in:
+            raise PlanOperationError(f"«{stay.name}»: Abreise muss nach der Anreise liegen")
+        if op.confirmed is not None:
+            stay.confirmed = op.confirmed
+            stay.booking = Booking(provider=(op.provider or stay.name)[:80], reference=op.reference) \
+                if op.confirmed else None
+    elif isinstance(op, UpdateTransport):
+        t = next((x for x in itin.transports if x.id == op.segment_id), None)
+        if t is None:
+            raise PlanOperationError("Verbindung nicht gefunden")
+        for f in ("depart", "arrive", "carrier", "number", "via", "origin_code", "destination_code", "cost",
+                  "search_url", "note"):
+            v = getattr(op, f)
+            if v is not None:
+                setattr(t, f, v)
+        if t.arrive <= t.depart:
+            raise PlanOperationError("Ankunft muss nach der Abfahrt liegen")
+        if op.confirmed is not None:
+            t.estimated = not op.confirmed
+            t.booking = Booking(provider=(t.carrier or "Buchung")[:80], reference=op.reference) \
+                if op.confirmed else None
+    elif isinstance(op, AddTransport):
+        if any(x.id == op.segment.id for x in itin.transports):
+            raise PlanOperationError("Verbindung gibt es schon")
+        itin.transports.append(op.segment)
     else:  # pragma: no cover
         raise PlanOperationError(f"unbekannte Operation {op!r}")
 

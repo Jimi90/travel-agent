@@ -145,6 +145,8 @@ class TransportSegment(Model):
     cost: Money = Decimal("0")
     booking: Booking | None = None
     via: list[str] = []  # Zwischenstopps
+    origin_code: str | None = Field(default=None, max_length=4)  # IATA-Code bei Flügen (für die Preisprüfung)
+    destination_code: str | None = Field(default=None, max_length=4)
     estimated: bool = True  # Zeiten/Preis geschätzt, nicht gebucht
     search_url: str | None = None
     note: str | None = None
