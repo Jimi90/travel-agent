@@ -39,9 +39,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - `disruption_ext.py` ExtendedDisruptionHandler: Fähre/Flug X Tage aus → `ShiftSchedule` (Tage, Unterkünfte,
   Verbindungen, Reiseende +X, Lücke = Tage am Ort), Unterkunft verlängern (oder neue vormerken), Lücke mit Programm
   füllen, Aufträge für Hotel/Umbuchung/spätere Buchungen. Budget wird dort nur gemeldet, nicht gesperrt.
-- `app/weather.py` Open-Meteo (Prognose 16 Tage stündlich, Archiv, Ortssuche), gratis. `app/llm.py` Claude über
-  `client.beta.messages.parse` (output_format = Pydantic), `fallbacks="default"` bei Opus/Sonnet 5.5, Websuche optional,
-  Kostenbremse `DAILY_BUDGET_USD`, Kosten je Aufruf in `costs`. Modell in den Einstellungen (Standard `claude-opus-5-5`).
+- `app/weather.py` Open-Meteo (Prognose 16 Tage stündlich, Archiv, Ortssuche), gratis.
+- `app/llm.py` (seit 1.2.0) drei Anbieter, `route(purpose)`: grosse Aufgaben (`HEAVY`: reiseplan, zielvorschlaege,
+  bild_uebersetzen) Gemini → Groq → Claude, kleine Groq → Gemini → Claude; Einstellung `prefer` = gratis|claude.
+  Bilder nur an Anbieter mit `vision` (Groq nicht). Gemini/Groq über OpenAI-kompatible Schnittstelle (`config.FREE_PROVIDERS`,
+  wie Hörwerk; eigener `User-Agent` wegen Cloudflare/Groq – nicht entfernen), `response_format: json_object` + Schema im
+  Systemtext, Antwort per Pydantic geprüft, einmal Korrektur mit Fehlerhinweis; unbekannte Felder (response_format,
+  reasoning_effort) werden bei 400 weggelassen. Limit/Fehler → nächster Anbieter (`_Skip`), Meldung nennt jeden Grund.
+  Claude über `client.beta.messages.parse`, `fallbacks="default"` bei Opus/Sonnet 5.5, Websuche nur Claude, Kostenbremse
+  nur für Claude. Schlüssel: `store.key(provider)`, `data/keys.json` (chmod 600) vor `.env`; `key_info()` nur letzte 4 Zeichen.
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -54,13 +60,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (19 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (28 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.1.0)
+## Stand (03.11.2026, Version 1.2.0)
+- 1.2.0: Gemini + Groq gratis mit Aufgabenteilung und gegenseitiger Reserve; Profil → KI. Mit nachgebildetem Server
+  getestet (`tests/test_llm.py`), echte Gemini-/Groq-Antworten (Planqualität, JSON-Treue, Limits) nur auf dem NAS prüfbar.
 - 1.1.0: Profil aufgeräumt (iPhone-Stil), Länderauswahl mit Suche. Mit Playwright bei 390 px hell/dunkel geprüft.
 - Vollständige App: Profile + Matching, Zielvorschläge mit Klima, Reiseplan mit Hotels/Verbindungen/Schlechtwetter-
   Programm, Favoriten, Morgen-Wettercheck mit Umplanung, Ausfall mehrtägig, «fällt aus», festnageln, als gebucht

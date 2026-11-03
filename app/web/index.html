@@ -611,7 +611,7 @@ $("dGo").onclick = async () => {
   const b = $("dGo"); b.disabled = true; msg($("dMsg"), `<span class="spin"></span>Schreibe Entwurf …`);
   try {
     const r = (await api("/api/draft", {kind: $("dKind").value, recipient: $("dTo").value, language: $("dLang").value, details: $("dDetails").value})).draft;
-    msg($("dMsg"), r.source === "vorlage" ? "Vorlage ohne KI (kein Claude-Schlüssel hinterlegt)." : "");
+    msg($("dMsg"), r.source === "vorlage" ? "Vorlage ohne KI (kein KI-Schlüssel hinterlegt – Profil → KI)." : "");
     $("draftOut").innerHTML = `<div class="card pad" style="margin-top:12px"><div class="s">${esc(r.language)}</div>
       <div class="pre">${esc(r.subject)}\n\n${esc(r.message)}</div>
       ${r.message_de && r.message_de !== r.message ? `<div class="s" style="margin-top:10px">Deutsche Fassung</div><div class="pre">${esc(r.message_de)}</div>` : ""}
@@ -669,6 +669,12 @@ async function loadProfile() {
   renderProfileMain();
 }
 
+function aiSummary() {
+  const k = INFO.keys, names = [k.gemini.set && "Gemini", k.groq.set && "Groq", k.anthropic.set && "Claude"].filter(Boolean);
+  if (INFO.fake) return "Testmodus";
+  return names.length ? names.join(" + ") : "Kein Schlüssel";
+}
+
 function personSummary(p) {
   const fav = Object.entries(p.activities).filter(([, v]) => v >= 2).map(([c]) => CATS[c]);
   return (fav.length ? "Liebt " + fav.slice(0, 3).join(", ") : "Vorlieben eintragen") + ` · ${p.climate.temp_min_c}–${p.climate.temp_max_c} °C`;
@@ -694,7 +700,7 @@ function renderProfileMain() {
     rNav("Schnittmenge", `${both} gemeinsam${veto ? ` · ${veto} nie` : ""}`, 'data-sub="match"') +
     rNav("Besuchte Länder", vc ? `${vc}` : "Keine", 'data-sub="laender"');
   $("pSettings").innerHTML =
-    rNav("KI", INFO.key.set ? (MODEL_TXT[s.model] || [s.model])[0] : "Kein Schlüssel", 'data-sub="ki"', INFO.key.set ? "" : "warn") +
+    rNav("KI", aiSummary(), 'data-sub="ki"', INFO.ai ? "" : "warn") +
     rNav("Wettercheck", s.auto_check ? `täglich ${s.check_time}` : "Aus", 'data-sub="wetter"') +
     rIn("Heimatflughafen", "sAir", s.home_airport, 'maxlength="3" autocapitalize="characters" style="max-width:70px"') +
     rNav("Kosten", `${usd(INFO.spent_30d)} · 30 Tage`, 'data-sub="kosten"');
@@ -875,16 +881,39 @@ const PAGES = {
   },
   ki: () => ({
     title: "KI",
-    html: () => { const s = INFO.settings, k = INFO.key; return `
-      <div class="card"><label class="row"><div class="grow t">Claude-Schlüssel</div>
-        <input class="inl" type="password" id="sKey" placeholder="${k.set ? "••••" + esc(k.hint) : "sk-ant-…"}" autocomplete="off"></label></div>
-      <p class="hint">${k.set ? `Hinterlegt${k.source === "env" ? " (aus einstellungen.env)" : ""}. Zum Ändern neuen Schlüssel eingeben.` : "Ohne Schlüssel kann Kompass nicht planen und übersetzen; Nachrichten gibt es dann nur als Vorlage."} Schlüssel gibt es auf platform.claude.com → API Keys.</p>
-      <button class="btn plain" id="sKeySave" style="margin-top:8px">Schlüssel sichern</button>
-      <h2>Modell</h2><div class="card">${INFO.models.map(m => rCheck((MODEL_TXT[m] || [m])[0], (MODEL_TXT[m] || ["", ""])[1], s.model === m, `data-model="${m}"`)).join("")}</div>
-      <h2>Sorgfalt</h2><div class="card">${Object.entries(EFFORT_TXT).map(([v, [l, d]]) => rCheck(l, d, s.effort === v, `data-eff="${v}"`)).join("")}</div>
-      <div class="card" style="margin-top:24px">${rSw("Websuche beim Planen", "sWeb", s.web_search, "Aktuelle Tipps, Trends, Öffnungszeiten · ca. 1 Rp. pro Suche")}</div>`; },
+    html: () => { const s = INFO.settings, k = INFO.keys;
+      const keyRow = (prov, label, ph) => `<label class="row"><div class="grow t">${label}</div>
+        <input class="inl" type="password" id="k_${prov}" placeholder="${k[prov].set ? "••••" + esc(k[prov].hint) : ph}" autocomplete="off"></label>`;
+      const status = prov => k[prov].set ? `hinterlegt${k[prov].source === "env" ? " (einstellungen.env)" : ""}` : "fehlt";
+      return `
+      <h2>Gratis</h2>
+      <div class="card">${keyRow("gemini", "Gemini", "Schlüssel einfügen")}${keyRow("groq", "Groq", "gsk_…")}</div>
+      <p class="hint">Gemini: ${status("gemini")} · Groq: ${status("groq")}.<br>
+        <b>Gemini</b> (aistudio.google.com → «Get API key») übernimmt Reisepläne, Zielvorschläge und Fotos.
+        <b>Groq</b> (console.groq.com → «API Keys») übernimmt kleine Aufgaben wie Nachrichten – sehr schnell.
+        Fällt einer aus, springt der andere ein. Google darf Inhalte aus dem Gratis-Kontingent zur Verbesserung nutzen.</p>
+      <h2>Claude (kostenpflichtig)</h2>
+      <div class="card">${keyRow("anthropic", "Claude", "sk-ant-…")}</div>
+      <p class="hint">Claude: ${status("anthropic")}. Optional – beste Qualität, kostet ein paar Rappen pro Aufgabe (platform.claude.com → API Keys). Websuche gibt es nur mit Claude.</p>
+      <button class="btn plain" id="kSave" style="margin-top:8px">Schlüssel sichern</button>
+      <h2>Wer zuerst?</h2>
+      <div class="card">${rCheck("Gratis zuerst", "Gemini/Groq; Claude nur als Reserve", s.prefer !== "claude", 'data-prefer="gratis"')}
+        ${rCheck("Claude zuerst", "Beste Qualität; Gemini/Groq als Reserve", s.prefer === "claude", 'data-prefer="claude"')}</div>
+      <h2>Claude-Modell</h2><div class="card">${INFO.models.map(m => rCheck((MODEL_TXT[m] || [m])[0], (MODEL_TXT[m] || ["", ""])[1], s.model === m, `data-model="${m}"`)).join("")}</div>
+      <h2>Claude-Sorgfalt</h2><div class="card">${Object.entries(EFFORT_TXT).map(([v, [l, d]]) => rCheck(l, d, s.effort === v, `data-eff="${v}"`)).join("")}</div>
+      <div class="card" style="margin-top:24px">${rSw("Websuche beim Planen (Claude)", "sWeb", s.web_search, "Aktuelle Tipps, Trends, Öffnungszeiten · ca. 1 Rp. pro Suche")}</div>`; },
     bind: () => {
-      $("sKeySave").onclick = async () => { try { INFO = await api("/api/keys", {anthropic: $("sKey").value}); toast("Schlüssel gesichert"); rerender(); } catch (e) { toast(e.message); } };
+      $("kSave").onclick = async () => {
+        let n = 0;
+        try {
+          for (const prov of ["gemini", "groq", "anthropic"]) {
+            const v = $("k_" + prov).value.trim();
+            if (v) { INFO = await api("/api/keys", {provider: prov, key: v}); n++; }
+          }
+          toast(n ? "Schlüssel gesichert" : "Kein neuer Schlüssel eingegeben"); rerender();
+        } catch (e) { toast(e.message); }
+      };
+      $("subIn").querySelectorAll("[data-prefer]").forEach(r => r.onclick = () => saveSettings({prefer: r.dataset.prefer}));
       $("subIn").querySelectorAll("[data-model]").forEach(r => r.onclick = () => saveSettings({model: r.dataset.model}));
       $("subIn").querySelectorAll("[data-eff]").forEach(r => r.onclick = () => saveSettings({effort: r.dataset.eff}));
       $("sWeb").onchange = e => saveSettings({web_search: e.target.checked});
@@ -905,7 +934,7 @@ const PAGES = {
     html: () => `<div class="card"><div class="row"><div class="grow t">Letzte 24 Stunden</div><span class="val">${esc(usd(INFO.spent_24h))}</span></div>
       <div class="row"><div class="grow t">Letzte 30 Tage</div><span class="val">${esc(usd(INFO.spent_30d))}</span></div>
       <div class="row"><div class="grow t">Kostenbremse</div><span class="val">${esc(usd(INFO.budget_usd))} / 24 Std.</span></div></div>
-      <p class="hint">Jede KI-Aktion (Planen, Übersetzen, Entwurf) kostet ein paar Rappen. Wetter und Matching sind gratis.</p>`,
+      <p class="hint">Mit Gemini und Groq ist alles gratis. Nur Claude kostet ein paar Rappen pro Aufgabe. Wetter und Matching sind immer gratis.</p>`,
     bind: () => {},
   }),
 };

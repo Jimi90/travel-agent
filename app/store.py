@@ -89,7 +89,8 @@ def save_household(h: Household) -> None:
 # --- Einstellungen und Schlüssel --------------------------------------------------------------
 
 DEFAULT_SETTINGS = {"model": config.MODEL, "effort": config.EFFORT, "check_time": config.CHECK_TIME,
-                    "auto_check": True, "web_search": False, "home_airport": config.HOME_AIRPORT}
+                    "auto_check": True, "web_search": False, "home_airport": config.HOME_AIRPORT,
+                    "prefer": "gratis"}  # gratis = Gemini/Groq zuerst, Claude nur als Reserve
 
 
 def settings() -> dict:
@@ -107,27 +108,54 @@ def _keys_path():
     return config.DATA_DIR / "keys.json"
 
 
-def anthropic_key() -> str:
+KEY_PROVIDERS = ("anthropic", "gemini", "groq")
+
+
+def _env_key(provider: str) -> str:
+    if provider == "anthropic":
+        return config.ANTHROPIC_API_KEY
+    return config.FREE_PROVIDERS[provider]["key"]
+
+
+def _app_keys() -> dict:
     try:
-        k = json.loads(_keys_path().read_text()).get("anthropic", "")
+        return json.loads(_keys_path().read_text())
     except (OSError, ValueError):
-        k = ""
-    return k or config.ANTHROPIC_API_KEY
+        return {}
 
 
-def save_anthropic_key(key: str) -> None:
+def key(provider: str) -> str:
+    """Schlüssel eines Anbieters: in der App hinterlegt gilt vor einstellungen.env."""
+    return _app_keys().get(provider, "") or _env_key(provider)
+
+
+def anthropic_key() -> str:
+    return key("anthropic")
+
+
+def save_key(provider: str, value: str) -> None:
+    if provider not in KEY_PROVIDERS:
+        raise ValueError(provider)
+    data = _app_keys()
+    data[provider] = value.strip()
     p = _keys_path()
-    p.write_text(json.dumps({"anthropic": key.strip()}))
+    p.write_text(json.dumps(data))
     os.chmod(p, 0o600)
 
 
+def save_anthropic_key(value: str) -> None:
+    save_key("anthropic", value)
+
+
 def key_info() -> dict:
-    k = anthropic_key()
-    try:
-        from_app = bool(json.loads(_keys_path().read_text()).get("anthropic"))
-    except (OSError, ValueError):
-        from_app = False
-    return {"set": bool(k), "hint": k[-4:] if k else "", "source": "app" if from_app else ("env" if k else "")}
+    """Nur die letzten 4 Zeichen – den Schlüssel selbst nie ausliefern."""
+    app = _app_keys()
+    out = {}
+    for prov in KEY_PROVIDERS:
+        k = key(prov)
+        out[prov] = {"set": bool(k), "hint": k[-4:] if k else "",
+                     "source": "app" if app.get(prov) else ("env" if k else "")}
+    return out
 
 
 # --- Kosten ---------------------------------------------------------------------------------
