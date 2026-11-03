@@ -30,6 +30,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Klima = Überschneidung, strengere Regentoleranz, tiefere Budgetgrenze). `prompt_text()` = was die KI bekommt.
 - `destinations.py` Zielvorschläge: KI schlägt vor, Code filtert hart (besuchte Länder, Flugzeit, Umstiege) und bewertet
   das Klima mit echten Messwerten derselben Tage im Vorjahr (Open-Meteo-Archiv).
+- `variants.py` (1.5.0) Routen-Varianten: Ziel → KI liefert 3 Routen (Orte + Nächte, Stichpunkte, Wassertemperatur,
+  Kosten Flüge/Unterkünfte/Programm/Transfers) → Code gleicht Nächte ab, ergänzt echtes Wetter (Archiv, grösster Ort),
+  Distanz (Haversine), Foto. Gemerkt in kv «variants»; `POST /api/trips {variant_set, index}` plant genau diese Route
+  (`generator.generate(route=…)`, Abweichung → Notiz). Ablauf in der App: Ziel (oder Zielvorschlag «Routen ansehen»)
+  → Varianten → Plan → Hotel je Ort wählen (3 Preisklassen `guenstig|mittel|gehoben` in `HotelSuggestion.tags`,
+  `choose-hotel` nimmt Index in `hotel_options`, exakter Ortsname vor ungefährem) → «Finaler Vorschlag» mit Kosten.
+- `app/tiles.py` (1.5.0) OpenStreetMap-Kacheln über `/api/tile/z/x/y` (eigener Absender, max. 2 gleichzeitig, 30 Tage
+  Cache in `data/tiles/`, Nutzungsrichtlinie OSM), Karte im Browser: Kacheln + SVG-Route (`mapHtml`/`drawMaps`),
+  «© OpenStreetMap» auf jeder Karte. tile.openstreetmap.org aus der Cloud nicht prüfbar.
 - `generator.py` Reiseplan: KI liefert `PlanDraft` (strukturierte Ausgabe), `build()` macht daraus einen geprüften Plan:
   Randbedingungen hart (zu anstrengend / ausgeschlossene Merkmale fliegen raus, mit Notiz), Überschneidungen weg,
   Unterkünfte aus Orten+Nächten, Booking.com-/Google-Flights-Suchlinks. Hotels/Flüge sind Vorschläge/Schätzungen.
@@ -83,13 +92,16 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (38 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (38 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.4.2)
+## Stand (03.11.2026, Version 1.5.0)
+- 1.5.0: Wunsch James: 2–3 Routen-Varianten mit Stichpunkten/Kosten/Karte, dann Plan mit Routenkarte, Hotelwahl aus
+  3 Vorschlägen je Ort, «Finaler Vorschlag». Im Testmodus (Platzhalter-Kacheln) bei 390 px hell/dunkel geprüft; echte
+  Karten und Qualität der Varianten nur auf dem NAS. Dabei behoben: Hotels von «Lissabon Insel» erschienen bei «Lissabon».
 - 1.4.2: «Neue Reise» neu (James: «Ziel (optional)» war verwirrend): Auswahl «Ziele vorschlagen / Ich weiss das Ziel»
   (`NEW_MODE`, gemerkt), Ziel-Zeile nur im zweiten Modus und dort Pflicht, Dauer mit −/+ (2–30). Globale Regel
   `[hidden]{display:none!important}` (vorher überstimmte `.row{display:flex}` das Ausblenden). Mit Playwright 390 px hell/dunkel geprüft.

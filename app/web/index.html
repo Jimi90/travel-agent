@@ -128,6 +128,20 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 .stepper button:disabled{opacity:.35}
 textarea.bare{background:none;border:0;border-radius:0;padding:12px 16px;min-height:84px}
 textarea.bare:focus{border:0}
+.map{position:relative;overflow:hidden;height:190px;background:var(--card2);border-radius:12px}
+.map img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}
+.map svg{position:absolute;inset:0;width:100%;height:100%}
+.map .osm{position:absolute;right:4px;bottom:3px;font-size:10px;color:#333;background:rgba(255,255,255,.75);padding:1px 4px;border-radius:4px}
+.var{padding:14px 16px}
+.var+.var{border-top:1px solid var(--line)}
+.var ul{margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.5}
+.costs{display:grid;grid-template-columns:1fr auto;gap:2px 12px;font-size:14px;margin-top:10px;color:var(--muted)}
+.costs b{color:var(--text)}
+.opt{display:flex;gap:12px;align-items:flex-start;padding:10px 16px 10px 32px;cursor:pointer}
+.opt .dotsel{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:none;margin-top:1px}
+.opt.on .dotsel{border:7px solid var(--accent)}
+.opt:active{background:var(--card2)}
+.final .row{min-height:40px}
 #asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
 #asheet.open{display:flex}
 #asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
@@ -355,6 +369,37 @@ function watchJob(id, label, onDone) {
 }
 function clearJob() { try { localStorage.removeItem("job"); } catch {} }
 
+// ---------- Karte (OpenStreetMap-Kacheln über den eigenen Server) ----------
+function mapHtml(points) {
+  const pts = (points || []).filter(p => p.lat != null && p.lon != null)
+    .filter((p, i, a) => i === 0 || p.name !== a[i - 1].name);
+  return pts.length ? `<div class="map" data-pts='${esc(JSON.stringify(pts))}'></div>` : "";
+}
+function drawMaps(root) {
+  (root || document).querySelectorAll(".map[data-pts]").forEach(el => {
+    const pts = JSON.parse(el.dataset.pts), W = el.clientWidth || 358, H = el.clientHeight || 190;
+    const X = (lon, z) => (lon + 180) / 360 * 256 * 2 ** z;
+    const Y = (lat, z) => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 256 * 2 ** z; };
+    let z = 12;
+    for (; z > 2; z--) {
+      const xs = pts.map(p => X(p.lon, z)), ys = pts.map(p => Y(p.lat, z));
+      if (Math.max(...xs) - Math.min(...xs) <= W - 70 && Math.max(...ys) - Math.min(...ys) <= H - 60) break;
+    }
+    if (pts.length === 1) z = Math.min(z, 10);
+    const xs = pts.map(p => X(p.lon, z)), ys = pts.map(p => Y(p.lat, z));
+    const left = (Math.min(...xs) + Math.max(...xs)) / 2 - W / 2, top = (Math.min(...ys) + Math.max(...ys)) / 2 - H / 2;
+    const n = 2 ** z; let html = "";
+    for (let tx = Math.floor(left / 256); tx <= Math.floor((left + W) / 256); tx++)
+      for (let ty = Math.max(0, Math.floor(top / 256)); ty <= Math.min(n - 1, Math.floor((top + H) / 256)); ty++)
+        html += `<img src="/api/tile/${z}/${((tx % n) + n) % n}/${ty}" style="left:${tx * 256 - left}px;top:${ty * 256 - top}px" alt="" loading="lazy">`;
+    const P = pts.map(p => [X(p.lon, z) - left, Y(p.lat, z) - top]);
+    html += `<svg viewBox="0 0 ${W} ${H}"><polyline points="${P.map(q => q.join(",")).join(" ")}" fill="none" stroke="#14877a" stroke-width="3" stroke-dasharray="6 5" stroke-linecap="round"/>` +
+      P.map((q, i) => `<circle cx="${q[0]}" cy="${q[1]}" r="11" fill="#14877a" stroke="#fff" stroke-width="2"/><text x="${q[0]}" y="${q[1] + 4}" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${i + 1}</text>`).join("") +
+      `</svg><span class="osm">© OpenStreetMap</span>`;
+    el.innerHTML = html; el.removeAttribute("data-pts");
+  });
+}
+
 // ---------- Reisen ----------
 async function loadTrips() {
   const [t, ideas] = await Promise.all([api("/api/trips"), api("/api/ideas")]);
@@ -410,10 +455,50 @@ $("nGo").onclick = async () => {
   if (NEW_MODE === "ziel") {
     const dest = $("nDest").value.trim();
     if (!dest) { msg($("nMsg"), "Bitte das Ziel eingeben.", "err"); $("nDest").focus(); return; }
-    return startPlan(dest);
+    return startVariants(dest);
   }
   suggest();
 };
+
+// Routen-Varianten (2–3) für ein Ziel – erst danach entsteht der ganze Plan
+async function startVariants(dest) {
+  const b = $("nGo"); b.disabled = true;
+  msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen und prüft das Wetter …`);
+  $("ideas").innerHTML = "";
+  try {
+    const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value});
+    const poll = async () => {
+      const j = await api("/api/jobs/" + r.job);
+      if (j.status === "laeuft") return setTimeout(poll, 2000);
+      b.disabled = false;
+      if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
+      msg($("nMsg"), ""); renderVariants(j.result);
+    };
+    poll();
+  } catch (e) { b.disabled = false; msg($("nMsg"), esc(e.message), "err"); }
+}
+
+function renderVariants(res) {
+  $("ideas").innerHTML = `<h2>Routen für ${esc(res.destination)}</h2><div class="card">` + res.variants.map((v, i) => `
+    <div class="var">${mapHtml(v.route)}
+      <div class="t" style="margin-top:10px"><b>${esc(v.name)}</b>${v.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div>
+      <div class="s">${esc(v.route.map(st => `${st.name} (${st.nights} N.)`).join(" → "))}</div>
+      <div class="s" style="margin-top:4px">${esc(v.summary)}</div>
+      <ul>${v.bullets.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
+      <div class="costs">${Object.entries(v.costs).map(([k, c]) => k === "Total" ? `<b>Total ca.</b><b>${esc(chf(c))}</b>` : `<span>${esc(k)}</span><span>${esc(chf(c))}</span>`).join("")}</div>
+      <button class="btn" data-var="${i}" style="margin-top:12px">Diese Route planen</button>
+    </div>`).join("") + `</div><p class="hint">Wetter = echte Messwerte derselben Tage im Vorjahr. Kosten sind Schätzungen für euch beide.</p>`;
+  drawMaps($("ideas"));
+  $("ideas").scrollIntoView({behavior: "smooth", block: "start"});
+  $("ideas").querySelectorAll("[data-var]").forEach(btn => btn.onclick = async () => {
+    const v = res.variants[+btn.dataset.var];
+    try {
+      const r = await api("/api/trips", {variant_set: res.id, index: +btn.dataset.var});
+      closeSheet("newSheet"); show("v-trips");
+      watchJob(r.job, `Kompass plant «${v.name}» …`, out => { loadTrips(); openTrip(out.trip_id); });
+    } catch (e) { toast(e.message); }
+  });
+}
 async function startPlan(dest) {
   try {
     const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value});
@@ -448,11 +533,12 @@ function renderIdeas(res) {
       <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
       <div class="s">Flug ca. ${esc(i.typical_flight_hours)} Std.${i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt"} · ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
       ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
-      <div class="btns"><button class="small" data-go="${n}">Diese Reise planen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
+      <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
       </div></div>`).join("") + `</div>` +
     (res.dropped.length ? `<p class="hint">Aussortiert: ${esc(res.dropped.join(" · "))}</p>` : "") +
     `<p class="hint">Klima = echte Messwerte derselben Tage im Vorjahr. Kosten und Flugzeiten sind Schätzungen der KI.</p>`;
-  $("ideas").querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const i = res.ideas[+b.dataset.go]; startPlan(`${i.name}, ${i.country}`); });
+  $("ideas").querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+    const i = res.ideas[+b.dataset.go]; setNewMode("ziel"); $("nDest").value = `${i.name}, ${i.country}`; startVariants($("nDest").value); });
   $("ideas").querySelectorAll("[data-fav]").forEach(b => b.onclick = async () => {
     const i = res.ideas[+b.dataset.fav]; await api("/api/fav-destination", {idea: i}); b.textContent = "★ Gemerkt"; b.disabled = true;
   });
@@ -495,6 +581,20 @@ function renderTrip(outcome) {
       }).join("") : `<div class="empty">Freier Tag</div>`);
   }).join("");
 
+  const route = []; t.days.forEach(day => { const last = route[route.length - 1];
+    if (last && last.name === day.base.name) last.nights++; else route.push({name: day.base.name, lat: day.base.lat, lon: day.base.lon, nights: 1}); });
+  route.forEach((r, i) => { if (i === route.length - 1) r.nights = Math.max(0, r.nights - 1); });
+  const routeHtml = `<h2>Route</h2><div class="card">${mapHtml(route) ? `<div style="padding:12px 12px 4px">${mapHtml(route)}</div>` : ""}
+    ${route.map((r, i) => `<div class="row"><span class="badge acc" style="margin:0">${i + 1}</span><div class="grow t">${esc(r.name)}</div><span class="val">${r.nights ? r.nights + (r.nights === 1 ? " Nacht" : " Nächte") : "Abreise"}</span></div>`).join("")}</div>`;
+  const hotelChoice = s => {
+    const opts = (d.hotel_options || {})[s.id] || [];
+    if (s.confirmed || opts.length < 2) return "";
+    const TIER = {guenstig: "günstig", mittel: "mittel", gehoben: "gehoben"};
+    return `<div class="s" style="padding:0 16px 4px 32px">Hotel wählen:</div>` + opts.map((o, i) => `<div class="opt ${o.chosen ? "on" : ""}" data-hotel="${esc(s.id)}:${i}">
+      <span class="dotsel"></span><div class="grow"><div class="t" style="font-size:15px">${esc(o.name)}${o.tier ? `<span class="badge">${esc(TIER[o.tier] || o.tier)}</span>` : ""}</div>
+      <div class="s">ca. CHF ${Math.round(o.night)}/Nacht · CHF ${Math.round(o.total).toLocaleString("de-CH")} total${o.area ? " · " + esc(o.area) : ""}</div>
+      ${o.why ? `<div class="s">${esc(o.why)}</div>` : ""}</div></div>`).join("");
+  };
   const stays = t.stays.map(s => `<div class="row">${photo(P.stays[s.id], "thumb")}<div class="grow">
       <div class="t">${esc(s.name)}${s.confirmed ? `<span class="badge ok">gebucht</span>` : `<span class="badge warn">Vorschlag</span>`}</div>
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))} · ${esc(chf(s.cost))}${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div>
@@ -502,7 +602,16 @@ function renderTrip(outcome) {
       <div class="btns">${s.search_url ? `<a class="small" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Bei Booking.com suchen</a>` : ""}
         ${!s.confirmed && INFO.prices.available ? `<button class="small" data-price="unterkunft:${esc(s.id)}">Echte Preise</button>` : ""}
         <button class="small" data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div>
-      </div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
+      </div></div>${hotelChoice(s)}`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
+  const C = d.costs || {}, total = Object.values(C).reduce((a, b) => a + b, 0);
+  const finalHtml = `<h2>Finaler Vorschlag</h2><div class="card final">
+    <div class="row"><div class="grow"><div class="t">Route</div><div class="s">${esc(route.map(r => r.name).join(" → "))}</div></div></div>
+    ${t.stays.map(s => `<div class="row"><div class="grow"><div class="t" style="font-size:15px">${esc(s.name)}</div><div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))}</div></div><span class="val">${s.confirmed ? "gebucht" : "Vorschlag"}</span></div>`).join("")}
+    ${t.transports.map(x => `<div class="row"><div class="grow"><div class="t" style="font-size:15px">${esc(MODE[x.mode] || x.mode)} ${esc(x.origin.name)} → ${esc(x.destination.name)}</div><div class="s">${esc(fmtD(x.depart))}, ${esc(x.depart.slice(11, 16))}</div></div><span class="val">${x.estimated ? "Vorschlag" : "gebucht"}</span></div>`).join("")}
+    <div class="pad"><div class="costs" style="margin:0">${Object.entries(C).map(([k, v]) => `<span>${esc(k)}</span><span>${esc(chf(v))}</span>`).join("")}
+      <b>Total ca.</b><b>${esc(chf(total))}</b>${d.budget ? `<span>Budget</span><span class="${total > d.budget ? "warnt" : ""}">${esc(chf(d.budget))}</span>` : ""}</div></div></div>
+    <p class="hint">So geht's weiter: 1. Hotels über «Bei Booking.com suchen» buchen · 2. Flüge über «Flüge suchen» buchen ·
+      3. Bestätigungen mit «Buchung importieren» eintragen · 4. Status oben auf «Gebucht» stellen – ab dann passt Kompass den Plan unterwegs selbst an.</p>`;
 
   const trans = t.transports.map(x => `<div class="row"><div class="grow">
       <div class="t">${esc(MODE[x.mode] || x.mode)} ${esc(x.origin.name)} → ${esc(x.destination.name)}${x.estimated ? `<span class="badge warn">Schätzung</span>` : `<span class="badge ok">gebucht</span>`}</div>
@@ -539,6 +648,7 @@ function renderTrip(outcome) {
     ${d.notes.length ? `<div class="card pad" style="margin-top:12px"><div class="s warnt">${d.notes.map(esc).join("<br>")}</div></div>` : ""}
     ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
+    ${routeHtml}
     <h2>Tagesplan</h2><div class="card">${days}</div>
     <p class="hint">Programmpunkt antippen: festnageln (die Automatik lässt ihn dann in Ruhe) oder «fällt aus» melden.</p>
     <h2>Unterkünfte</h2><div class="card">${stays}</div>
@@ -546,6 +656,7 @@ function renderTrip(outcome) {
     <p class="hint">Fällt eine Fähre oder ein Flug aus, verlängert Kompass die Unterkunft und schiebt alle Folgetage nach hinten – in einem Schritt, rückgängig machbar.</p>
     ${hotels ? `<div class="card" style="margin-top:12px"><details><summary>Weitere Hotels (${t.hotel_suggestions.length})</summary>${hotels}</details></div>` : ""}
     ${alts ? `<div class="card" style="margin-top:12px"><details><summary>Schlechtwetter-Programm (${t.alternatives.length})</summary>${alts}</details></div>` : ""}
+    ${finalHtml}
     <h2>Verlauf</h2><div class="card">${hist}</div>
     <p class="hint">KI-Kosten dieser Reise: ${esc(usd(d.ai_cost))}</p>
     <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button>`;
@@ -578,6 +689,12 @@ function renderTrip(outcome) {
     reTrip(await api(`/api/trips/${tid}/confirm`, {target, item_id: id, confirmed: on === "1", reference}));
   });
   $("tImport").onclick = () => openImport(tid);
+  drawMaps($("tripIn"));
+  q("[data-hotel]").forEach(o => o.onclick = async () => {
+    const [stay_id, i] = o.dataset.hotel.split(":");
+    const r = await api(`/api/trips/${tid}/choose-hotel`, {stay_id, index: +i});
+    reTrip(r); toast(r.outcome.status === "angewendet" ? "Hotel gewählt" : (r.outcome.problems[0] || "Nicht möglich"));
+  });
   q("[data-price]").forEach(b => b.onclick = () => { const [target, id] = b.dataset.price.split(":"); openPrices(tid, target, id); });
   q("[data-cancel]").forEach(b => b.onclick = () => {
     const seg = t.transports.find(x => x.id === b.dataset.cancel);

@@ -108,6 +108,47 @@ class AppTest(unittest.TestCase):
         self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))
         self.assertEqual(self.call("POST", "/api/destinations", {"start": "2020-01-01", "days": 6})[0], 400)
 
+        # --- Routen-Varianten → Plan aus Variante → Hotel wählen → Kostenaufstellung
+        code, r = self.call("POST", "/api/variants", {"destination": "Lissabon", "start": start.isoformat(),
+                                                      "days": 6, "wishes": ""})
+        j = self.wait_job(r["job"])
+        self.assertEqual(j["status"], "fertig", j)
+        vs = j["result"]
+        self.assertEqual(len(vs["variants"]), 3)
+        v1 = vs["variants"][1]
+        self.assertTrue(v1["bullets"][0].startswith("Wetter Lissabon"))      # echte Klimadaten (Testmodus)
+        self.assertTrue(any("Wasser" in b for b in v1["bullets"]))
+        self.assertEqual(sum(st["nights"] for st in v1["route"]), 5)
+        self.assertEqual(v1["costs"]["Total"], sum(c for k, c in v1["costs"].items() if k != "Total"))
+        code, r = self.call("POST", "/api/trips", {"variant_set": vs["id"], "index": 1})
+        j = self.wait_job(r["job"])
+        self.assertEqual(j["status"], "fertig", j)
+        vt = j["result"]["trip_id"]
+        code, d = self.call("GET", f"/api/trips/{vt}")
+        bases = list(dict.fromkeys(day["base"]["name"] for day in d["trip"]["days"]))
+        self.assertEqual(bases, [st["name"] for st in v1["route"]])
+        self.assertTrue(d["trip"]["summary"].startswith("Stadt & Insel"))
+        s0 = d["trip"]["stays"][0]
+        opts = d["hotel_options"][s0["id"]]
+        self.assertEqual([o["tier"] for o in opts], ["mittel", "guenstig", "gehoben"])
+        self.assertTrue(opts[0]["chosen"])
+        code, d = self.call("POST", f"/api/trips/{vt}/choose-hotel", {"stay_id": s0["id"], "index": 1})
+        self.assertEqual(d["outcome"]["status"], "angewendet", d["outcome"])
+        nights = (date.fromisoformat(s0["check_out"]) - date.fromisoformat(s0["check_in"])).days
+        self.assertEqual((d["trip"]["stays"][0]["name"], float(d["trip"]["stays"][0]["cost"])), ("Casa Lissabon", 95.0 * nights))
+        self.assertTrue(d["hotel_options"][s0["id"]][1]["chosen"])
+        self.assertEqual(set(d["costs"]), {"Flüge & Verbindungen", "Unterkünfte", "Programm"})
+        self.assertEqual(self.call("POST", f"/api/trips/{vt}/choose-hotel", {"stay_id": s0["id"], "index": 9})[0], 400)
+        self.assertEqual(self.call("POST", "/api/trips", {"variant_set": "gibtsnicht", "index": 0})[0], 404)
+        self.assertEqual(self.call("DELETE", f"/api/trips/{vt}")[0], 200)
+
+        # --- Kartenkacheln (Testmodus: Platzhalter), ungültige Kachel → 404
+        req = urllib.request.Request(f"{self.base}/api/tile/3/4/2", headers={"Cookie": AppTest.cookie})
+        with urllib.request.urlopen(req) as rr:
+            self.assertEqual(rr.headers["Content-Type"], "image/svg+xml")
+        self.assertEqual(self.call("GET", "/api/tile/3/9/2")[0], 404)
+        self.assertEqual(self.call("GET", "/api/tile/3/4/2", auth=False)[0], 401)
+
         # --- Reiseplan erstellen (heute beginnend, 6 Tage, mit Fähre an Tag 3)
         code, r = self.call("POST", "/api/trips", {"destination": "Lissabon", "start": date.today().isoformat(),
                                                    "days": 6, "wishes": ""})
