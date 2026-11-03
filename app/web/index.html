@@ -16,6 +16,8 @@
 @media (prefers-color-scheme: light){:root{color-scheme:light;--bg:#f2f4f3;--card:#fff;--card2:#e8eceb;--line:#e1e6e5;
   --text:#14201e;--muted:#6b7877;--accent:#14877a;--onaccent:#fff;--warn:#b26b00;--err:#c43c3c;--ok:#1d8a4c;--new:rgba(20,135,122,.08)}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.row[hidden]+.row::before{display:none}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
 body{min-height:calc(100dvh + 1px)}
 main,.sheet>.in{max-width:600px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 96px)}
@@ -120,6 +122,12 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 .thumb{width:54px;height:54px;border-radius:10px;object-fit:cover;flex:none;background:var(--card2)}
 .thumb.s{width:44px;height:44px;border-radius:9px}
 .idea-img{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--card2)}
+.stepper{display:flex;align-items:center;gap:12px;flex:none}
+.stepper span{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
+.stepper button{width:34px;height:34px;border-radius:50%;border:0;background:var(--card2);color:var(--accent);font:inherit;font-size:21px;font-weight:600;line-height:1;cursor:pointer;padding:0}
+.stepper button:disabled{opacity:.35}
+textarea.bare{background:none;border:0;border-radius:0;padding:12px 16px;min-height:84px}
+textarea.bare:focus{border:0}
 #asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
 #asheet.open{display:flex}
 #asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
@@ -215,17 +223,21 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 <div class="sheet" id="newSheet"><div class="in">
   <div class="topbar"><button class="back" data-close="newSheet">‹ Reisen</button></div>
   <h1>Neue Reise</h1>
-  <p class="sub">Ziel eingeben oder passende Ziele für euch beide vorschlagen lassen.</p>
-  <div class="card">
-    <div class="two">
-      <label class="f"><span>Abreise</span><input type="date" id="nStart"></label>
-      <label class="f"><span>Tage</span><input type="number" id="nDays" min="2" max="30" value="7" inputmode="numeric"></label>
-    </div>
-    <label class="f"><span>Ziel (optional)</span><input id="nDest" maxlength="200" placeholder="z. B. Madeira, Japan, «irgendwo am Meer»"></label>
-    <label class="f"><span>Wünsche</span><textarea id="nWish" maxlength="800" placeholder="z. B. ruhig, gutes Essen, kein Mietauto"></textarea></label>
+  <div class="seg" id="nMode" style="margin-top:14px">
+    <button data-mode="vorschlag" class="on">Ziele vorschlagen</button><button data-mode="ziel">Ich weiss das Ziel</button>
   </div>
-  <button class="btn" id="nPlan">Plan erstellen</button>
-  <button class="btn plain" id="nSuggest">Ziele vorschlagen lassen</button>
+  <p class="hint" id="nModeHint"></p>
+  <div class="card" style="margin-top:14px">
+    <label class="row" id="nDestRow" hidden><div class="grow t">Ziel</div>
+      <input class="inl" id="nDest" maxlength="200" placeholder="z. B. Madeira" autocomplete="off"></label>
+    <label class="row"><div class="grow t">Abreise</div><input class="inl" type="date" id="nStart" style="max-width:170px"></label>
+    <div class="row"><div class="grow t">Dauer</div>
+      <div class="stepper"><button type="button" id="nMinus" aria-label="Ein Tag weniger">−</button>
+        <span id="nDaysTxt">7 Tage</span><button type="button" id="nPlus" aria-label="Ein Tag mehr">+</button></div></div>
+  </div>
+  <h2>Wünsche <span class="r">optional</span></h2>
+  <div class="card"><textarea id="nWish" class="bare" maxlength="800"></textarea></div>
+  <button class="btn" id="nGo">Ziele vorschlagen</button>
   <div class="msg" id="nMsg"></div>
   <div id="ideas"></div>
 </div></div>
@@ -309,6 +321,7 @@ function show(view) {
   document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
   try { localStorage.setItem("view", view); } catch {}
   window.scrollTo(0, 0);
+  if (view !== "v-profile") loadInfo().catch(() => {});  // Zähler «neue Meldungen» aktuell halten
   if (view === "v-trips") loadTrips();
   if (view === "v-today") loadToday();
   if (view === "v-profile") loadProfile();
@@ -354,45 +367,77 @@ async function loadTrips() {
   $("favDestWrap").hidden = !ideas.saved.length;
   $("favDest").innerHTML = ideas.saved.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.name)}</div>
       <div class="s">${esc(i.why || "")}</div></div><button class="small" data-plan="${esc(i.name)}">Planen</button></div>`).join("");
-  $("favDest").querySelectorAll("[data-plan]").forEach(b => b.onclick = () => { openNew(); $("nDest").value = b.dataset.plan; });
+  $("favDest").querySelectorAll("[data-plan]").forEach(b => b.onclick = () => openNew(b.dataset.plan));
 }
 
-function openNew() {
+// Neue Reise: zwei Wege – Ziele vorschlagen lassen oder ein bekanntes Ziel planen
+let NEW_MODE = "vorschlag", NEW_DAYS = 7;
+const NEW_TXT = {
+  vorschlag: {hint: "Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima zur Reisezeit.",
+    wish: "z. B. Meer, warm, gutes Essen, nicht zu weit", go: "Ziele vorschlagen"},
+  ziel: {hint: "Kompass plant Tage, Unterkünfte, Verbindungen und ein Schlechtwetter-Programm.",
+    wish: "z. B. ruhig, kein Mietauto, ein Tag Spa", go: "Plan erstellen"},
+};
+function setNewMode(m) {
+  NEW_MODE = m;
+  try { localStorage.setItem("newMode", m); } catch {}
+  $("nMode").querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.mode === m));
+  $("nModeHint").textContent = NEW_TXT[m].hint;
+  $("nWish").placeholder = NEW_TXT[m].wish;
+  $("nGo").textContent = NEW_TXT[m].go;
+  $("nDestRow").hidden = m !== "ziel";
+  msg($("nMsg"), "");
+}
+function setDays(n) { NEW_DAYS = Math.min(30, Math.max(2, n)); $("nDaysTxt").textContent = `${NEW_DAYS} Tage`;
+  $("nMinus").disabled = NEW_DAYS <= 2; $("nPlus").disabled = NEW_DAYS >= 30; }
+$("nMode").querySelectorAll("button").forEach(b => b.onclick = () => { setNewMode(b.dataset.mode); if (b.dataset.mode === "ziel") $("nDest").focus(); });
+$("nMinus").onclick = () => setDays(NEW_DAYS - 1);
+$("nDest").oninput = () => msg($("nMsg"), "");
+$("nPlus").onclick = () => setDays(NEW_DAYS + 1);
+
+function openNew(dest) {
   const d = new Date(); d.setDate(d.getDate() + 30);
   if (!$("nStart").value) $("nStart").value = d.toISOString().slice(0, 10);
-  msg($("nMsg"), "");
+  let m = "vorschlag"; try { m = localStorage.getItem("newMode") || m; } catch {}
+  if (dest) { m = "ziel"; $("nDest").value = dest; }
+  setNewMode(m); setDays(NEW_DAYS);
   openSheet("newSheet");
 }
-$("newTrip").onclick = openNew;
+$("newTrip").onclick = () => openNew();
 
-$("nPlan").onclick = async () => {
-  const dest = $("nDest").value.trim();
-  if (!dest) { msg($("nMsg"), "Bitte ein Ziel eingeben – oder «Ziele vorschlagen lassen».", "err"); return; }
-  await startPlan(dest);
+$("nGo").onclick = async () => {
+  if (!$("nStart").value) { msg($("nMsg"), "Bitte das Abreisedatum wählen.", "err"); return; }
+  if (NEW_MODE === "ziel") {
+    const dest = $("nDest").value.trim();
+    if (!dest) { msg($("nMsg"), "Bitte das Ziel eingeben.", "err"); $("nDest").focus(); return; }
+    return startPlan(dest);
+  }
+  suggest();
 };
 async function startPlan(dest) {
   try {
-    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: +$("nDays").value, wishes: $("nWish").value});
+    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value});
     closeSheet("newSheet"); show("v-trips");
     watchJob(r.job, `Kompass plant «${dest}» …`, res => { loadTrips(); openTrip(res.trip_id); });
   } catch (e) { msg($("nMsg"), esc(e.message), "err"); }
 }
 
-$("nSuggest").onclick = async () => {
-  const b = $("nSuggest"); b.disabled = true;
+async function suggest() {
+  const b = $("nGo"); b.disabled = true;
   msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima …`);
   try {
-    const r = await api("/api/destinations", {start: $("nStart").value, days: +$("nDays").value, wish: $("nDest").value + " " + $("nWish").value});
+    const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
       if (j.status === "laeuft") return setTimeout(poll, 2000);
       b.disabled = false;
       if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
       msg($("nMsg"), ""); renderIdeas(j.result);
+      $("ideas").scrollIntoView({behavior: "smooth", block: "start"});
     };
     poll();
   } catch (e) { b.disabled = false; msg($("nMsg"), esc(e.message), "err"); }
-};
+}
 
 function renderIdeas(res) {
   const saved = new Set();
