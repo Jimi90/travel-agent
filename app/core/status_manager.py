@@ -67,6 +67,10 @@ class StatusManager:
             self._db.execute("PRAGMA synchronous = FULL")
         self._db.executescript(SCHEMA)
 
+    def close(self) -> None:
+        with self._lock:
+            self._db.close()
+
     # --- Lesen --------------------------------------------------------------------------------
 
     def get(self, itinerary_id: str) -> Itinerary:

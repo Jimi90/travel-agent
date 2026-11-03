@@ -4,7 +4,7 @@
 
 | Teil | Wahl | Warum |
 |---|---|---|
-| Backend | **Python 3.12 + FastAPI + Pydantic v2** | Gleiche Sprache wie Hörwerk, Pydantic prüft jede Eingabe streng, FastAPI braucht wenig RAM (NAS: 8 GB, nur CPU). |
+| Backend | **Python 3.12 + Pydantic v2**, Webserver aus der Standardbibliothek wie Hörwerk | Pydantic prüft jede Eingabe streng. Statt FastAPI (ursprünglicher Vorschlag) übernimmt der Server die erprobte Anmeldung/Sicherheit von Hörwerk 1:1 – weniger Risiko, weniger RAM. |
 | Datenbank | **SQLite** (Datei in `data/`) | Echte ACID-Transaktionen ohne eigenen Datenbank-Server; eine Datei = einfache Sicherung. |
 | Oberfläche | **Vanilla-JS als PWA** (wie Hörwerk, kein Build-Schritt) | Für zwei Personen reicht das. React/Next.js bräuchte Node, einen Build und mehr RAM, ohne Nutzen. |
 | Zeitpläne | Scheduler-Thread in der App (wie Hörwerk) | Morgen-Wettercheck, Outbox abarbeiten. Kein Cron, kein zweiter Container. |
@@ -44,13 +44,14 @@ travel-agent/
 │   ├── features/
 │   │   ├── vision.py            Speisekarten/Schilder übersetzen
 │   │   └── drafting.py          Nachrichten-Entwürfe für Buchungen/Nachfragen
-│   ├── server.py                FastAPI-Routen, Anmeldung, Sicherheits-Header
+│   ├── **server.py**            Routen, Anmeldung (`auth.py` aus Hörwerk), Sicherheits-Header
+│   ├── **demo.py**              Demo-Reise Lissabon zum Ausprobieren
 │   ├── scheduler.py             Morgen-Wettercheck, Outbox
-│   └── web/                     index.html, sw.js, Symbole (PWA)
+│   └── **web/**                 index.html, login.html, Symbole (PWA)
 ├── **tests/**
 ├── **docs/**
-├── Dockerfile, docker-compose.yaml, tailscale-serve.json
-└── .github/workflows/bauen.yml
+├── **Dockerfile, docker-compose.yaml, tailscale-serve.json**
+└── **.github/workflows/bauen.yml**   Tests bei jedem Push, Image nur auf main
 ```
 
 ## Datenfluss bei Schlechtwetter

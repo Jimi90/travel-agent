@@ -52,7 +52,7 @@ class ReplanOutcome(Model):
         """Kurzer Text für die Push-Meldung am Morgen."""
         lines = [f"{d.date:%d.%m.} «{d.title}»: {d.detail}" for d in self.decisions if d.action != "unveraendert"]
         lines += self.needs_user
-        return "\n".join(lines) or "Wetter passt – nichts geändert."
+        return "\n".join(lines) or "Nichts betroffen – das Geplante passt zu diesem Wetter."
 
 
 def find_free_slot(day: DayPlan, duration: int, preferred: time, cfg: MiddlewareConfig) -> tuple[time, time] | None:
@@ -97,10 +97,10 @@ class AutonomousRePlanningModule:
                 return ReplanOutcome(event_id=event.id, status=ChangeStatus.NOOP, decisions=decisions,
                                      needs_user=needs_user, attempts=attempt)
             changed = sum(d.action != "unveraendert" for d in decisions)
+            span = f"{event.date_from:%d.%m.}" + (f"–{event.date_to:%d.%m.}" if event.date_to != event.date_from else "")
             cs = ChangeSet(
                 itinerary_id=itin.id, base_version=itin.version, operations=ops,
-                reason=f"Schlechtwetter in {event.place.name} ({event.date_from:%d.%m.}–{event.date_to:%d.%m.}):"
-                       f" {changed} Aktivität(en) angepasst",
+                reason=f"Schlechtwetter in {event.place.name} ({span}): {changed} Aktivität(en) angepasst",
                 event_id=event.id, actor="autonom", external_actions=actions,
             )
             res = self.status.apply(cs, self.household.constraints, now)

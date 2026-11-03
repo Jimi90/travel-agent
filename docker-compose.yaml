@@ -1,0 +1,38 @@
+name: reise
+
+# Der Reise-Assistent ist NUR über Tailscale Funnel erreichbar: https://reise.<dein-tailnet>.ts.net
+# Am NAS wird kein Port geöffnet. Der kleine Tailscale-Container nimmt die verschlüsselten
+# Anfragen entgegen und reicht sie an die App weiter. Die App verlangt immer ein Passwort.
+
+services:
+  reise:
+    image: ghcr.io/jimi90/travel-agent:latest   # wird von GitHub gebaut und automatisch aktualisiert
+    container_name: reise
+    restart: unless-stopped
+    env_file: einstellungen.env
+    environment:
+      TZ: Europe/Zurich
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"   # der Updater darf diese App aktualisieren
+    volumes:
+      - ./data:/data         # Reisepläne (reise.db), Anmelde-Geheimnis
+
+  tailscale:
+    image: tailscale/tailscale:stable
+    container_name: reise-tailscale
+    restart: unless-stopped
+    env_file: tailscale.env          # nur der Tailscale-Schlüssel
+    environment:
+      # Name im Tailnet → https://reise.<dein-tailnet>.ts.net
+      # (bewusst nicht «hostname:», sonst zeigt «reise» im Container auf sich selbst statt auf die App)
+      TS_HOSTNAME: reise
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/tailscale-serve.json
+      TS_USERSPACE: "true"
+      TS_AUTH_ONCE: "true"
+      TZ: Europe/Zurich
+    volumes:
+      - ./tailscale:/var/lib/tailscale                          # Anmeldung bei Tailscale bleibt erhalten
+      - ./tailscale-serve.json:/config/tailscale-serve.json:ro  # Funnel-Einstellung
+    depends_on:
+      - reise
