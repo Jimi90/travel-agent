@@ -142,6 +142,18 @@ textarea.bare:focus{border:0}
 .opt.on .dotsel{border:7px solid var(--accent)}
 .opt:active{background:var(--card2)}
 .final .row{min-height:40px}
+.strip{display:flex;gap:8px;overflow-x:auto;padding:2px 16px 12px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.strip figure{margin:0;flex:none;width:150px;scroll-snap-align:start}
+.strip img{width:150px;height:105px;border-radius:10px;object-fit:cover;display:block;background:var(--card2);cursor:zoom-in}
+.strip figcaption{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hstrip{display:flex;gap:6px;overflow-x:auto;margin:8px 0 4px;scrollbar-width:none}
+.hstrip::-webkit-scrollbar{display:none}
+.hstrip img{width:96px;height:72px;border-radius:8px;object-fit:cover;flex:none;background:var(--card2);cursor:zoom-in}
+.live{font-size:14px;color:var(--accent);margin-top:2px}
+#lightbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 16px) 12px calc(env(safe-area-inset-bottom) + 16px)}
+#lightbox img{max-width:100%;max-height:80vh;border-radius:10px;object-fit:contain}
+#lightbox .cap{color:#ddd;font-size:14px;margin-top:12px;text-align:center}
 #asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
 #asheet.open{display:flex}
 #asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
@@ -265,6 +277,7 @@ textarea.bare:focus{border:0}
 <!-- Aktionsblatt -->
 <div id="asheet"><div class="box"><div class="grp" id="aGrp"></div><div class="grp"><button class="bold" id="aCancel">Abbrechen</button></div></div></div>
 <div id="toast"></div>
+<div id="lightbox" hidden><img alt=""><div class="cap"></div></div>
 
 <nav id="tabbar">
   <button data-view="v-trips" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Reisen</button>
@@ -292,7 +305,16 @@ const fmtLong = iso => fmtD(iso, {weekday: "long", day: "numeric", month: "long"
 const hm = t => (t || "").slice(0, 5);
 const chf = v => Number(v) ? `CHF ${Math.round(Number(v)).toLocaleString("de-CH")}` : "gratis";
 const usd = v => `${Number(v || 0).toFixed(2)} USD`;
-const photo = (id, cls = "thumb", alt = "") => id ? `<img class="${cls}" src="/api/photo/${esc(id)}" alt="${esc(alt)}" loading="lazy" decoding="async">` : "";
+const photo = (id, cls = "thumb", alt = "") => id ? `<img class="${cls}" src="/api/photo/${esc(id)}" alt="${esc(alt)}" data-zoom="1" loading="lazy" decoding="async">` : "";
+// Foto antippen → gross anzeigen (vor allen anderen Klicks, damit z. B. kein Hotel gewählt wird)
+document.addEventListener("click", e => {
+  const img = e.target.closest && e.target.closest("img[data-zoom]");
+  if (!img || img.classList.contains("hero") || img.classList.contains("band")) return;
+  e.preventDefault(); e.stopPropagation();
+  const lb = $("lightbox"); lb.querySelector("img").src = img.src; lb.querySelector(".cap").textContent = img.alt || "";
+  lb.hidden = false;
+}, true);
+$("lightbox").onclick = () => { $("lightbox").hidden = true; };
 const actKey = t => t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 2600); }
 function msg(el, text, kind = "") { el.className = "msg " + kind; el.innerHTML = text; }
@@ -570,14 +592,17 @@ function renderTrip(outcome) {
     const isToday = day.date === d.today;
     const band = day.base.name !== lastBase && P.places[day.base.name] ? photo(P.places[day.base.name], "band", day.base.name) : "";
     lastBase = day.base.name;
-    return band + `<div class="dayh ${isToday ? "today" : ""}"><span>${esc(fmtLong(day.date))}${isToday ? " · heute" : ""}</span><span class="s">${esc(day.base.name)}</span></div>` +
+    const seen = new Set(), pics = day.activities.map(a => [P.activities[actKey(a.title)], a.title])
+      .filter(([id]) => id && !seen.has(id) && seen.add(id));
+    const strip = pics.length ? `<div class="strip">${pics.map(([id, title]) => `<figure>${photo(id, "", title)}<figcaption>${esc(title)}</figcaption></figure>`).join("")}</div>` : "";
+    return band + `<div class="dayh ${isToday ? "today" : ""}"><span>${esc(fmtLong(day.date))}${isToday ? " · heute" : ""}</span><span class="s">${esc(day.base.name)}</span></div>` + strip +
       (day.activities.length ? day.activities.map(a => {
         const isNew = a.origin === "umplanung";
         const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
         return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
           <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
           <div class="s">${esc(CATS[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(INT[a.intensity])} · ${esc(chf(a.cost))}</div>
-          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div>${photo(P.activities[actKey(a.title)], "thumb", a.title)}</div>`;
+          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
       }).join("") : `<div class="empty">Freier Tag</div>`);
   }).join("");
 
@@ -590,9 +615,16 @@ function renderTrip(outcome) {
     const opts = (d.hotel_options || {})[s.id] || [];
     if (s.confirmed || opts.length < 2) return "";
     const TIER = {guenstig: "günstig", mittel: "mittel", gehoben: "gehoben"};
-    return `<div class="s" style="padding:0 16px 4px 32px">Hotel wählen:</div>` + opts.map((o, i) => `<div class="opt ${o.chosen ? "on" : ""}" data-hotel="${esc(s.id)}:${i}">
+    const anyLive = opts.some(o => o.live);
+    const head = `<div class="s" style="padding:0 16px 4px 32px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+      <span>Hotel wählen${anyLive ? ` · Preise vom ${esc(opts.find(o => o.live).live.ts.slice(8, 10))}.${esc(opts.find(o => o.live).live.ts.slice(5, 7))}.` : ""}</span>
+      ${INFO.prices.available ? `<button class="small" data-hprices="${esc(s.id)}">${anyLive ? "Preise aktualisieren" : "Echte Preise laden"}</button>` : ""}</div>
+      ${INFO.prices.available ? "" : `<div class="s" style="padding:0 16px 6px 32px">Echte Preise und mehr Fotos: SerpApi-Schlüssel unter Profil → KI.</div>`}`;
+    return head + opts.map((o, i) => `<div class="opt ${o.chosen ? "on" : ""}" data-hotel="${esc(s.id)}:${i}">
       <span class="dotsel"></span><div class="grow"><div class="t" style="font-size:15px">${esc(o.name)}${o.tier ? `<span class="badge">${esc(TIER[o.tier] || o.tier)}</span>` : ""}</div>
-      <div class="s">ca. CHF ${Math.round(o.night)}/Nacht · CHF ${Math.round(o.total).toLocaleString("de-CH")} total${o.area ? " · " + esc(o.area) : ""}</div>
+      ${o.photos && o.photos.length ? `<div class="hstrip">${o.photos.map(id => photo(id, "", o.name)).join("")}</div>` : ""}
+      ${o.live ? `<div class="live">Google Hotels: CHF ${Math.round(o.live.night)}/Nacht · CHF ${Math.round(o.live.total || o.live.night * (o.total / o.night)).toLocaleString("de-CH")} für eure Nächte${o.live.rating ? ` · ★ ${o.live.rating}${o.live.reviews ? ` (${o.live.reviews})` : ""}` : ""}</div>` : ""}
+      <div class="s">${o.live ? "Schätzung: " : "ca. "}CHF ${Math.round(o.night)}/Nacht · CHF ${Math.round(o.total).toLocaleString("de-CH")} total${o.area ? " · " + esc(o.area) : ""}</div>
       ${o.why ? `<div class="s">${esc(o.why)}</div>` : ""}</div></div>`).join("");
   };
   const stays = t.stays.map(s => `<div class="row">${photo(P.stays[s.id], "thumb")}<div class="grow">
@@ -600,7 +632,7 @@ function renderTrip(outcome) {
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))} · ${esc(chf(s.cost))}${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div>
       ${s.note ? `<div class="s">${esc(s.note)}</div>` : ""}
       <div class="btns">${s.search_url ? `<a class="small" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Bei Booking.com suchen</a>` : ""}
-        ${!s.confirmed && INFO.prices.available ? `<button class="small" data-price="unterkunft:${esc(s.id)}">Echte Preise</button>` : ""}
+        ${!s.confirmed && INFO.prices.available ? `<button class="small" data-price="unterkunft:${esc(s.id)}">Andere Hotels suchen</button>` : ""}
         <button class="small" data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div>
       </div></div>${hotelChoice(s)}`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
   const C = d.costs || {}, total = Object.values(C).reduce((a, b) => a + b, 0);
@@ -690,6 +722,11 @@ function renderTrip(outcome) {
   });
   $("tImport").onclick = () => openImport(tid);
   drawMaps($("tripIn"));
+  q("[data-hprices]").forEach(b => b.onclick = async e => {
+    e.stopPropagation(); b.disabled = true; b.innerHTML = `<span class="spin"></span>Lade …`;
+    try { reTrip(await api(`/api/trips/${tid}/hotel-prices`, {stay_id: b.dataset.hprices})); toast("Preise aktualisiert"); }
+    catch (err) { toast(err.message); b.disabled = false; b.textContent = "Preise aktualisieren"; }
+  });
   q("[data-hotel]").forEach(o => o.onclick = async () => {
     const [stay_id, i] = o.dataset.hotel.split(":");
     const r = await api(`/api/trips/${tid}/choose-hotel`, {stay_id, index: +i});

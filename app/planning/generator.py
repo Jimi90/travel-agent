@@ -38,6 +38,7 @@ class DraftActivity(BaseModel):
     cost_chf: float  # für beide zusammen
     tags: list[str]
     note: str
+    wikipedia: str  # Titel des passenden Wikipedia-Artikels (Ort, Sehenswürdigkeit, Gericht), sonst ""
 
 
 class DraftDay(BaseModel):
@@ -111,6 +112,8 @@ Regeln:
 - An- und Abreisetage leichter planen. Wechsel zwischen Orten als Transport mit Abfahrt/Dauer angeben.
 - exposure ehrlich: outdoor = wetterabhängig, indoor = wetterfest, gemischt = teils.
 - intensity: 1 leicht, 2 mittel, 3 anstrengend. Kosten in CHF für beide zusammen (Schätzung).
+- wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels, der zeigt, was man an diesem Programmpunkt sieht
+  (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast» oder bei Streetfood «Vietnamesische Küche»; sonst "".
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
@@ -225,7 +228,7 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
             tags = {t.strip().lower() for t in a.tags if t.strip()}
             act = Activity(title=a.title[:160], category=ActivityCategory(a.category), exposure=Exposure(a.exposure),
                            intensity=_int(a.intensity), start=s, end=e, place=base, cost=_money(a.cost_chf),
-                           tags=tags, note=(a.note or None))
+                           tags=tags, note=(a.note or None), wiki=(a.wikipedia or "").strip()[:200] or None)
             if act.intensity > max_int or act.tags & avoid:
                 notes.append(f"Tag {i + 1}: «{a.title}» entfernt (Randbedingung: "
                              f"{'zu anstrengend' if act.intensity > max_int else ', '.join(sorted(act.tags & avoid))})")
@@ -340,11 +343,12 @@ def fake_draft(destination: str, days: int, home_airport: str, route: list[dict]
     for i in range(1, days + 1):
         b = bases[0].name if (not two or i <= n1) else bases[1].name  # (Testplan: höchstens 2 Orte)
         acts = [DraftActivity(title=f"Küstenwanderung {i}", category="wandern", exposure="outdoor", intensity=2,
-                              start="09:00", end="12:00", cost_chf=0, tags=[], note=""),
+                              start="09:00", end="12:00", cost_chf=0, tags=[], note="", wikipedia=""),
                 DraftActivity(title=f"Altstadt-Museum {i}", category="museum", exposure="indoor", intensity=1,
-                              start="14:00", end="16:00", cost_chf=30, tags=[], note=""),
+                              start="14:00", end="16:00", cost_chf=30, tags=[], note="", wikipedia=f"Museu {i}"),
                 DraftActivity(title=f"Abendessen {i}", category="kulinarik", exposure="indoor", intensity=1,
-                              start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="")]
+                              start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="",
+                              wikipedia="Portugiesische Küche")]
         if i == 1 or i == days:
             acts = acts[2:]
         if two and i == n1 + 1:  # Fähre am Wechseltag

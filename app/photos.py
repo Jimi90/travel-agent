@@ -24,7 +24,7 @@ from . import config, store
 
 UA = f"Kompass/{config.APP_VERSION} (privater Reiseplaner)"
 WIKIS = ("https://de.wikipedia.org/w/api.php", "https://en.wikipedia.org/w/api.php")
-ALLOWED_HOSTS = (".wikimedia.org", ".googleusercontent.com", ".gstatic.com")
+ALLOWED_HOSTS = (".wikimedia.org", ".googleusercontent.com", ".gstatic.com", ".serpapi.com")
 TYPES = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
 MAX_BYTES = 2_000_000
 # Programmpunkte, zu denen ein Wikipedia-Bild nur Zufall wäre
@@ -60,7 +60,7 @@ def _get_json(url: str, params: dict) -> dict:
 def _allowed(url: str) -> bool:
     u = urllib.parse.urlparse(url or "")
     host = (u.hostname or "").lower()
-    return u.scheme == "https" and any(host.endswith(h) for h in ALLOWED_HOSTS)
+    return u.scheme == "https" and any(host.endswith(h) or host == h[1:] for h in ALLOWED_HOSTS)
 
 
 class _SafeRedirect(urllib.request.HTTPRedirectHandler):
@@ -116,15 +116,16 @@ def get(pid: str) -> tuple[bytes, str, dict] | None:
 
 # --- Wikipedia --------------------------------------------------------------------------------
 
+def parse_wiki_all(data: dict) -> list[dict]:
+    """MediaWiki-Antwort (formatversion=2, prop=pageimages|info) → alle Seiten mit Bild, beste zuerst."""
+    pages = sorted((data.get("query") or {}).get("pages") or [], key=lambda p: p.get("index", 99))
+    return [{"url": p["thumbnail"]["source"], "title": p.get("title", ""), "page": p.get("fullurl", "")}
+            for p in pages if (p.get("thumbnail") or {}).get("source")]
+
+
 def parse_wiki(data: dict) -> dict | None:
-    """MediaWiki-Antwort (formatversion=2, generator=search, prop=pageimages|info) → bestes Bild."""
-    pages = (data.get("query") or {}).get("pages") or []
-    pages = sorted(pages, key=lambda p: p.get("index", 99))
-    for p in pages:
-        th = p.get("thumbnail") or {}
-        if th.get("source"):
-            return {"url": th["source"], "title": p.get("title", ""), "page": p.get("fullurl", "")}
-    return None
+    hits = parse_wiki_all(data)
+    return hits[0] if hits else None
 
 
 def wiki_photo(query: str, must_match: str = "") -> str | None:
@@ -137,22 +138,62 @@ def wiki_photo(query: str, must_match: str = "") -> str | None:
     need = _words(must_match)
     for api in WIKIS:
         if config.FAKE_MODE:
-            hit = {"url": f"https://upload.wikimedia.org/fake/{urllib.parse.quote(query)}.jpg", "title": query,
-                   "page": ""}
+            hits = [{"url": f"https://upload.wikimedia.org/fake/{urllib.parse.quote(query)}.jpg", "title": query,
+                     "page": ""}]
         else:
             try:
                 data = _get_json(api, {"action": "query", "format": "json", "formatversion": 2, "generator": "search",
-                                       "gsrsearch": query, "gsrlimit": 3, "gsrnamespace": 0, "prop": "pageimages|info",
+                                       "gsrsearch": query, "gsrlimit": 6, "gsrnamespace": 0, "prop": "pageimages|info",
                                        "inprop": "url", "piprop": "thumbnail", "pithumbsize": 800, "pilicense": "free"})
             except (urllib.error.URLError, TimeoutError, ValueError):
                 return None  # später nochmals versuchen (nichts merken)
-            hit = parse_wiki(data)
-        if hit and (not need or need & _words(hit["title"])):
+            hits = parse_wiki_all(data)
+        # alle Treffer prüfen, nicht nur den ersten (oft ist das der Artikel über die Stadt)
+        hit = next((h for h in hits if not need or need & _words(h["title"])), None)
+        if hit:
             pid = download(hit["url"], "Wikipedia", hit["title"], hit["page"])
             if pid:
                 break
     store.put("photo_q", key, {"id": pid})
     return pid
+
+
+def wiki_title_photo(title: str) -> str | None:
+    """Foto eines bestimmten Wikipedia-Artikels (Titel von der KI), deutsch zuerst, Weiterleitungen folgen."""
+    key = "title:" + _fold(title).strip()
+    cached = store.get("photo_q", key)
+    if cached is not None:
+        return cached.get("id")
+    pid = None
+    for api in WIKIS:
+        if config.FAKE_MODE:
+            hits = [{"url": f"https://upload.wikimedia.org/fake/t-{urllib.parse.quote(title)}.jpg", "title": title,
+                     "page": ""}]
+        else:
+            try:
+                data = _get_json(api, {"action": "query", "format": "json", "formatversion": 2, "titles": title,
+                                       "redirects": 1, "prop": "pageimages|info", "inprop": "url",
+                                       "piprop": "thumbnail", "pithumbsize": 800, "pilicense": "free"})
+            except (urllib.error.URLError, TimeoutError, ValueError):
+                return None
+            hits = parse_wiki_all(data)
+        if hits:
+            pid = download(hits[0]["url"], "Wikipedia", hits[0]["title"], hits[0]["page"])
+            if pid:
+                break
+    store.put("photo_q", key, {"id": pid})
+    return pid
+
+
+def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
+    """Foto zu einem Programmpunkt: Wikipedia-Titel der KI → Suche «Titel Ort» → Suche «Titel»."""
+    if wiki:
+        pid = wiki_title_photo(wiki)
+        if pid:
+            return pid
+    if GENERIC.match(title.strip()) or not _words(title):
+        return None
+    return wiki_photo(f"{title} {base}", must_match=title) or wiki_photo(title, must_match=title)
 
 
 # --- Fotos einer Reise -------------------------------------------------------------------------
@@ -184,10 +225,7 @@ def fill_trip(itin) -> None:
                     k = activity_key(a.title)
                     if k in m["activities"]:
                         continue
-                    if GENERIC.match(a.title.strip()) or not _words(a.title):
-                        m["activities"][k] = None
-                    else:
-                        m["activities"][k] = wiki_photo(f"{a.title} {b.name}", must_match=a.title)
+                    m["activities"][k] = activity_photo(a.title, a.wiki, b.name)
                     store.put("trip_photos", itin.id, m)
         except Exception as e:  # Fotos sind nett, aber nie wichtig genug für einen Absturz
             print(f"[Fotos] {itin.id}: {type(e).__name__}: {e}", flush=True)
