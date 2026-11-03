@@ -124,7 +124,12 @@ class AppTest(unittest.TestCase):
         j = self.wait_job(r["job"])
         self.assertEqual(j["status"], "fertig", j)
         vt = j["result"]["trip_id"]
-        code, d = self.call("GET", f"/api/trips/{vt}")
+        for _ in range(80):  # Fotos + echte Hotelpreise kommen im Hintergrund
+            code, d = self.call("GET", f"/api/trips/{vt}")
+            if not d["photos_pending"]:
+                break
+            time.sleep(0.05)
+        self.assertFalse(d["photos_pending"])
         bases = list(dict.fromkeys(day["base"]["name"] for day in d["trip"]["days"]))
         self.assertEqual(bases, [st["name"] for st in v1["route"]])
         self.assertTrue(d["trip"]["summary"].startswith("Stadt & Insel"))
@@ -132,10 +137,19 @@ class AppTest(unittest.TestCase):
         opts = d["hotel_options"][s0["id"]]
         self.assertEqual([o["tier"] for o in opts], ["mittel", "guenstig", "gehoben"])
         self.assertTrue(opts[0]["chosen"])
+        self.assertTrue(all(o["live"] and o["live"]["night"] and len(o["photos"]) == 4 for o in opts), opts)
         code, d = self.call("POST", f"/api/trips/{vt}/choose-hotel", {"stay_id": s0["id"], "index": 1})
         self.assertEqual(d["outcome"]["status"], "angewendet", d["outcome"])
         nights = (date.fromisoformat(s0["check_out"]) - date.fromisoformat(s0["check_in"])).days
-        self.assertEqual((d["trip"]["stays"][0]["name"], float(d["trip"]["stays"][0]["cost"])), ("Casa Lissabon", 95.0 * nights))
+        live_night = opts[1]["live"]["night"]
+        self.assertEqual((d["trip"]["stays"][0]["name"], float(d["trip"]["stays"][0]["cost"])),
+                         ("Casa Lissabon", live_night * nights))   # echter Preis statt Schätzung
+        self.assertIn("Google Hotels", d["trip"]["stays"][0]["note"])
+        self.assertEqual(d["photos"]["stays"][s0["id"]], opts[1]["photos"][0])
+        used = self.call("GET", "/api/info")[1]["prices"]["month"]
+        code, d = self.call("POST", f"/api/trips/{vt}/hotel-prices", {"stay_id": s0["id"]})
+        self.assertEqual(code, 200)
+        self.assertEqual(self.call("GET", "/api/info")[1]["prices"]["month"], used + 3)  # je Vorschlag 1 Suche
         self.assertTrue(d["hotel_options"][s0["id"]][1]["chosen"])
         self.assertEqual(set(d["costs"]), {"Flüge & Verbindungen", "Unterkünfte", "Programm"})
         self.assertEqual(self.call("POST", f"/api/trips/{vt}/choose-hotel", {"stay_id": s0["id"], "index": 9})[0], 400)
@@ -173,7 +187,8 @@ class AppTest(unittest.TestCase):
         self.assertFalse(d["photos_pending"])
         self.assertTrue(d["hero"]["id"])
         acts = d["photos"]["activities"]
-        self.assertIsNone(acts["abendessen 1"])            # Allgemeines bekommt kein Zufallsbild
+        self.assertTrue(acts["abendessen 1"])              # Bild über den Wikipedia-Titel der KI («Portugiesische Küche»)
+        self.assertTrue(acts["altstadt-museum 3"])         # Bild über den Wikipedia-Titel «Museu 3»
         self.assertTrue(acts["altstadt-museum 2"])
         req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})
         with urllib.request.urlopen(req) as r:

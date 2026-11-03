@@ -24,6 +24,18 @@ class PhotoTest(unittest.TestCase):
         self.assertIsNone(photos.parse_wiki({"query": {"pages": [{"title": "x", "index": 1}]}}))
         self.assertIsNone(photos.parse_wiki({}))
 
+    def test_generic_activity_without_wiki_title_gets_no_photo(self):
+        self.assertIsNone(photos.activity_photo("Abendessen im Hotel", None, "Lissabon"))
+        self.assertIsNone(photos.activity_photo("Ankunft und Check-in", "", "Lissabon"))
+
+    def test_search_checks_all_hits(self):
+        data = {"query": {"pages": [
+            {"title": "Ho-Chi-Minh-Stadt", "index": 1, "thumbnail": {"source": "https://upload.wikimedia.org/stadt.jpg"}},
+            {"title": "Wiedervereinigungspalast", "index": 2, "thumbnail": {"source": "https://upload.wikimedia.org/p.jpg"}}]}}
+        hits = photos.parse_wiki_all(data)
+        need = photos._words("Wiedervereinigungspalast")
+        self.assertEqual(next(h for h in hits if need & photos._words(h["title"]))["title"], "Wiedervereinigungspalast")
+
     def test_generic_activities_and_word_match(self):
         self.assertTrue(photos.GENERIC.match("Abendessen im Hotel"))
         self.assertFalse(photos.GENERIC.match("Mosteiro dos Jerónimos"))

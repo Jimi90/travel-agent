@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, bookings, config, drafting, llm, photos, prices, service, store, tiles, vision
+from . import auth, bookings, config, drafting, hotels, llm, photos, prices, service, store, tiles, vision
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -69,13 +69,7 @@ def trip_summary(it) -> dict:
             "place": it.days[0].base.name if it.days else "", "favorite": bool(store.get("fav", it.id))}
 
 
-def hotel_options(it, stay) -> list:
-    """Die 2–3 Hotelvorschläge des Plans für den Ort dieser Unterkunft."""
-    name = stay.place.name.casefold()
-    exact = [h for h in it.hotel_suggestions if h.base.casefold() == name]
-    if exact:  # zuerst genau dieser Ort («Lissabon» darf nicht die Hotels von «Lissabon Insel» zeigen)
-        return exact
-    return [h for h in it.hotel_suggestions if h.base.casefold() in name or name in h.base.casefold()]
+hotel_options = hotels.options
 
 
 def trip_detail(trip_id: str) -> dict:
@@ -92,16 +86,25 @@ def trip_detail(trip_id: str) -> dict:
     pending = photos.missing(it)
     if pending:
         photos.fill_trip(it)  # im Hintergrund; die Seite fragt kurz danach nochmals
+    if hotels.missing(it):
+        hotels.enrich(it)  # echte Preise + Fotos der Hotelvorschläge (SerpApi), ebenfalls im Hintergrund
+        pending = True
     tp = photos.trip_photos(it.id)
     hero = next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
     hero_meta = (store.get("photo", hero) or {}) if hero else {}
     hotel_opts = {}
     for st in it.stays:
         nights = (st.check_out - st.check_in).days
-        hotel_opts[st.id] = [{"name": h.name, "area": h.area, "night": float(h.price_per_night),
-                              "total": float(h.price_per_night) * nights, "why": h.why,
-                              "tier": next((t for t in ("guenstig", "mittel", "gehoben") if t in h.tags), ""),
-                              "url": h.search_url, "chosen": h.name == st.name} for h in hotel_options(it, st)]
+        opts = []
+        for h in hotel_options(it, st):
+            live = hotels.cached(h.name, st) or {}
+            opts.append({"name": h.name, "area": h.area, "night": float(h.price_per_night),
+                         "total": float(h.price_per_night) * nights, "why": h.why,
+                         "tier": next((t for t in ("guenstig", "mittel", "gehoben") if t in h.tags), ""),
+                         "url": h.search_url, "chosen": h.name == st.name, "photos": live.get("photos", []),
+                         "live": {k: live.get(k) for k in ("night", "total", "rating", "reviews", "link", "ts")}
+                         if live.get("found") and live.get("night") else None})
+        hotel_opts[st.id] = opts
     costs = {"Flüge & Verbindungen": float(sum(t.cost for t in it.transports)),
              "Unterkünfte": float(sum(s.cost for s in it.stays)),
              "Programm": float(sum(a.cost for d in it.days for a in d.activities))}
@@ -540,10 +543,27 @@ class Handler(BaseHTTPRequestHandler):
                 raise BadRequest("Für diesen Ort gibt es keine Hotelvorschläge.")
             h = opts[idx]
             nights = (stay.check_out - stay.check_in).days
-            op = UpdateStay(stay_id=stay.id, name=h.name, cost=round(h.price_per_night * nights, 2),
-                            search_url=h.search_url, note=h.why or None)
+            live = hotels.cached(h.name, stay) or {}
+            if live.get("found") and live.get("total"):  # echter Preis für genau diese Nächte statt Schätzung
+                cost = round(float(live["total"]), 2)
+                note = f"CHF {live['night']:.0f}/Nacht laut Google Hotels am {live['ts'][8:10]}.{live['ts'][5:7]}."
+            else:
+                cost, note = round(h.price_per_night * nights, 2), h.why or None
+            op = UpdateStay(stay_id=stay.id, name=h.name, cost=cost, search_url=h.search_url, note=note)
+            photos.set_stay_photo(trip_id, stay.id, (live.get("photos") or [None])[0])
             out = service.change(trip_id, [op], f"Hotel gewählt: {h.name}")
             return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "hotel-prices":  # Preise + Fotos einer Unterkunft neu holen (je Vorschlag 1 Suche)
+            stay = next((x for x in it.stays if x.id == str(body.get("stay_id") or "")), None)
+            if stay is None:
+                raise KeyError("stay")
+            if not prices.available():
+                raise BadRequest("Dafür braucht es einen SerpApi-Schlüssel (Profil → KI → Echte Preise).")
+            errs = [r["error"] for r in (hotels.fetch(h.name, stay, trip_id) for h in hotel_options(it, stay))
+                    if r.get("error")]
+            if errs:
+                return self._send(502, {"error": errs[0]})
+            return self._send(200, trip_detail(trip_id))
         if action == "favorite":
             if store.get("fav", trip_id):
                 store.delete("fav", trip_id)

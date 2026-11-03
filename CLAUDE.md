@@ -36,6 +36,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   (`generator.generate(route=…)`, Abweichung → Notiz). Ablauf in der App: Ziel (oder Zielvorschlag «Routen ansehen»)
   → Varianten → Plan → Hotel je Ort wählen (3 Preisklassen `guenstig|mittel|gehoben` in `HotelSuggestion.tags`,
   `choose-hotel` nimmt Index in `hotel_options`, exakter Ortsname vor ungefährem) → «Finaler Vorschlag» mit Kosten.
+- `app/hotels.py` (1.6.0) Hotelvorschläge mit echten Preisen + 3–4 Fotos: je Vorschlag eine SerpApi-Suche «Name Ort»
+  für genau die Nächte, im Hintergrund (`enrich`, max. 15 Suchen pro Lauf) nach dem Planen bzw. wenn etwas fehlt;
+  dauerhaft gemerkt (kv «hotel_live», auch «nicht gefunden»). `same_hotel()`: Treffer nur übernehmen, wenn der Name passt
+  (Ortswörter zählen nicht; bei ≥ 2 bezeichnenden Wörtern müssen 2 übereinstimmen – sonst wäre «Rex Hotel Saigon» =
+  «Liberty … Saigon»). «Hotel wählen» nimmt den echten Preis, sonst die Schätzung; «Preise aktualisieren» = `hotel-prices`.
+  Ohne SerpApi: Foto per Wikipedia, keine Preise. Fotos von `.serpapi.com`/`.googleusercontent.com` erlaubt.
 - `app/tiles.py` (1.5.0) OpenStreetMap-Kacheln über `/api/tile/z/x/y` (eigener Absender, max. 2 gleichzeitig, 30 Tage
   Cache in `data/tiles/`, Nutzungsrichtlinie OSM), Karte im Browser: Kacheln + SVG-Route (`mapHtml`/`drawMaps`),
   «© OpenStreetMap» auf jeder Karte. tile.openstreetmap.org aus der Cloud nicht prüfbar.
@@ -78,6 +84,9 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   (30 Tage zwischenspeichern). CSP bleibt `img-src 'self' data:` – nie lockern. Zuordnung pro Reise in kv «trip_photos»
   (Orte, Programmpunkte nach Titel, Unterkünfte); `fill_trip` im Hintergrund nach dem Planen und wenn etwas fehlt.
   Titelbild mit Quellenangabe (Wikipedia-Lizenzen). Wikipedia aus der Cloud gesperrt: nur mit nachgebildeten Antworten geprüft.
+  Seit 1.6.0: KI nennt pro Programmpunkt `wikipedia` (→ `Activity.wiki`, Foto per Titel mit Weiterleitungen), Suche prüft
+  ALLE Treffer (vorher nur den ersten – meist der Stadtartikel → kein Bild), dann «Titel» ohne Ort. Tagesplan: Bildleiste
+  je Tag (`.strip`), Foto antippen = Grossansicht (`#lightbox`, Klick-Abfang in der Capture-Phase, damit kein Hotel gewählt wird).
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -92,13 +101,16 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (38 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (40 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.5.0)
+## Stand (03.11.2026, Version 1.6.0)
+- 1.6.0: Wunsch James: Hotelvorschläge mit 3–4 Fotos und echten Preisen für die Nächte; Bilder im Tagesplan (in seinem
+  Plan fehlten sie bei Sehenswürdigkeiten wie dem Wiedervereinigungspalast). Im Testmodus bei 390 px hell/dunkel geprüft;
+  echte Google-/Wikipedia-Treffer nur auf dem NAS. Pro Reise ca. 3 SerpApi-Suchen je Ort.
 - 1.5.0: Wunsch James: 2–3 Routen-Varianten mit Stichpunkten/Kosten/Karte, dann Plan mit Routenkarte, Hotelwahl aus
   3 Vorschlägen je Ort, «Finaler Vorschlag». Im Testmodus (Platzhalter-Kacheln) bei 390 px hell/dunkel geprüft; echte
   Karten und Qualität der Varianten nur auf dem NAS. Dabei behoben: Hotels von «Lissabon Insel» erschienen bei «Lissabon».
