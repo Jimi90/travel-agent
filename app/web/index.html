@@ -226,6 +226,9 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 <!-- ============ BLATT: REISE ============ -->
 <div class="sheet" id="tripSheet"><div class="in" id="tripIn"></div></div>
 
+<!-- ============ BLATT: IMPORT / PREISE (über der Reise) ============ -->
+<div class="sheet" id="toolSheet" style="z-index:35"><div class="in" id="toolIn"></div></div>
+
 <!-- Aktionsblatt -->
 <div id="asheet"><div class="box"><div class="grp" id="aGrp"></div><div class="grp"><button class="bold" id="aCancel">Abbrechen</button></div></div></div>
 <div id="toast"></div>
@@ -439,6 +442,7 @@ function renderTrip(outcome) {
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))} · ${esc(chf(s.cost))}${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div>
       ${s.note ? `<div class="s">${esc(s.note)}</div>` : ""}
       <div class="btns">${s.search_url ? `<a class="small" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Bei Booking.com suchen</a>` : ""}
+        ${!s.confirmed && INFO.prices.available ? `<button class="small" data-price="unterkunft:${esc(s.id)}">Echte Preise</button>` : ""}
         <button class="small" data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div>
       </div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
 
@@ -447,6 +451,7 @@ function renderTrip(outcome) {
       <div class="s">${esc(fmtD(x.depart))}, ${esc(x.depart.slice(11, 16))} – ${esc(x.arrive.slice(11, 16))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""} · ${esc(chf(x.cost))}</div>
       ${x.note ? `<div class="s">${esc(x.note)}</div>` : ""}
       <div class="btns">${x.search_url ? `<a class="small" href="${esc(x.search_url)}" target="_blank" rel="noopener noreferrer">Flüge suchen</a>` : ""}
+        ${x.mode === "flug" && x.estimated && INFO.prices.available ? `<button class="small" data-price="verbindung:${esc(x.id)}">Echte Preise</button>` : ""}
         <button class="small" data-conf="verbindung:${esc(x.id)}:${x.estimated ? 1 : 0}">${x.estimated ? "Als gebucht markieren" : "Als Vorschlag"}</button>
         <button class="small red" data-cancel="${esc(x.id)}">Fällt aus …</button></div>
       </div></div>`).join("") || `<div class="empty">Keine Verbindungen</div>`;
@@ -469,6 +474,7 @@ function renderTrip(outcome) {
     <div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <p class="hint" style="margin:8px 4px 0">Ab «Gebucht» prüft Kompass während der Reise jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) das Wetter und stellt den Tag bei Bedarf um.</p>
     <button class="btn" id="tWeather">Wetter jetzt prüfen</button>
+    <button class="btn plain" id="tImport">Buchung importieren</button>
     <div class="card pad res" id="tOut" hidden></div>
     ${t.summary ? `<h2>Überblick</h2><div class="card pad"><div class="t">${esc(t.summary)}</div>${t.cost_note ? `<div class="s">${esc(t.cost_note)}</div>` : ""}</div>` : ""}
     ${d.notes.length ? `<div class="card pad" style="margin-top:12px"><div class="s warnt">${d.notes.map(esc).join("<br>")}</div></div>` : ""}
@@ -512,6 +518,8 @@ function renderTrip(outcome) {
     if (on === "1") reference = prompt("Buchungsnummer (optional):") || "";
     reTrip(await api(`/api/trips/${tid}/confirm`, {target, item_id: id, confirmed: on === "1", reference}));
   });
+  $("tImport").onclick = () => openImport(tid);
+  q("[data-price]").forEach(b => b.onclick = () => { const [target, id] = b.dataset.price.split(":"); openPrices(tid, target, id); });
   q("[data-cancel]").forEach(b => b.onclick = () => {
     const seg = t.transports.find(x => x.id === b.dataset.cancel);
     actionSheet(`${seg.origin.name} → ${seg.destination.name}: wie lange fällt sie aus?`, [1, 2, 3, 4].map(n => ({
@@ -538,6 +546,81 @@ function showOutcome(o) {
     ((o.warnings || []).length ? `<ul>${o.warnings.map(w => `<li class="warn">${esc(w)}</li>`).join("")}</ul>` : "");
   box.hidden = false;
   box.scrollIntoView({behavior: "smooth", block: "center"});
+}
+
+// ---------- Buchung importieren ----------
+function toolPage(title, html) {
+  $("toolIn").innerHTML = `<div class="topbar"><button class="back" id="toolBack">‹ Reise</button></div><h1>${esc(title)}</h1>${html}`;
+  $("toolBack").onclick = () => closeSheet("toolSheet");
+  openSheet("toolSheet");
+}
+
+function openImport(tid) {
+  let img = null;
+  toolPage("Buchung importieren", `
+    <p class="sub">Bestätigung fotografieren, Bildschirmfoto der Mail wählen oder den Mailtext einfügen. Kompass trägt Flüge, Hotels, Fähren und Tickets als «gebucht» ein – erst nach deiner Bestätigung.</p>
+    <div class="card pad"><input type="file" id="iPhoto" accept="image/*"><img id="iPrev" class="prev" alt="" hidden>
+      <textarea id="iText" maxlength="20000" placeholder="… oder Mailtext hier einfügen" style="margin-top:10px"></textarea></div>
+    <button class="btn" id="iRead">Bestätigung lesen</button>
+    <div class="msg" id="iMsg"></div><div id="iOut"></div>`);
+  $("iPhoto").onchange = async () => {
+    const f = $("iPhoto").files[0]; if (!f) return;
+    try { const url = await shrink(f, 2000); img = url.split(",")[1]; $("iPrev").src = url; $("iPrev").hidden = false; }
+    catch { msg($("iMsg"), "Das Bild konnte nicht gelesen werden.", "err"); }
+  };
+  $("iRead").onclick = async () => {
+    const b = $("iRead"); b.disabled = true; msg($("iMsg"), `<span class="spin"></span>Lese Bestätigung …`);
+    try {
+      const r = (await api(`/api/trips/${tid}/import`, {image: img, media_type: "image/jpeg", text: $("iText").value})).preview;
+      msg($("iMsg"), "");
+      $("iOut").innerHTML = `<h2>Das würde Kompass eintragen</h2><div class="card">${r.lines.length ? r.lines.map(l => `<div class="row"><div class="grow t">${esc(l)}</div></div>`).join("") : `<div class="empty">Nichts zuzuordnen.</div>`}</div>
+        ${r.summary ? `<p class="hint">${esc(r.summary)}</p>` : ""}
+        ${r.warnings.map(w => `<p class="hint warnt">${esc(w)}</p>`).join("")}
+        ${r.problems.map(w => `<p class="hint" style="color:var(--err)">Geht so nicht: ${esc(w)}</p>`).join("")}
+        ${r.can_apply ? `<button class="btn" id="iApply">Übernehmen</button>` : ""}`;
+      if (r.can_apply) $("iApply").onclick = async () => {
+        const x = await api(`/api/trips/${tid}/import/apply`, {token: r.token});
+        if (!x.ok) { toast(x.error); return; }
+        closeSheet("toolSheet"); reTrip(x); toast("Buchung eingetragen");
+      };
+    } catch (e) { msg($("iMsg"), esc(e.message), "err"); }
+    b.disabled = false;
+  };
+}
+
+// Foto verkleinern (als data:-Adresse lesen: die Sicherheitsregeln erlauben keine blob:-Bilder)
+async function shrink(f, max) {
+  const src = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+  const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return c.toDataURL("image/jpeg", 0.85);
+}
+
+// ---------- Echte Preise ----------
+async function openPrices(tid, target, id) {
+  toolPage(target === "verbindung" ? "Echte Flugpreise" : "Echte Hotelpreise", `<div class="msg" id="pMsg"><span class="spin"></span>Frage Google ${target === "verbindung" ? "Flights" : "Hotels"} ab …</div><div id="pOut"></div>`);
+  try {
+    const r = await api(`/api/trips/${tid}/prices`, {target, item_id: id});
+    msg($("pMsg"), "");
+    const rows = r.options.map((o, i) => target === "verbindung"
+      ? `<div class="row"><div class="grow"><div class="t">CHF ${Math.round(o.price).toLocaleString("de-CH")} · ${esc(o.carrier)}</div>
+          <div class="s">${esc(o.depart.slice(11, 16))} – ${esc(o.arrive.slice(11, 16))}${o.arrive.slice(0, 10) !== o.depart.slice(0, 10) ? " (+1)" : ""} · ${Math.floor(o.duration_min / 60)} Std. ${o.duration_min % 60} Min. · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"}</div>
+          <div class="s">${esc(o.number)}</div></div><button class="small" data-pick="${i}">Übernehmen</button></div>`
+      : `<div class="row"><div class="grow"><div class="t">${esc(o.name)}${o.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div>
+          <div class="s">CHF ${Math.round(o.night)}/Nacht${o.total ? ` · CHF ${Math.round(o.total).toLocaleString("de-CH")} total` : ""}${o.rating ? ` · ★ ${o.rating}` : ""}${o.reviews ? ` (${o.reviews})` : ""}${o.stars ? ` · ${o.stars}-Sterne` : ""}</div>
+          ${o.link ? `<div class="btns"><a class="small" href="${esc(o.link)}" target="_blank" rel="noopener noreferrer">Ansehen</a></div>` : ""}</div>
+          <button class="small" data-pick="${i}">Übernehmen</button></div>`).join("");
+    $("pOut").innerHTML = `<div class="card">${rows || `<div class="empty">Keine Angebote gefunden.</div>`}</div>
+      <p class="hint">${esc(r.note)}${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Bei Google öffnen</a>` : ""}</p>
+      <p class="hint">Übernehmen trägt Zeiten und Preis in den Plan ein (weiterhin «Vorschlag», bis du gebucht hast). SerpApi diesen Monat: ${r.month} von 250 Gratis-Suchen.</p>`;
+    $("pOut").querySelectorAll("[data-pick]").forEach(b => b.onclick = async () => {
+      const x = await api(`/api/trips/${tid}/prices/apply`, {token: r.token, index: +b.dataset.pick});
+      closeSheet("toolSheet"); reTrip(x);
+      toast(x.outcome.status === "angewendet" ? "Übernommen" : (x.outcome.problems[0] || "Nicht möglich"));
+    });
+  } catch (e) { msg($("pMsg"), esc(e.message), "err"); }
 }
 
 // ---------- Unterwegs ----------
@@ -581,13 +664,7 @@ $("photo").onchange = async () => {
   const f = $("photo").files[0]; if (!f) return;
   msg($("photoMsg"), "");
   try {
-    // als data:-Adresse lesen (die Sicherheitsregeln erlauben keine blob:-Bilder)
-    const src = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
-    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
-    const s = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
-    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
-    const url = c.toDataURL("image/jpeg", 0.85);
+    const url = await shrink(f, 1600);
     PHOTO = url.split(",")[1];
     $("photoPrev").src = url; $("photoPrev").hidden = false; $("photoGo").disabled = false;
   } catch { msg($("photoMsg"), "Das Bild konnte nicht gelesen werden.", "err"); }
@@ -895,6 +972,9 @@ const PAGES = {
       <h2>Claude (kostenpflichtig)</h2>
       <div class="card">${keyRow("anthropic", "Claude", "sk-ant-…")}</div>
       <p class="hint">Claude: ${status("anthropic")}. Optional – beste Qualität, kostet ein paar Rappen pro Aufgabe (platform.claude.com → API Keys). Websuche gibt es nur mit Claude.</p>
+      <h2>Echte Preise (SerpApi)</h2>
+      <div class="card">${keyRow("serpapi", "SerpApi", "Schlüssel einfügen")}</div>
+      <p class="hint">SerpApi: ${status("serpapi")}${k.serpapi.set ? ` · diesen Monat ${INFO.prices.month} von 250 Gratis-Suchen` : ""}. Liefert echte Preise von Google Flights und Google Hotels (Konto bei serpapi.com → Dashboard → «Your Private API Key»).</p>
       <button class="btn plain" id="kSave" style="margin-top:8px">Schlüssel sichern</button>
       <h2>Wer zuerst?</h2>
       <div class="card">${rCheck("Gratis zuerst", "Gemini/Groq; Claude nur als Reserve", s.prefer !== "claude", 'data-prefer="gratis"')}
@@ -906,7 +986,7 @@ const PAGES = {
       $("kSave").onclick = async () => {
         let n = 0;
         try {
-          for (const prov of ["gemini", "groq", "anthropic"]) {
+          for (const prov of ["gemini", "groq", "anthropic", "serpapi"]) {
             const v = $("k_" + prov).value.trim();
             if (v) { INFO = await api("/api/keys", {provider: prov, key: v}); n++; }
           }

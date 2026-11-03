@@ -108,12 +108,14 @@ def _keys_path():
     return config.DATA_DIR / "keys.json"
 
 
-KEY_PROVIDERS = ("anthropic", "gemini", "groq")
+KEY_PROVIDERS = ("anthropic", "gemini", "groq", "serpapi")
 
 
 def _env_key(provider: str) -> str:
     if provider == "anthropic":
         return config.ANTHROPIC_API_KEY
+    if provider == "serpapi":
+        return config.SERPAPI_API_KEY
     return config.FREE_PROVIDERS[provider]["key"]
 
 

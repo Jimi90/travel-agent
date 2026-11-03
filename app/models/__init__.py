@@ -1,5 +1,5 @@
 from .changes import (
-    AddActivity, AddStay, ChangeRecord, ExtendStay, SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule, ChangeResult, ChangeSet, ChangeStatus, ExternalAction, MoveActivity,
+    AddActivity, AddStay, AddTransport, ChangeRecord, UpdateStay, UpdateTransport, ExtendStay, SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule, ChangeResult, ChangeSet, ChangeStatus, ExternalAction, MoveActivity,
     PlanOperation, Problem, RemoveActivity, ReplaceActivity,
 )
 from .common import ActivityCategory, Exposure, Intensity, Place, new_id

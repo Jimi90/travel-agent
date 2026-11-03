@@ -6,6 +6,7 @@ Plan-Version). Der StatusManager wendet es ganz oder gar nicht an.
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 from enum import StrEnum
 from typing import Annotated, Any, Literal, Union
 
@@ -13,7 +14,7 @@ from pydantic import Field
 
 from .common import Model, new_id
 from .common import Place
-from .itinerary import Accommodation, Activity
+from .itinerary import Accommodation, Activity, TransportSegment
 
 
 class ReplaceActivity(Model):
@@ -89,9 +90,49 @@ class SetConfirmed(Model):
     reference: str | None = None
 
 
+class UpdateStay(Model):
+    """Unterkunft mit echten Daten aktualisieren (Buchungsbestätigung, echte Preise). None = unverändert."""
+
+    op: Literal["unterkunft_aendern"] = "unterkunft_aendern"
+    stay_id: str
+    name: str | None = None
+    check_in: date | None = None
+    check_out: date | None = None
+    cost: Decimal | None = Field(default=None, ge=0)
+    confirmed: bool | None = None
+    provider: str | None = None
+    reference: str | None = None
+    search_url: str | None = None
+    note: str | None = None
+
+
+class UpdateTransport(Model):
+    """Verbindung mit echten Daten aktualisieren. None = unverändert."""
+
+    op: Literal["verbindung_aendern"] = "verbindung_aendern"
+    segment_id: str
+    depart: datetime | None = None
+    arrive: datetime | None = None
+    carrier: str | None = None
+    number: str | None = None
+    via: list[str] | None = None
+    origin_code: str | None = None
+    destination_code: str | None = None
+    cost: Decimal | None = Field(default=None, ge=0)
+    confirmed: bool | None = None
+    reference: str | None = None
+    search_url: str | None = None
+    note: str | None = None
+
+
+class AddTransport(Model):
+    op: Literal["verbindung_hinzufuegen"] = "verbindung_hinzufuegen"
+    segment: TransportSegment
+
+
 PlanOperation = Annotated[
     Union[ReplaceActivity, MoveActivity, AddActivity, RemoveActivity, ExtendStay, AddStay, ShiftSchedule,
-          SetTripStatus, SetFixed, SetConfirmed],
+          SetTripStatus, SetFixed, SetConfirmed, UpdateStay, UpdateTransport, AddTransport],
     Field(discriminator="op"),
 ]
 
