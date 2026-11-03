@@ -1,4 +1,4 @@
-"""Anmeldung für den Reise-Assistenten – gebaut für den Betrieb im offenen Internet (Tailscale Funnel).
+"""Anmeldung für Kompass – gebaut für den Betrieb im offenen Internet (Tailscale Funnel).
 
 Schutzschichten:
 - Ohne starkes Passwort (APP_PASSWORD, mind. 16 Zeichen) startet die App gesperrt («fail closed»).
@@ -7,7 +7,7 @@ Schutzschichten:
   «Überall abmelden» macht alle alten Sitzungen ungültig.
 - Sperre bei Fehlversuchen: 5 Fehler einer Adresse → 15 Min. gesperrt; 20 Fehler insgesamt pro Stunde
   → Anmeldung für alle 60 Min. gesperrt (gegen verteiltes Durchprobieren). Jeder Fehlversuch wartet 1.5 s.
-- Schutz gegen fremde Webseiten (CSRF): Änderungen nur mit eigenem Header «X-Reise».
+- Schutz gegen fremde Webseiten (CSRF): Änderungen nur mit eigenem Header «X-Kompass».
 """
 import hashlib
 import hmac
@@ -17,12 +17,12 @@ import time
 
 from . import config
 
-COOKIE = "reise_sitzung"
+COOKIE = "kompass_sitzung"
 SESSION_DAYS = 90
 MIN_PW_LEN = 16
 IP_MAX_FAILS, IP_WINDOW, IP_LOCK = 5, 15 * 60, 15 * 60
 GLOBAL_MAX_FAILS, GLOBAL_WINDOW, GLOBAL_LOCK = 20, 60 * 60, 60 * 60
-CSRF_HEADER = "X-Reise"
+CSRF_HEADER = "X-Kompass"
 
 _lock = threading.Lock()
 _fails = {}            # Adresse → [Zeitpunkte]
@@ -52,7 +52,7 @@ def _secret():
 
 
 def _key():
-    return hashlib.sha256(f"reise|{_secret()}|{config.APP_PASSWORD}".encode()).digest()
+    return hashlib.sha256(f"kompass|{_secret()}|{config.APP_PASSWORD}".encode()).digest()
 
 
 def _sign(payload):

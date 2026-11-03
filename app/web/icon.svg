@@ -2,8 +2,11 @@
   <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
     <stop offset="0" stop-color="#2bb3a3"/><stop offset="1" stop-color="#0f6f86"/></linearGradient></defs>
   <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <circle cx="256" cy="256" r="150" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="14"/>
-  <path d="M106 256h300M256 106c-50 45-50 255 0 300M256 106c50 45 50 255 0 300" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="12"/>
-  <path d="M138 262 384 150c12-5 22 6 16 17L300 380c-6 11-22 10-26-2l-26-78-80-22c-12-4-14-20-2-26z" fill="#fff"/>
-  <path d="m248 300 64-74" stroke="#0f6f86" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#fff" stroke-width="16"/>
+  <g stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-opacity=".55">
+    <path d="M256 118v26M256 368v26M118 256h26M368 256h26"/>
+  </g>
+  <path d="M256 150 292 256H220z" fill="#fff"/>
+  <path d="M220 256h72L256 362z" fill="#fff" fill-opacity=".45"/>
+  <circle cx="256" cy="256" r="16" fill="#0f6f86" stroke="#fff" stroke-width="8"/>
 </svg>

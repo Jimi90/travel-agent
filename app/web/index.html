@@ -3,12 +3,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Reise">
+<meta name="apple-mobile-web-app-title" content="Kompass">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
-<title>Reise</title>
+<title>Kompass</title>
 <style>
 :root{color-scheme:dark;--bg:#0f1417;--card:#182024;--card2:#212b30;--line:#2a353b;--text:#eef2f1;--muted:#93a1a0;
   --accent:#3fb6a8;--onaccent:#06201d;--warn:#f0b04a;--err:#ef6a6a;--new:rgba(63,182,168,.12);
@@ -60,7 +60,7 @@ footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
 </style>
 </head>
 <body><main>
-  <h1>Reise</h1>
+  <h1>Kompass</h1>
   <p class="sub" id="sub">Testversion</p>
 
   <h2>Wettercheck simulieren</h2>
@@ -109,7 +109,7 @@ const chf = v => Number(v) ? `CHF ${Number(v).toLocaleString("de-CH", {maximumFr
 
 async function api(path, body) {
   const r = await fetch(path, body === undefined ? {credentials: "same-origin"} : {method: "POST", credentials: "same-origin",
-    headers: {"Content-Type": "application/json", "X-Reise": "1"}, body: JSON.stringify(body)});
+    headers: {"Content-Type": "application/json", "X-Kompass": "1"}, body: JSON.stringify(body)});
   if (r.status === 401) { location.replace("/login"); throw new Error("abgemeldet"); }
   const j = await r.json().catch(() => ({}));
   if (!r.ok && !j.state) throw new Error(j.error || "Fehler " + r.status);
@@ -146,7 +146,7 @@ function render() {
       ${h.can_undo ? `<button class="small" data-undo="${esc(h.id)}">Rückgängig</button>` : ""}</div>`).join("")
     : `<div class="empty">Noch keine Änderungen</div>`;
   $("hist").querySelectorAll("[data-undo]").forEach(b => b.onclick = () => undo(b.dataset.undo, b));
-  $("foot").textContent = `Reise-Assistent ${S.version} · ${S.build}`;
+  $("foot").textContent = `Kompass ${S.version} · ${S.build}`;
 }
 
 function showResult(o) {

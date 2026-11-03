@@ -1,4 +1,4 @@
-"""Webserver des Reise-Assistenten (Standardbibliothek, wie Hörwerk).
+"""Webserver von Kompass (Standardbibliothek, wie Hörwerk).
 
 Jede Anfrage läuft durch ``_gate()``: ohne gültige Sitzung nur /login, /health, Manifest und Symbole.
 Schritt 2 (Testversion): Demo-Reise anzeigen, Wettercheck simulieren, Rückgängig, Demo zurücksetzen.
@@ -94,7 +94,7 @@ def run_check(scenario: str, pregnant: bool, dry_next_day: bool) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Reise/0"
+    server_version = "Kompass/0"
     protocol_version = "HTTP/1.1"
 
     def end_headers(self):
@@ -239,7 +239,7 @@ def main():
         print(f"ACHTUNG: {problem} Die App bleibt gesperrt, bis das behoben ist.", flush=True)
     status()
     srv = ThreadingHTTPServer(("0.0.0.0", config.PORT), Handler)
-    print(f"Reise-Assistent {config.APP_VERSION} ({config.APP_BUILD}) läuft auf Port {config.PORT}", flush=True)
+    print(f"Kompass {config.APP_VERSION} ({config.APP_BUILD}) läuft auf Port {config.PORT}", flush=True)
     srv.serve_forever()
 
 

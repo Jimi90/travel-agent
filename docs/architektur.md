@@ -1,4 +1,4 @@
-# Architektur – Reise-Assistent
+# Architektur – Kompass (Reise-Assistent)
 
 ## Technik-Entscheid
 

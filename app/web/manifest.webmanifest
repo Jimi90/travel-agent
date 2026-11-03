@@ -1,6 +1,6 @@
 {
-  "name": "Reise-Assistent",
-  "short_name": "Reise",
+  "name": "Kompass",
+  "short_name": "Kompass",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f1417",

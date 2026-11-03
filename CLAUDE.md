@@ -1,6 +1,6 @@
-# Reise-Assistent – Hinweise für Claude
+# Kompass (Reise-Assistent) – Hinweise für Claude
 
-Persönlicher Reise-Assistent (James + Partnerin). Läuft wie Hörwerk (`jimi90/hoerwerk`) als Docker-Container
+Persönlicher Reise-Assistent «Kompass» (James + Partnerin; Name von James gewählt, Repo heisst weiter `travel-agent`, Image `ghcr.io/jimi90/travel-agent`). Läuft wie Hörwerk (`jimi90/hoerwerk`) als Docker-Container
 auf dem Ugreen DXP4800 Plus (UGOS, 8 GB RAM, nur CPU), Zugriff nur über Tailscale Funnel. Besitzer: James (Schweiz).
 
 ## Zusammenarbeit
@@ -12,10 +12,10 @@ auf dem Ugreen DXP4800 Plus (UGOS, 8 GB RAM, nur CPU), Zugriff nur über Tailsca
 - Geld/Buchungen nie ohne Bestätigung: externe Aktionen laufen über die Outbox (`ExternalAction.needs_confirmation`).
 
 ## Aufbau (siehe docs/architektur.md)
-- Python 3.12, Pydantic v2, SQLite (`data/reise.db`). Webserver aus der Standardbibliothek (`app/server.py`), Anmeldung
-  `app/auth.py` 1:1 aus Hörwerk (Cookie `reise_sitzung`, CSRF-Header `X-Reise`, Sperren, CSP). Nicht aufweichen.
+- Python 3.12, Pydantic v2, SQLite (`data/kompass.db`). Webserver aus der Standardbibliothek (`app/server.py`), Anmeldung
+  `app/auth.py` 1:1 aus Hörwerk (Cookie `kompass_sitzung`, CSRF-Header `X-Kompass`, Sperren, CSP). Nicht aufweichen.
 - `app/demo.py` Demo-Reise (beginnt immer morgen, «jetzt» = Tag 2, 07:00), 4 Wetter-Lagen, Schalter Schwangerschaft
-  und «Folgetag trocken». Oberfläche `app/web/index.html` (Vanilla-JS, kein Build). «Demo zurücksetzen» löscht `reise.db`.
+  und «Folgetag trocken». Adresse `https://kompass.<tailnet>.ts.net`, Container `kompass` + `kompass-tailscale`. Symbol `app/web/icon.svg`, `apple-touch-icon.png` ohne runde Ecken (Playwright: SVG direkt öffnen, `rx=0`). Oberfläche `app/web/index.html` (Vanilla-JS, kein Build). «Demo zurücksetzen» löscht `kompass.db`.
 - `app/models/` Schemas. `app/core/status_manager.py` ist die **einzige** Stelle, die Pläne ändert
   (Transaktion, Versionsnummer, Protokoll, Outbox, Rückgängig). `app/core/plausibility.py` = MiddlewareConfig.
 - `app/planning/replanning.py` AutonomousRePlanningModule: verschieben auf trockenen Tag → sonst ersetzen;
