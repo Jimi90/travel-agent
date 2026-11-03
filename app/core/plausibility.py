@@ -6,7 +6,7 @@ Wird zweimal benutzt: beim Planen (welche Option ist zulässig?) und im StatusMa
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from ..models import Activity, Itinerary, Problem, TravelConstraints
 from ..models.common import to_min
@@ -31,10 +31,16 @@ class PlausibilityChecker:
         after: Itinerary,
         constraints: TravelConstraints | None,
         now: datetime,
+        acknowledged: set[str] | frozenset[str] = frozenset(),
     ) -> list[Problem]:
         out: list[Problem] = []
-        out += self._days(after)
-        out += self._locked_untouched(before, after, now)
+        # Strukturprobleme, die es schon vorher gab, sperren keine neue Änderung (nur Warnung)
+        known = {(p.code, p.message) for p in self._days(before) + self._stays_and_transports(before)}
+        for p in self._days(after) + self._stays_and_transports(after):
+            if (p.code, p.message) in known and p.level == "fehler":
+                p = p.model_copy(update={"level": "warnung", "message": p.message + " (bestand schon vorher)"})
+            out.append(p)
+        out += self._locked_untouched(before, after, now, acknowledged)
         if constraints:
             out += self._constraints(before, after, constraints)
             out += self._budget(before, after, constraints)
@@ -58,16 +64,36 @@ class PlausibilityChecker:
                 prev = a
         return out
 
-    def _locked_untouched(self, before: Itinerary, after: Itinerary, now: datetime) -> list[Problem]:
+    def _locked_untouched(self, before: Itinerary, after: Itinerary, now: datetime,
+                          acknowledged: set[str] | frozenset[str]) -> list[Problem]:
         out = []
         for day in before.days:
             for a in day.activities:
-                if not a.locked(now):
+                if not a.locked(now) or a.id in acknowledged:
                     continue
                 found = after.find_activity(a.id)
                 if not found or found[0].date != day.date or found[1] != a:
                     out.append(Problem(code="fest_veraendert", activity_id=a.id,
                                        message=f"«{a.title}» ist fest/gebucht und darf nicht automatisch geändert werden"))
+        return out
+
+    def _stays_and_transports(self, itin: Itinerary) -> list[Problem]:
+        out = []
+        for a, b in zip(itin.stays, itin.stays[1:]):
+            if b.check_in < a.check_out:
+                out.append(Problem(code="unterkunft_doppelt",
+                                   message=f"Unterkünfte «{a.name}» und «{b.name}» überschneiden sich"))
+        for s in itin.stays:
+            if s.check_in < itin.start_date or s.check_out > itin.end_date + timedelta(days=1):
+                out.append(Problem(code="unterkunft_ausserhalb", level="warnung",
+                                   message=f"«{s.name}» liegt teilweise ausserhalb der Reisedaten"))
+        for a, b in zip(itin.transports, itin.transports[1:]):
+            if b.depart < a.arrive:
+                out.append(Problem(code="transport_reihenfolge",
+                                   message=f"{b.origin.name} → {b.destination.name} startet vor der Ankunft der vorherigen Verbindung"))
+        dates = [d.date for d in itin.days]
+        if dates and any((y - x).days != 1 for x, y in zip(dates, dates[1:])):
+            out.append(Problem(code="tage_luecke", level="warnung", message="Im Plan fehlen einzelne Tage"))
         return out
 
     def _constraints(self, before: Itinerary, after: Itinerary, k: TravelConstraints) -> list[Problem]:

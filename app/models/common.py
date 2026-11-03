@@ -69,6 +69,7 @@ class Place(Model):
     country: str = Field(pattern=r"^[A-Z]{2}$", description="ISO-3166-Ländercode, z. B. PT")
     lat: float | None = Field(default=None, ge=-90, le=90)
     lon: float | None = Field(default=None, ge=-180, le=180)
+    tz: str | None = Field(default=None, max_length=64, description="IANA-Zeitzone, z. B. Europe/Lisbon")
 
     @field_validator("country", mode="before")
     @classmethod
@@ -77,3 +78,12 @@ class Place(Model):
 
     def same_area(self, other: Place) -> bool:
         return self.country == other.country and self.name.casefold() == other.name.casefold()
+
+
+CATEGORY_LABELS = {
+    ActivityCategory.WANDERN: "Wandern", ActivityCategory.NATUR: "Natur", ActivityCategory.STRAND: "Strand",
+    ActivityCategory.WASSERSPORT: "Wassersport", ActivityCategory.KULTUR: "Kultur", ActivityCategory.MUSEUM: "Museen",
+    ActivityCategory.STADT: "Städte", ActivityCategory.KULINARIK: "Essen & Trinken",
+    ActivityCategory.WELLNESS: "Wellness & Spa", ActivityCategory.ENTSPANNUNG: "Entspannung",
+    ActivityCategory.SHOPPING: "Shopping", ActivityCategory.NACHTLEBEN: "Ausgang",
+}

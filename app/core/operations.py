@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from datetime import timedelta
 
 from pydantic import ValidationError
 
-from ..models import AddActivity, Activity, Itinerary, MoveActivity, RemoveActivity, ReplaceActivity
+from ..models import (
+    AddActivity, AddStay, Activity, DayPlan, ExtendStay, Itinerary, MoveActivity, RemoveActivity, ReplaceActivity,
+    SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule,
+)
+from ..models.itinerary import Booking
 from ..models.changes import PlanOperation
 
 
@@ -57,5 +62,68 @@ def _apply_one(itin: Itinerary, op: PlanOperation) -> None:
     elif isinstance(op, RemoveActivity):
         idx, _, acts = _take(itin, op.activity_id)
         acts.pop(idx)
+    elif isinstance(op, ExtendStay):
+        stay = next((x for x in itin.stays if x.id == op.stay_id), None)
+        if stay is None:
+            raise PlanOperationError(f"Unterkunft {op.stay_id} nicht gefunden")
+        if op.new_check_out <= stay.check_in:
+            raise PlanOperationError("Abreise muss nach der Anreise liegen")
+        nights_old = (stay.check_out - stay.check_in).days
+        nights_new = (op.new_check_out - stay.check_in).days
+        if stay.cost and nights_old:
+            stay.cost = round(stay.cost / nights_old * nights_new, 2)
+        stay.check_out = op.new_check_out
+        if op.new_check_out - timedelta(days=1) > itin.end_date:
+            itin.end_date = op.new_check_out - timedelta(days=1)
+    elif isinstance(op, AddStay):
+        if any(x.id == op.stay.id for x in itin.stays):
+            raise PlanOperationError("Unterkunft gibt es schon")
+        itin.stays.append(op.stay)
+    elif isinstance(op, ShiftSchedule):
+        _shift(itin, op)
+    elif isinstance(op, SetTripStatus):
+        itin.status = op.status
+    elif isinstance(op, SetFixed):
+        idx, act, acts = _take(itin, op.activity_id)
+        acts[idx] = act.model_copy(update={"fixed": op.fixed})
+    elif isinstance(op, SetConfirmed):
+        items = itin.stays if op.target == "unterkunft" else itin.transports
+        item = next((x for x in items if x.id == op.item_id), None)
+        if item is None:
+            raise PlanOperationError("Eintrag nicht gefunden")
+        if op.target == "unterkunft":
+            item.confirmed = op.confirmed
+        else:
+            item.estimated = not op.confirmed
+        if op.confirmed and op.reference:
+            item.booking = Booking(provider="eigene Buchung", reference=op.reference[:60])
+        elif not op.confirmed:
+            item.booking = None
     else:  # pragma: no cover
         raise PlanOperationError(f"unbekannte Operation {op!r}")
+
+
+def _shift(itin: Itinerary, op: ShiftSchedule) -> None:
+    """Ab ``from_date`` alles um ``days`` nach hinten; Lücke = leere Tage am Ort ``gap_base``."""
+    delta = timedelta(days=op.days)
+    if not itin.start_date <= op.from_date <= itin.end_date:
+        raise PlanOperationError("Verschiebe-Datum liegt ausserhalb der Reise")
+    for d in itin.days:
+        if d.date >= op.from_date:
+            d.date += delta
+    for i in range(op.days):
+        itin.days.append(DayPlan(date=op.from_date + timedelta(days=i), base=op.gap_base))
+    for s in itin.stays:
+        if s.check_in >= op.from_date:
+            s.check_in += delta
+            s.check_out += delta
+        elif s.check_out >= op.from_date:  # Unterkunft am Ort, wo man festsitzt: verlängern
+            nights_old = (s.check_out - s.check_in).days
+            s.check_out += delta
+            if s.cost and nights_old:
+                s.cost = round(s.cost / nights_old * (nights_old + op.days), 2)
+    for t in itin.transports:
+        if t.depart.date() >= op.from_date:
+            t.depart += delta
+            t.arrive += delta
+    itin.end_date += delta

@@ -1,5 +1,5 @@
 from .changes import (
-    AddActivity, ChangeRecord, ChangeResult, ChangeSet, ChangeStatus, ExternalAction, MoveActivity,
+    AddActivity, AddStay, ChangeRecord, ExtendStay, SetConfirmed, SetFixed, SetTripStatus, ShiftSchedule, ChangeResult, ChangeSet, ChangeStatus, ExternalAction, MoveActivity,
     PlanOperation, Problem, RemoveActivity, ReplaceActivity,
 )
 from .common import ActivityCategory, Exposure, Intensity, Place, new_id
@@ -8,7 +8,7 @@ from .disruption import (
     WeatherForecast,
 )
 from .itinerary import (
-    Accommodation, Activity, Booking, DayPlan, Itinerary, SavedItinerary, TransportSegment,
+    Accommodation, Activity, AlternativeCandidate, Booking, HotelSuggestion, DayPlan, Itinerary, SavedItinerary, TransportSegment,
     WeatherLimits,
 )
 from .profile import (
