@@ -88,7 +88,8 @@ def trip_detail(trip_id: str) -> dict:
 def info() -> dict:
     s = store.settings()
     return {"version": config.APP_VERSION, "build": config.APP_BUILD, "fake": config.FAKE_MODE,
-            "settings": s, "models": config.MODELS, "key": store.key_info(), "ai": llm.available(),
+            "settings": s, "models": config.MODELS, "keys": store.key_info(), "ai": llm.available(),
+            "free_models": {k: v["model"] for k, v in config.FREE_PROVIDERS.items()},
             "spent_24h": round(store.spent_since(24), 4), "spent_30d": round(store.spent_since(24 * 30), 4),
             "budget_usd": config.DAILY_BUDGET_USD, "unread": store.unread(),
             "categories": {k.value: v for k, v in CATEGORY_LABELS.items()}}
@@ -279,6 +280,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(body["check_time"])):
                     raise BadRequest("Zeit als HH:MM angeben.")
                 allowed["check_time"] = body["check_time"]
+            if "prefer" in body:
+                if body["prefer"] not in ("gratis", "claude"):
+                    raise BadRequest("Unbekannte Reihenfolge.")
+                allowed["prefer"] = body["prefer"]
             for k in ("auto_check", "web_search"):
                 if k in body:
                     allowed[k] = bool(body[k])
@@ -290,10 +295,17 @@ class Handler(BaseHTTPRequestHandler):
             store.save_settings(allowed)
             return self._send(200, info())
         if p == "/api/keys":
-            key = _text(body.get("anthropic"), 300)
-            if key and not key.startswith("sk-"):
+            prov = str(body.get("provider") or "anthropic")
+            if prov not in store.KEY_PROVIDERS:
+                raise BadRequest("Unbekannter Anbieter.")
+            key = _text(body.get("key", body.get("anthropic")), 300)
+            if re.search(r"\s", key):
+                raise BadRequest("Der Schlüssel enthält Leerzeichen – bitte genau kopieren.")
+            if key and prov == "anthropic" and not key.startswith("sk-"):
                 raise BadRequest("Das sieht nicht wie ein Claude-Schlüssel aus (beginnt mit «sk-»).")
-            store.save_anthropic_key(key)
+            if key and prov == "groq" and not key.startswith("gsk_"):
+                raise BadRequest("Das sieht nicht wie ein Groq-Schlüssel aus (beginnt mit «gsk_»).")
+            store.save_key(prov, key)
             return self._send(200, info())
 
         if p == "/api/destinations":
