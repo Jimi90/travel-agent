@@ -10,7 +10,7 @@ import traceback
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import config, llm, store, weather
+from . import config, llm, photos, store, weather
 from .core.status_manager import StatusManager
 from .models import (
     ChangeSet, ChangeStatus, ClosureDisruption, Itinerary, Place, SetTripStatus, TransportDisruption,
@@ -211,6 +211,7 @@ def start_plan(destination: str, start: date, days: int, wishes: str) -> str:
                                          web_search=bool(s.get("web_search")))
         sm().create(itin)
         store.put("plan_notes", itin.id, notes)
+        photos.fill_trip(itin)
         # Kosten des Planens der neuen Reise zuordnen
         store.db().execute("UPDATE costs SET trip_id = ? WHERE trip_id IS NULL AND purpose = 'reiseplan' "
                            "AND ts >= ?", (itin.id, (datetime.now() - timedelta(minutes=30)).isoformat()))

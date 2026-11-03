@@ -105,6 +105,7 @@ class AppTest(unittest.TestCase):
         self.assertNotIn("Kreta (Chania)", names)
         self.assertEqual(len(j["result"]["dropped"]), 2)
         self.assertIsNotNone(j["result"]["ideas"][0]["climate_score"])
+        self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))
         self.assertEqual(self.call("POST", "/api/destinations", {"start": "2020-01-01", "days": 6})[0], 400)
 
         # --- Reiseplan erstellen (heute beginnend, 6 Tage, mit Fähre an Tag 3)
@@ -121,6 +122,25 @@ class AppTest(unittest.TestCase):
         flights = [t for t in trip["transports"] if t["mode"] == "flug"]
         self.assertTrue(flights[0]["search_url"].startswith("https://www.google.com/travel/flights"))
         self.assertEqual(code, 200)
+
+        # --- Fotos: werden im Hintergrund geholt, dann über /api/photo ausgeliefert
+        for _ in range(60):
+            code, d = self.call("GET", f"/api/trips/{tid}")
+            if not d["photos_pending"]:
+                break
+            time.sleep(0.05)
+        self.assertFalse(d["photos_pending"])
+        self.assertTrue(d["hero"]["id"])
+        acts = d["photos"]["activities"]
+        self.assertIsNone(acts["abendessen 1"])            # Allgemeines bekommt kein Zufallsbild
+        self.assertTrue(acts["altstadt-museum 2"])
+        req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})
+        with urllib.request.urlopen(req) as r:
+            self.assertEqual(r.headers["Content-Type"], "image/svg+xml")
+            self.assertEqual(r.headers.get_all("Cache-Control"), ["private, max-age=2592000"])
+        self.assertEqual(self.call("GET", "/api/photo/" + "0" * 24)[0], 404)
+        code, tl = self.call("GET", "/api/trips")
+        self.assertTrue(tl["trips"][0]["photo"])
 
         # --- Wettercheck: Tag 2, 07:00, Regen → Wanderung wird ersetzt (keine Sauna wegen Schwangerschaft)
         day2 = date.today() + timedelta(days=1)
@@ -225,8 +245,10 @@ class AppTest(unittest.TestCase):
         stay2 = service.sm().get(tid).stays[1]
         code, pr = self.call("POST", f"/api/trips/{tid}/prices", {"target": "unterkunft", "item_id": stay2.id})
         self.assertEqual(pr["options"][-1]["over_budget"], False)
-        code, d = self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": pr["token"], "index": 0})
-        self.assertEqual(service.sm().get(tid).stays[1].cost, pr["options"][0]["total"])
+        pick = next(i for i, o in enumerate(pr["options"]) if o["photo"])  # Bild aus Google Hotels
+        code, d = self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": pr["token"], "index": pick})
+        self.assertEqual(service.sm().get(tid).stays[1].cost, pr["options"][pick]["total"])
+        self.assertEqual(d["photos"]["stays"][stay2.id], pr["options"][pick]["photo"])
         self.assertEqual(self.call("POST", f"/api/trips/{tid}/prices/apply", {"token": "falsch", "index": 0})[0], 404)
         code, info = self.call("GET", "/api/info")
         self.assertGreaterEqual(info["prices"]["month"], 2)

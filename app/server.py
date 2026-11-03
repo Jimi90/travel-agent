@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, bookings, config, drafting, llm, prices, service, store, vision
+from . import auth, bookings, config, drafting, llm, photos, prices, service, store, vision
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -62,7 +62,9 @@ def _text(v, maxlen: int) -> str:
 # --- Antworten zusammenstellen ----------------------------------------------------------------
 
 def trip_summary(it) -> dict:
+    pm = photos.trip_photos(it.id)["places"]
     return {"id": it.id, "title": it.title, "start": it.start_date.isoformat(), "end": it.end_date.isoformat(),
+            "photo": next((pm.get(d.base.name) for d in it.days if pm.get(d.base.name)), None),
             "status": it.status, "version": it.version, "total": str(it.total_cost()),
             "place": it.days[0].base.name if it.days else "", "favorite": bool(store.get("fav", it.id))}
 
@@ -78,7 +80,16 @@ def trip_detail(trip_id: str) -> dict:
     hist = [h.model_dump(mode="json") for h in sm.history(it.id)]
     for h in hist:
         h["can_undo"] = h["undone_by"] is None and h["to_version"] == it.version and h["operations"] != []
+    pending = photos.missing(it)
+    if pending:
+        photos.fill_trip(it)  # im Hintergrund; die Seite fragt kurz danach nochmals
+    tp = photos.trip_photos(it.id)
+    hero = next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
+    hero_meta = (store.get("photo", hero) or {}) if hero else {}
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
+            "photos": tp, "photos_pending": pending,
+            "hero": {"id": hero, "title": hero_meta.get("title", ""), "page": hero_meta.get("page", ""),
+                     "source": hero_meta.get("source", "")} if hero else None,
             "today": today.date.isoformat() if today else None, "history": list(reversed(hist)),
             "actions": sm.actions(it.id, status="offen"), "notes": store.get("plan_notes", it.id, []),
             "favorite": bool(store.get("fav", it.id)), "ai_cost": round(store.spent_for_trip(it.id), 4),
@@ -130,7 +141,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        if "Cache-Control" not in (extra or {}):
+            self.send_header("Cache-Control", "no-store")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -198,6 +210,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
         if p == "/api/info":
             return self._send(200, info())
+        if m := re.fullmatch(r"/api/photo/([0-9a-f]{24})", p):
+            got = photos.get(m.group(1))
+            if not got:
+                return self._send(404, {"error": "nicht gefunden"})
+            data, ctype, _ = got
+            return self._send(200, data, ctype, {"Cache-Control": "private, max-age=2592000"})
         if p == "/api/trips":
             return self._send(200, {"trips": [trip_summary(t) for t in service.sm().list()]})
         if m := re.fullmatch(rf"/api/trips/({ID})", p):
@@ -456,6 +474,7 @@ class Handler(BaseHTTPRequestHandler):
                 reason = f"Flug aus echten Preisen übernommen ({opt['carrier']}, CHF {opt['price']:.0f})"
             else:
                 total = opt["total"] or 0
+                photos.set_stay_photo(trip_id, data["item_id"], opt.get("photo"))
                 op = UpdateStay(stay_id=data["item_id"], name=opt["name"], cost=round(total, 2),
                                 search_url=opt.get("link"),
                                 note=f"CHF {opt['night']:.0f}/Nacht laut Google Hotels am {date.today():%d.%m.%Y}")
