@@ -89,7 +89,10 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.4.1)
+## Stand (03.11.2026, Version 1.4.2)
+- 1.4.2: «Neue Reise» neu (James: «Ziel (optional)» war verwirrend): Auswahl «Ziele vorschlagen / Ich weiss das Ziel»
+  (`NEW_MODE`, gemerkt), Ziel-Zeile nur im zweiten Modus und dort Pflicht, Dauer mit −/+ (2–30). Globale Regel
+  `[hidden]{display:none!important}` (vorher überstimmte `.row{display:flex}` das Ausblenden). Mit Playwright 390 px hell/dunkel geprüft.
 - 1.4.1: Erster echter Lauf (James) scheiterte: «Gemini: Tageslimit · Groq: Tempolimit». Behoben: Minutenlimit wurde als
   Tageslimit gedeutet, Groq bekam ganze Reisepläne (passt nie ins Minutenkontingent). Ob Gemini echt am Tageslimit war
   (evtl. gleicher Schlüssel wie Hörwerk), zeigt jetzt Googles Text in der Meldung. Ausserdem DB-Zugriffe threadsicher.
