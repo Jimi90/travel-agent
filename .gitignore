@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+*.db
+*.db-*
+einstellungen.env
+tailscale.env

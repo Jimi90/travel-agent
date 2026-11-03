@@ -1,0 +1,2 @@
+# Schritt 1: nur Datenmodelle + Umplanung. FastAPI/uvicorn kommen mit der Web-Schnittstelle (Schritt 2).
+pydantic>=2.7,<3
