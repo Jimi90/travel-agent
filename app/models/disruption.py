@@ -100,12 +100,12 @@ class WeatherDisruption(_DisruptionBase):
 
 
 class TransportDisruption(_DisruptionBase):
-    """Für den ExtendedDisruptionHandler (Schritt 3): Fähre/Flug fällt aus oder verspätet sich."""
+    """Fähre/Flug fällt aus: man sitzt ``delay_days`` Tage am Abfahrtsort fest."""
 
     type: Literal["transport"] = "transport"
     segment_id: str
-    cancelled: bool = False
-    expected_delay_hours: float | None = Field(default=None, ge=0)
+    cancelled: bool = True
+    delay_days: int = Field(default=1, ge=1, le=14)  # so viele Tage fährt/fliegt nichts
 
 
 class ClosureDisruption(_DisruptionBase):

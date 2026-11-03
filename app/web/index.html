@@ -11,174 +11,754 @@
 <title>Kompass</title>
 <style>
 :root{color-scheme:dark;--bg:#0f1417;--card:#182024;--card2:#212b30;--line:#2a353b;--text:#eef2f1;--muted:#93a1a0;
-  --accent:#3fb6a8;--onaccent:#06201d;--warn:#f0b04a;--err:#ef6a6a;--new:rgba(63,182,168,.12);
+  --accent:#3fb6a8;--onaccent:#06201d;--warn:#f0b04a;--err:#ef6a6a;--ok:#5cc98a;--new:rgba(63,182,168,.12);
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
 @media (prefers-color-scheme: light){:root{color-scheme:light;--bg:#f2f4f3;--card:#fff;--card2:#e8eceb;--line:#e1e6e5;
-  --text:#14201e;--muted:#6b7877;--accent:#14877a;--onaccent:#fff;--warn:#b26b00;--err:#c43c3c;--new:rgba(20,135,122,.08)}}
-*{box-sizing:border-box}
+  --text:#14201e;--muted:#6b7877;--accent:#14877a;--onaccent:#fff;--warn:#b26b00;--err:#c43c3c;--ok:#1d8a4c;--new:rgba(20,135,122,.08)}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
-main{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 40px)}
-h1{font-size:34px;font-weight:700;letter-spacing:-.5px;margin:8px 4px 2px}
-.sub{color:var(--muted);font-size:14px;margin:0 4px 22px}
-h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:26px 16px 8px;display:flex;justify-content:space-between;gap:8px}
-h2 span{text-transform:none;letter-spacing:0;font-weight:500}
+body{min-height:calc(100dvh + 1px)}
+main,.sheet>.in{max-width:600px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 96px)}
+h1{font-size:34px;font-weight:700;letter-spacing:-.5px;margin:8px 4px 4px}
+.sub{color:var(--muted);font-size:14px;margin:0 4px 18px;line-height:1.4}
+h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:26px 16px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+h2 .r{text-transform:none;letter-spacing:0;font-weight:500}
 .card{background:var(--card);border-radius:14px;overflow:hidden}
+.card+.card{margin-top:12px}
 .pad{padding:14px 16px}
 .hint{color:var(--muted);font-size:13px;line-height:1.45;margin:8px 16px 0}
 .row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:48px;position:relative}
-.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:1px solid var(--line)}
-.row .grow{flex:1;min-width:0}
-.row .t{font-size:16px}
-.row .s{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.35}
-label.row{cursor:pointer}
-input[type=radio]{appearance:none;width:22px;height:22px;margin:0;flex:none;border-radius:50%;border:2px solid var(--line)}
-input[type=radio]:checked{border:7px solid var(--accent)}
-.sw{appearance:none;flex:none;width:51px;height:31px;border-radius:16px;background:var(--card2);position:relative;margin:0;cursor:pointer;transition:background .2s}
+.row+.row::before,.row+details::before,details+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:1px solid var(--line)}
+.grow{flex:1;min-width:0}
+.t{font-size:16px;line-height:1.3}
+.s{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4}
+.tap{cursor:pointer}
+.tap:active{background:var(--card2)}
+.chev::after{content:"›";color:var(--muted);font-size:22px;margin-left:4px}
+input,select,textarea{font:inherit;font-size:16px;color:var(--text);background:var(--card2);border:1px solid transparent;border-radius:10px;padding:10px 12px;width:100%}
+textarea{min-height:76px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
+label.f{display:block;padding:10px 16px}
+label.f>span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.sw{appearance:none;flex:none;width:51px;height:31px;border-radius:16px;background:var(--card2);position:relative;margin:0;cursor:pointer;transition:background .2s;padding:0;border:0}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:transform .2s}
 .sw:checked{background:var(--accent)}.sw:checked::after{transform:translateX(20px)}
 .btn{display:block;width:100%;padding:15px;border:0;border-radius:14px;background:var(--accent);color:var(--onaccent);font:inherit;font-weight:600;font-size:17px;cursor:pointer;margin-top:12px}
 .btn:disabled{opacity:.5}
 .btn.plain{background:var(--card);color:var(--accent);font-weight:500}
 .btn.danger{background:var(--card);color:var(--err);font-weight:500}
-.small{border:0;background:var(--card2);color:var(--accent);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;flex:none}
-.res{margin-top:14px}
-.res .head{font-weight:600;font-size:16px;margin-bottom:6px}
-.res ul{margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:15px}
-.res li.warn{color:var(--warn)}
+.small{border:0;background:var(--card2);color:var(--accent);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;flex:none;text-decoration:none;display:inline-block}
+.small.red{color:var(--err)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.seg{display:flex;background:var(--card2);border-radius:9px;padding:2px;gap:2px}
+.seg button{flex:1;border:0;background:transparent;color:var(--text);font:inherit;font-size:13px;padding:6px 4px;border-radius:7px;cursor:pointer;min-width:0}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.18);font-weight:600}
+.pref{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;padding:6px 16px}
+.pref .seg button{font-size:15px;padding:5px 0}
+.pref .seg button.on.v-2{color:var(--err)}.pref .seg button.on.v2{color:var(--accent)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--card2);color:var(--muted);margin-left:6px;vertical-align:2px;white-space:nowrap}
+.badge.acc{background:var(--accent);color:var(--onaccent)}.badge.warn{color:var(--warn)}.badge.ok{color:var(--ok)}
 .time{width:52px;flex:none;font-variant-numeric:tabular-nums;font-size:15px;align-self:flex-start;padding-top:1px}
 .time small{display:block;color:var(--muted);font-size:12px}
 .act.new{background:var(--new)}
 .act.new::after{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--accent)}
-.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--card2);color:var(--muted);margin-left:6px;vertical-align:2px}
-.badge.new{background:var(--accent);color:var(--onaccent)}
 .note{font-size:13px;color:var(--accent);margin-top:3px}
-.dayh{font-weight:600;font-size:15px;padding:12px 16px 4px;color:var(--text)}
-.empty{color:var(--muted);font-size:14px;padding:10px 16px 14px}
-.chip{background:var(--card2);color:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px}
-footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
-.err{color:var(--err);font-size:14px;margin-top:10px}
+.warnt{color:var(--warn)}
+.dayh{font-weight:600;font-size:15px;padding:14px 16px 4px;display:flex;justify-content:space-between;gap:8px}
+.dayh .s{margin:0;font-weight:400}
+.dayh.today{color:var(--accent)}
+.empty{color:var(--muted);font-size:14px;padding:12px 16px 14px;line-height:1.45}
+.chip{background:var(--card2);color:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px;white-space:nowrap}
+details>summary{list-style:none;cursor:pointer;padding:12px 16px;display:flex;justify-content:space-between;color:var(--accent);font-size:15px}
+details>summary::-webkit-details-marker{display:none}
+details>summary::after{content:"›";transform:rotate(90deg);transition:transform .2s}
+details[open]>summary::after{transform:rotate(270deg)}
+details{position:relative}
+.msg{min-height:20px;font-size:14px;margin:10px 4px 0;line-height:1.45}
+.msg.err{color:var(--err)}.msg.ok{color:var(--ok)}
+.res ul{margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:15px}
+.res li.warn{color:var(--warn)}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:sp 1s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.pre{white-space:pre-wrap;font-size:15px;line-height:1.5;background:var(--card2);border-radius:10px;padding:12px;margin-top:8px;user-select:text;-webkit-user-select:text}
+.star{border:0;background:none;font-size:22px;color:var(--warn);cursor:pointer;padding:4px}
+.idea .s b{color:var(--text);font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:6px;vertical-align:1px}
+img.prev{max-width:100%;max-height:260px;border-radius:10px;display:block;margin:10px auto 0}
+/* untere Leiste */
+#tabbar{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:6px 4px calc(env(safe-area-inset-bottom) + 6px);display:flex;z-index:20}
+#tabbar button{flex:1;border:0;background:none;color:var(--muted);font:inherit;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:4px 0;position:relative}
+#tabbar button svg{width:26px;height:26px}
+#tabbar button.on{color:var(--accent)}
+#tabbar .cnt{position:absolute;top:0;left:calc(50% + 8px);background:var(--err);color:#fff;border-radius:999px;font-size:11px;min-width:18px;height:18px;line-height:18px;padding:0 5px;font-weight:600}
+/* Vollbild-Blätter */
+.sheet{position:fixed;inset:0;background:var(--bg);z-index:30;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .28s ease;visibility:hidden}
+.sheet.open{transform:none;visibility:visible}
+.back{border:0;background:none;color:var(--accent);font:inherit;font-size:17px;padding:4px 0;cursor:pointer}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+#toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 80px);max-width:560px;margin:0 auto;background:var(--text);color:var(--bg);border-radius:12px;padding:12px 14px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.on{opacity:1}
+/* Aktionsblatt */
+#asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
+#asheet.open{display:flex}
+#asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
+#asheet .grp{background:var(--card);border-radius:14px;overflow:hidden;margin-bottom:8px}
+#asheet .grp .ttl{padding:12px 16px;color:var(--muted);font-size:13px;text-align:center}
+#asheet .grp button{display:block;width:100%;border:0;border-top:1px solid var(--line);background:none;color:var(--accent);font:inherit;font-size:18px;padding:15px;cursor:pointer}
+#asheet .grp button.red{color:var(--err)}
+#asheet .grp button.bold{font-weight:600}
 </style>
 </head>
-<body><main>
-  <h1>Kompass</h1>
-  <p class="sub" id="sub">Testversion</p>
-
-  <h2>Wettercheck simulieren</h2>
-  <div class="card" id="scen"></div>
-  <div class="card" style="margin-top:12px">
-    <label class="row"><div class="grow"><div class="t">Schwangerschaft berücksichtigen</div>
-      <div class="s">keine Sauna/Hitze, höchstens mittel anstrengend</div></div>
-      <input type="checkbox" class="sw" id="preg"></label>
-    <label class="row"><div class="grow"><div class="t">Folgetag ist trocken</div>
-      <div class="s">dann darf Draussen-Programm verschoben statt ersetzt werden</div></div>
-      <input type="checkbox" class="sw" id="dry"></label>
+<body>
+<!-- ============ REISEN ============ -->
+<main id="v-trips" class="view">
+  <h1>Reisen</h1>
+  <p class="sub">Plant Reisen für euch beide und passt sie unterwegs selbständig an.</p>
+  <button class="btn" id="newTrip">Neue Reise planen</button>
+  <div id="jobBox" class="card pad" style="margin-top:12px" hidden></div>
+  <h2>Eure Reisen</h2>
+  <div class="card" id="tripList"></div>
+  <div id="favDestWrap" hidden>
+    <h2>Gemerkte Ziele</h2>
+    <div class="card" id="favDest"></div>
   </div>
-  <p class="hint" id="when"></p>
-  <button class="btn" id="run">Wettercheck auslösen</button>
-  <div class="card pad res" id="res" hidden></div>
-
-  <h2>Reiseplan <span id="ver"></span></h2>
-  <div class="card" id="plan"></div>
-
-  <div id="actWrap" hidden>
-    <h2>Wartet auf deine Bestätigung</h2>
-    <div class="card" id="acts"></div>
-    <p class="hint">In der Testversion wird nichts gebucht oder storniert – die Aufträge werden nur vorgemerkt.</p>
-  </div>
-
-  <h2>Verlauf</h2>
-  <div class="card" id="hist"></div>
-
-  <button class="btn plain" id="reset" style="margin-top:28px">Demo zurücksetzen</button>
-  <button class="btn danger" id="logout">Abmelden</button>
-  <footer id="foot"></footer>
 </main>
+
+<!-- ============ UNTERWEGS ============ -->
+<main id="v-today" class="view" hidden>
+  <h1>Unterwegs</h1>
+  <p class="sub" id="todaySub">Heute auf der Reise</p>
+  <div id="todayBox"></div>
+  <h2>Meldungen <span class="r"><button class="small" id="markRead">Alle gelesen</button></span></h2>
+  <div class="card" id="notices"></div>
+</main>
+
+<!-- ============ HELFER ============ -->
+<main id="v-help" class="view" hidden>
+  <h1>Helfer</h1>
+  <p class="sub">Für unterwegs: Fotos übersetzen und Nachrichten entwerfen.</p>
+  <h2>Speisekarte &amp; Schilder</h2>
+  <div class="card pad">
+    <div class="t">Foto aufnehmen oder wählen</div>
+    <div class="s">Kompass liest den Text, übersetzt ihn und erklärt Gerichte – bei Schwangerschaft mit Hinweisen.</div>
+    <input type="file" id="photo" accept="image/*" capture="environment" style="margin-top:12px">
+    <img id="photoPrev" class="prev" alt="" hidden>
+    <input type="text" id="photoQ" placeholder="Frage dazu (optional), z. B. «Was ist vegetarisch?»" style="margin-top:10px" maxlength="300">
+    <button class="btn" id="photoGo" disabled>Übersetzen</button>
+    <div class="msg" id="photoMsg"></div>
+  </div>
+  <div id="visionOut"></div>
+
+  <h2>Nachricht entwerfen</h2>
+  <div class="card">
+    <label class="f"><span>Worum geht es?</span>
+      <select id="dKind">
+        <option value="nachricht">Allgemeine Anfrage</option>
+        <option value="hotel_verlaengern">Hotel verlängern</option>
+        <option value="buchung_aendern">Buchung verschieben</option>
+        <option value="transport_umbuchen">Fähre/Flug umbuchen</option>
+        <option value="buchung_anfragen">Reservation anfragen</option>
+        <option value="buchung_stornieren">Stornieren</option>
+      </select></label>
+    <label class="f"><span>An wen?</span><input id="dTo" maxlength="120" placeholder="z. B. Hotel Sol, Reception"></label>
+    <label class="f"><span>Sprache der Nachricht</span><input id="dLang" maxlength="40" placeholder="leer = Landessprache, sonst Englisch"></label>
+    <label class="f"><span>Was soll drinstehen?</span><textarea id="dDetails" maxlength="1200" placeholder="z. B. zwei Nächte länger bleiben, 4.–6. Dezember, gleiches Zimmer"></textarea></label>
+  </div>
+  <button class="btn" id="dGo">Entwurf schreiben</button>
+  <div class="msg" id="dMsg"></div>
+  <div id="draftOut"></div>
+</main>
+
+<!-- ============ PROFIL ============ -->
+<main id="v-profile" class="view" hidden>
+  <h1>Profil</h1>
+  <p class="sub" id="saveState">Änderungen werden automatisch gespeichert.</p>
+  <div id="people"></div>
+  <h2>Feste Randbedingungen</h2>
+  <div class="card" id="constraints"></div>
+  <h2>Gemeinsame Schnittmenge</h2>
+  <div class="card pad" id="matchBox"></div>
+
+  <h2>Einstellungen</h2>
+  <div class="card" id="settings"></div>
+  <h2>Kosten</h2>
+  <div class="card" id="costs"></div>
+  <p class="hint">Jede KI-Aktion (Planen, Übersetzen, Entwurf) kostet ein paar Rappen. Wetter und Matching sind gratis.</p>
+  <button class="btn plain" id="logout" style="margin-top:24px">Abmelden</button>
+  <button class="btn danger" id="logoutAll">Überall abmelden</button>
+  <p class="hint" id="ver" style="text-align:center;margin-top:16px"></p>
+</main>
+
+<!-- ============ BLATT: NEUE REISE ============ -->
+<div class="sheet" id="newSheet"><div class="in">
+  <div class="topbar"><button class="back" data-close="newSheet">‹ Reisen</button></div>
+  <h1>Neue Reise</h1>
+  <p class="sub">Ziel eingeben oder passende Ziele für euch beide vorschlagen lassen.</p>
+  <div class="card">
+    <div class="two">
+      <label class="f"><span>Abreise</span><input type="date" id="nStart"></label>
+      <label class="f"><span>Tage</span><input type="number" id="nDays" min="2" max="30" value="7" inputmode="numeric"></label>
+    </div>
+    <label class="f"><span>Ziel (optional)</span><input id="nDest" maxlength="200" placeholder="z. B. Madeira, Japan, «irgendwo am Meer»"></label>
+    <label class="f"><span>Wünsche</span><textarea id="nWish" maxlength="800" placeholder="z. B. ruhig, gutes Essen, kein Mietauto"></textarea></label>
+  </div>
+  <button class="btn" id="nPlan">Plan erstellen</button>
+  <button class="btn plain" id="nSuggest">Ziele vorschlagen lassen</button>
+  <div class="msg" id="nMsg"></div>
+  <div id="ideas"></div>
+</div></div>
+
+<!-- ============ BLATT: REISE ============ -->
+<div class="sheet" id="tripSheet"><div class="in" id="tripIn"></div></div>
+
+<!-- Aktionsblatt -->
+<div id="asheet"><div class="box"><div class="grp" id="aGrp"></div><div class="grp"><button class="bold" id="aCancel">Abbrechen</button></div></div></div>
+<div id="toast"></div>
+
+<nav id="tabbar">
+  <button data-view="v-trips" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Reisen</button>
+  <button data-view="v-today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Unterwegs<span class="cnt" id="unread" hidden></span></button>
+  <button data-view="v-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Helfer</button>
+  <button data-view="v-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M14.5 14.3c.6-.2 1.3-.3 2-.3 2.4 0 4 1.5 4.5 4"/></svg>Profil</button>
+</nav>
+
 <script>
+"use strict";
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const EXP = {indoor: "drinnen", outdoor: "draussen", gemischt: "drinnen & draussen"};
-const CAT = {wandern:"Wandern", natur:"Natur", strand:"Strand", wassersport:"Wassersport", kultur:"Kultur", museum:"Museum",
-  stadt:"Stadt", kulinarik:"Essen", wellness:"Wellness", entspannung:"Entspannung", shopping:"Shopping", nachtleben:"Ausgang"};
-const KIND = {buchung_stornieren:"Stornieren", buchung_aendern:"Umbuchen", buchung_anfragen:"Reservieren",
-  hotel_verlaengern:"Hotel verlängern", nachricht:"Nachricht"};
-let S = null, scenario = "regen";
+const MODE = {flug: "✈︎ Flug", faehre: "⛴ Fähre", zug: "🚆 Zug", bus: "🚌 Bus", auto: "🚗 Auto"};
+const STATUS = {entwurf: "Entwurf", gebucht: "Gebucht", unterwegs: "Unterwegs", abgeschlossen: "Beendet"};
+const KIND = {buchung_stornieren: "Stornieren", buchung_aendern: "Buchung verschieben", buchung_anfragen: "Anfragen",
+  hotel_verlaengern: "Hotel verlängern", transport_umbuchen: "Umbuchen", nachricht: "Nachricht"};
+const PREF = [[-2, "✕"], [-1, "−"], [0, "·"], [1, "+"], [2, "★"]];
+const INT = {1: "leicht", 2: "mittel", 3: "anstrengend"};
+let INFO = null, HH = null, TRIP = null, CATS = {};
 
-const dayLabel = iso => new Date(iso + "T12:00").toLocaleDateString("de-CH", {weekday: "long", day: "numeric", month: "long"});
-const hm = t => t.slice(0, 5);
-const chf = v => Number(v) ? `CHF ${Number(v).toLocaleString("de-CH", {maximumFractionDigits: 0})}` : "gratis";
+// ---------- Hilfen ----------
+const fmtD = (iso, o = {weekday: "short", day: "numeric", month: "short"}) => new Date(iso.slice(0, 10) + "T12:00").toLocaleDateString("de-CH", o);
+const fmtLong = iso => fmtD(iso, {weekday: "long", day: "numeric", month: "long"});
+const hm = t => (t || "").slice(0, 5);
+const chf = v => Number(v) ? `CHF ${Math.round(Number(v)).toLocaleString("de-CH")}` : "gratis";
+const usd = v => `${Number(v || 0).toFixed(2)} USD`;
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 2600); }
+function msg(el, text, kind = "") { el.className = "msg " + kind; el.innerHTML = text; }
 
-async function api(path, body) {
-  const r = await fetch(path, body === undefined ? {credentials: "same-origin"} : {method: "POST", credentials: "same-origin",
-    headers: {"Content-Type": "application/json", "X-Kompass": "1"}, body: JSON.stringify(body)});
-  if (r.status === 401) { location.replace("/login"); throw new Error("abgemeldet"); }
+async function api(path, body, method) {
+  const opt = {credentials: "same-origin", method: method || (body === undefined ? "GET" : "POST")};
+  if (body !== undefined || method === "DELETE") {
+    opt.headers = {"Content-Type": "application/json", "X-Kompass": "1"};
+    opt.body = JSON.stringify(body || {});
+  }
+  const r = await fetch(path, opt);
+  if (r.status === 401) { location.replace("/login"); throw new Error("Bitte anmelden."); }
   const j = await r.json().catch(() => ({}));
-  if (!r.ok && !j.state) throw new Error(j.error || "Fehler " + r.status);
+  if (!r.ok && !j.trip) throw new Error(j.error || "Fehler " + r.status);
   return j;
 }
 
-function renderScenarios() {
-  $("scen").innerHTML = Object.entries(S.scenarios).map(([k, v]) =>
-    `<label class="row"><div class="grow t">${esc(v)}</div><input type="radio" name="sc" value="${k}" ${k === scenario ? "checked" : ""}></label>`).join("");
-  $("scen").querySelectorAll("input").forEach(i => i.onchange = () => scenario = i.value);
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch { const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove(); }
+  toast("Kopiert");
 }
 
-function render() {
-  const p = S.plan, now = new Date(S.now);
-  $("sub").textContent = `${p.title} · Testversion ${S.version}`;
-  $("when").textContent = `Simuliert wird der Morgen von ${dayLabel(S.now.slice(0, 10))}, ${now.toTimeString().slice(0, 5)} Uhr – so, wie es die App später jeden Morgen von selbst macht.`;
-  $("ver").innerHTML = `<span class="chip">Version ${p.version}</span> <span class="chip">${esc(chf(S.total))}</span>`;
-  $("plan").innerHTML = p.days.map(d => `<div class="dayh">${esc(dayLabel(d.date))} · ${esc(d.base.name)}</div>` + (d.activities.length ? d.activities.map(a => {
-    const isNew = a.origin === "umplanung";
-    const badge = isNew ? `<span class="badge new">neu</span>` : a.locked ? `<span class="badge">fest</span>` : a.booking ? `<span class="badge">gebucht</span>` : "";
-    return `<div class="row act ${isNew ? "new" : ""}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
-      <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
-      <div class="s">${esc(CAT[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(chf(a.cost))}</div>
-      ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
-  }).join("") : `<div class="empty">Noch nichts geplant</div>`)).join("");
+function actionSheet(title, items) {
+  $("aGrp").innerHTML = `<div class="ttl">${esc(title)}</div>` + items.map((it, i) => `<button data-i="${i}" class="${it.red ? "red" : ""}">${esc(it.label)}</button>`).join("");
+  $("aGrp").querySelectorAll("button").forEach(b => b.onclick = () => { closeAS(); items[+b.dataset.i].fn(); });
+  $("asheet").classList.add("open");
+}
+const closeAS = () => $("asheet").classList.remove("open");
+$("aCancel").onclick = closeAS;
+$("asheet").onclick = e => { if (e.target.id === "asheet") closeAS(); };
 
-  $("actWrap").hidden = !S.actions.length;
-  $("acts").innerHTML = S.actions.map(a => `<div class="row"><div class="grow"><div class="t">${esc(a.description)}</div>
-    <div class="s">${esc(KIND[a.kind] || a.kind)} · braucht Bestätigung</div></div></div>`).join("");
+function openSheet(id) { $(id).classList.add("open"); $(id).scrollTop = 0; document.body.style.overflow = "hidden"; }
+function closeSheet(id) { $(id).classList.remove("open"); if (!document.querySelector(".sheet.open")) document.body.style.overflow = ""; }
+document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeSheet(b.dataset.close));
 
-  $("hist").innerHTML = S.history.length ? S.history.map(h => `<div class="row"><div class="grow">
-      <div class="t">${esc(h.reason)}</div>
-      <div class="s">${h.actor === "autonom" ? "automatisch" : "von dir"} · Version ${h.from_version} → ${h.to_version}${h.undone_by ? " · rückgängig gemacht" : ""}</div></div>
-      ${h.can_undo ? `<button class="small" data-undo="${esc(h.id)}">Rückgängig</button>` : ""}</div>`).join("")
-    : `<div class="empty">Noch keine Änderungen</div>`;
-  $("hist").querySelectorAll("[data-undo]").forEach(b => b.onclick = () => undo(b.dataset.undo, b));
-  $("foot").textContent = `Kompass ${S.version} · ${S.build}`;
+// ---------- Ansichten ----------
+function show(view) {
+  document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== view);
+  document.querySelectorAll("#tabbar button").forEach(b => b.classList.toggle("on", b.dataset.view === view));
+  try { localStorage.setItem("view", view); } catch {}
+  window.scrollTo(0, 0);
+  if (view === "v-trips") loadTrips();
+  if (view === "v-today") loadToday();
+  if (view === "v-profile") loadProfile();
+}
+document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => show(b.dataset.view));
+
+async function loadInfo() {
+  INFO = await api("/api/info");
+  CATS = INFO.categories;
+  const u = $("unread"); u.hidden = !INFO.unread; u.textContent = INFO.unread;
 }
 
-function showResult(o) {
-  const head = o.applied ? "Plan angepasst" : o.status === "nichts_zu_tun" ? (o.needs_user.length ? "Nichts automatisch geändert" : "Nichts betroffen – das Geplante passt zu diesem Wetter") : "Nicht geändert";
-  const lines = o.decisions.filter(d => d.action !== "unveraendert")
-    .map(d => `<li><b>${esc(d.title)}</b>: ${esc(d.detail)} <span style="color:var(--muted)">(${esc(d.reason)})</span></li>`);
-  const warn = o.needs_user.map(n => `<li class="warn">${esc(n)}</li>`);
-  const probs = o.problems.filter(p => p.level === "fehler").map(p => `<li class="warn">${esc(p.message)}</li>`);
-  $("res").innerHTML = `<div class="head">${head}</div>` + (lines.length + warn.length + probs.length ? `<ul>${lines.join("")}${warn.join("")}${probs.join("")}</ul>` : "");
-  $("res").hidden = false;
+// ---------- Hintergrund-Aufträge ----------
+let jobTimer = null;
+function watchJob(id, label, onDone) {
+  const box = $("jobBox");
+  box.hidden = false;
+  box.innerHTML = `<span class="spin"></span>${esc(label)}<div class="s">Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.</div>`;
+  try { localStorage.setItem("job", JSON.stringify({id, label})); } catch {}
+  clearTimeout(jobTimer);
+  const tick = async () => {
+    let j;
+    try { j = await api("/api/jobs/" + id); } catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; clearJob(); return; }
+    if (j.status === "laeuft") { jobTimer = setTimeout(tick, 2000); return; }
+    clearJob();
+    if (j.status === "fehler") { box.innerHTML = `<span class="warnt">${esc(j.error)}</span>`; return; }
+    box.hidden = true;
+    onDone(j.result);
+  };
+  tick();
+}
+function clearJob() { try { localStorage.removeItem("job"); } catch {} }
+
+// ---------- Reisen ----------
+async function loadTrips() {
+  const [t, ideas] = await Promise.all([api("/api/trips"), api("/api/ideas")]);
+  $("tripList").innerHTML = t.trips.length ? t.trips.map(x => `<div class="row tap chev" data-trip="${esc(x.id)}">
+      <div class="grow"><div class="t">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
+      <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div>
+      <span class="chip">${esc(STATUS[x.status])}</span></div>`).join("")
+    : `<div class="empty">Noch keine Reise. Tippe auf «Neue Reise planen».<br>Tipp: Zuerst unter «Profil» eure Vorlieben eintragen.</div>`;
+  $("tripList").querySelectorAll("[data-trip]").forEach(r => r.onclick = () => openTrip(r.dataset.trip));
+  $("favDestWrap").hidden = !ideas.saved.length;
+  $("favDest").innerHTML = ideas.saved.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.name)}</div>
+      <div class="s">${esc(i.why || "")}</div></div><button class="small" data-plan="${esc(i.name)}">Planen</button></div>`).join("");
+  $("favDest").querySelectorAll("[data-plan]").forEach(b => b.onclick = () => { openNew(); $("nDest").value = b.dataset.plan; });
 }
 
-async function load() { S = await api("/api/state"); renderScenarios(); render(); }
+function openNew() {
+  const d = new Date(); d.setDate(d.getDate() + 30);
+  if (!$("nStart").value) $("nStart").value = d.toISOString().slice(0, 10);
+  msg($("nMsg"), "");
+  openSheet("newSheet");
+}
+$("newTrip").onclick = openNew;
 
-$("run").onclick = async () => {
-  const b = $("run"); b.disabled = true;
+$("nPlan").onclick = async () => {
+  const dest = $("nDest").value.trim();
+  if (!dest) { msg($("nMsg"), "Bitte ein Ziel eingeben – oder «Ziele vorschlagen lassen».", "err"); return; }
+  await startPlan(dest);
+};
+async function startPlan(dest) {
   try {
-    const j = await api("/api/demo/check", {scenario, pregnant: $("preg").checked, dry_next_day: $("dry").checked});
-    S = j.state; render(); showResult(j.outcome);
-  } catch (e) { $("res").innerHTML = `<div class="err">${esc(e.message)}</div>`; $("res").hidden = false; }
+    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: +$("nDays").value, wishes: $("nWish").value});
+    closeSheet("newSheet"); show("v-trips");
+    watchJob(r.job, `Kompass plant «${dest}» …`, res => { loadTrips(); openTrip(res.trip_id); });
+  } catch (e) { msg($("nMsg"), esc(e.message), "err"); }
+}
+
+$("nSuggest").onclick = async () => {
+  const b = $("nSuggest"); b.disabled = true;
+  msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima …`);
+  try {
+    const r = await api("/api/destinations", {start: $("nStart").value, days: +$("nDays").value, wish: $("nDest").value + " " + $("nWish").value});
+    const poll = async () => {
+      const j = await api("/api/jobs/" + r.job);
+      if (j.status === "laeuft") return setTimeout(poll, 2000);
+      b.disabled = false;
+      if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
+      msg($("nMsg"), ""); renderIdeas(j.result);
+    };
+    poll();
+  } catch (e) { b.disabled = false; msg($("nMsg"), esc(e.message), "err"); }
+};
+
+function renderIdeas(res) {
+  const saved = new Set();
+  $("ideas").innerHTML = `<h2>Vorschläge für euch</h2><div class="card">` + res.ideas.map((i, n) => `<div class="row idea">
+      <div class="grow"><div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
+      <div class="s">${esc(i.why)}</div>
+      <div class="s">${esc((i.highlights || []).join(" · "))}</div>
+      <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
+      <div class="s">Flug ca. ${esc(i.typical_flight_hours)} Std.${i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt"} · ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
+      ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
+      <div class="btns"><button class="small" data-go="${n}">Diese Reise planen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
+      </div></div>`).join("") + `</div>` +
+    (res.dropped.length ? `<p class="hint">Aussortiert: ${esc(res.dropped.join(" · "))}</p>` : "") +
+    `<p class="hint">Klima = echte Messwerte derselben Tage im Vorjahr. Kosten und Flugzeiten sind Schätzungen der KI.</p>`;
+  $("ideas").querySelectorAll("[data-go]").forEach(b => b.onclick = () => { const i = res.ideas[+b.dataset.go]; startPlan(`${i.name}, ${i.country}`); });
+  $("ideas").querySelectorAll("[data-fav]").forEach(b => b.onclick = async () => {
+    const i = res.ideas[+b.dataset.fav]; await api("/api/fav-destination", {idea: i}); b.textContent = "★ Gemerkt"; b.disabled = true;
+  });
+}
+
+// ---------- Reise-Detail ----------
+async function openTrip(id) {
+  const d = await api("/api/trips/" + id);
+  TRIP = d; renderTrip(); openSheet("tripSheet");
+}
+function reTrip(d) { TRIP = d; renderTrip(); }
+
+function renderTrip(outcome) {
+  const d = TRIP, t = d.trip;
+  const actions = d.actions.map(a => {
+    const dr = d.drafts[a.id];
+    return `<div class="row"><div class="grow"><div class="t">${esc(a.description)}</div>
+      <div class="s">${esc(KIND[a.kind] || a.kind)} · braucht deine Bestätigung</div>
+      ${dr ? `<div class="pre">${esc(dr.subject)}\n\n${esc(dr.message)}</div>
+        ${dr.message_de && dr.message_de !== dr.message ? `<details><summary>Deutsche Fassung</summary><div class="pre" style="margin:0 16px 12px">${esc(dr.message_de)}</div></details>` : ""}` : ""}
+      <div class="btns">${dr ? `<button class="small" data-copy="${esc(a.id)}">Kopieren</button>` : `<button class="small" data-draft="${esc(a.id)}">Nachricht entwerfen</button>`}
+        <button class="small" data-done="${esc(a.id)}">Erledigt</button><button class="small red" data-drop="${esc(a.id)}">Verwerfen</button></div>
+      </div></div>`;
+  }).join("");
+
+  const days = t.days.map(day => {
+    const isToday = day.date === d.today;
+    return `<div class="dayh ${isToday ? "today" : ""}"><span>${esc(fmtLong(day.date))}${isToday ? " · heute" : ""}</span><span class="s">${esc(day.base.name)}</span></div>` +
+      (day.activities.length ? day.activities.map(a => {
+        const isNew = a.origin === "umplanung";
+        const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
+        return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
+          <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
+          <div class="s">${esc(CATS[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(INT[a.intensity])} · ${esc(chf(a.cost))}</div>
+          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
+      }).join("") : `<div class="empty">Freier Tag</div>`);
+  }).join("");
+
+  const stays = t.stays.map(s => `<div class="row"><div class="grow">
+      <div class="t">${esc(s.name)}${s.confirmed ? `<span class="badge ok">gebucht</span>` : `<span class="badge warn">Vorschlag</span>`}</div>
+      <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))} · ${esc(chf(s.cost))}${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div>
+      ${s.note ? `<div class="s">${esc(s.note)}</div>` : ""}
+      <div class="btns">${s.search_url ? `<a class="small" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Bei Booking.com suchen</a>` : ""}
+        <button class="small" data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div>
+      </div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
+
+  const trans = t.transports.map(x => `<div class="row"><div class="grow">
+      <div class="t">${esc(MODE[x.mode] || x.mode)} ${esc(x.origin.name)} → ${esc(x.destination.name)}${x.estimated ? `<span class="badge warn">Schätzung</span>` : `<span class="badge ok">gebucht</span>`}</div>
+      <div class="s">${esc(fmtD(x.depart))}, ${esc(x.depart.slice(11, 16))} – ${esc(x.arrive.slice(11, 16))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""} · ${esc(chf(x.cost))}</div>
+      ${x.note ? `<div class="s">${esc(x.note)}</div>` : ""}
+      <div class="btns">${x.search_url ? `<a class="small" href="${esc(x.search_url)}" target="_blank" rel="noopener noreferrer">Flüge suchen</a>` : ""}
+        <button class="small" data-conf="verbindung:${esc(x.id)}:${x.estimated ? 1 : 0}">${x.estimated ? "Als gebucht markieren" : "Als Vorschlag"}</button>
+        <button class="small red" data-cancel="${esc(x.id)}">Fällt aus …</button></div>
+      </div></div>`).join("") || `<div class="empty">Keine Verbindungen</div>`;
+
+  const hotels = t.hotel_suggestions.map(h => `<div class="row"><div class="grow"><div class="t">${esc(h.name)}</div>
+      <div class="s">${esc(h.base)}${h.area ? " · " + esc(h.area) : ""} · ca. ${esc(chf(h.price_per_night))}/Nacht</div><div class="s">${esc(h.why)}</div>
+      ${h.search_url ? `<div class="btns"><a class="small" href="${esc(h.search_url)}" target="_blank" rel="noopener noreferrer">Bei Booking.com suchen</a></div>` : ""}</div></div>`).join("");
+  const alts = t.alternatives.map(a => `<div class="row"><div class="grow"><div class="t">${esc(a.title)}</div>
+      <div class="s">${esc(a.place.name)} · ${esc(CATS[a.category] || a.category)} · ${a.duration_min} Min. · ${esc(chf(a.cost))}${a.tags.length ? " · " + esc(a.tags.join(", ")) : ""}</div></div></div>`).join("");
+
+  const hist = d.history.length ? d.history.map(h => `<div class="row"><div class="grow"><div class="t">${esc(h.reason)}</div>
+      <div class="s">${h.actor === "autonom" ? "automatisch" : "von dir"} · ${esc(new Date(h.created_at).toLocaleString("de-CH", {dateStyle: "short", timeStyle: "short"}))} · Version ${h.from_version} → ${h.to_version}${h.undone_by ? " · rückgängig gemacht" : ""}</div></div>
+      ${h.can_undo ? `<button class="small" data-undo="${esc(h.id)}">Rückgängig</button>` : ""}</div>`).join("") : `<div class="empty">Noch keine Änderungen</div>`;
+
+  $("tripIn").innerHTML = `
+    <div class="topbar"><button class="back" data-close="tripSheet">‹ Reisen</button>
+      <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></div>
+    <h1>${esc(t.title)}</h1>
+    <p class="sub">${esc(fmtD(t.start_date, {day: "numeric", month: "long"}))} – ${esc(fmtD(t.end_date, {day: "numeric", month: "long", year: "numeric"}))} · ${t.days.length} Tage · ca. ${esc(chf(d.total))} · Version ${t.version}</p>
+    <div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
+    <p class="hint" style="margin:8px 4px 0">Ab «Gebucht» prüft Kompass während der Reise jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) das Wetter und stellt den Tag bei Bedarf um.</p>
+    <button class="btn" id="tWeather">Wetter jetzt prüfen</button>
+    <div class="card pad res" id="tOut" hidden></div>
+    ${t.summary ? `<h2>Überblick</h2><div class="card pad"><div class="t">${esc(t.summary)}</div>${t.cost_note ? `<div class="s">${esc(t.cost_note)}</div>` : ""}</div>` : ""}
+    ${d.notes.length ? `<div class="card pad" style="margin-top:12px"><div class="s warnt">${d.notes.map(esc).join("<br>")}</div></div>` : ""}
+    ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
+      <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
+    <h2>Tagesplan</h2><div class="card">${days}</div>
+    <p class="hint">Programmpunkt antippen: festnageln (die Automatik lässt ihn dann in Ruhe) oder «fällt aus» melden.</p>
+    <h2>Unterkünfte</h2><div class="card">${stays}</div>
+    <h2>Verbindungen</h2><div class="card">${trans}</div>
+    <p class="hint">Fällt eine Fähre oder ein Flug aus, verlängert Kompass die Unterkunft und schiebt alle Folgetage nach hinten – in einem Schritt, rückgängig machbar.</p>
+    ${hotels ? `<div class="card" style="margin-top:12px"><details><summary>Weitere Hotels (${t.hotel_suggestions.length})</summary>${hotels}</details></div>` : ""}
+    ${alts ? `<div class="card" style="margin-top:12px"><details><summary>Schlechtwetter-Programm (${t.alternatives.length})</summary>${alts}</details></div>` : ""}
+    <h2>Verlauf</h2><div class="card">${hist}</div>
+    <p class="hint">KI-Kosten dieser Reise: ${esc(usd(d.ai_cost))}</p>
+    <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button>`;
+
+  const tid = t.id;
+  $("tripIn").querySelector("[data-close]").onclick = () => { closeSheet("tripSheet"); loadTrips(); };
+  $("tFav").onclick = async () => reTrip(await api(`/api/trips/${tid}/favorite`, {}));
+  $("tStatus").querySelectorAll("button").forEach(b => b.onclick = async () => reTrip(await api(`/api/trips/${tid}/status`, {status: b.dataset.st})));
+  $("tWeather").onclick = async () => {
+    const b = $("tWeather"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Prüfe Wetter …`;
+    try { const r = await api(`/api/trips/${tid}/weathercheck`, {}); reTrip(r); showOutcome(r.outcome); }
+    catch (e) { toast(e.message); b.disabled = false; b.textContent = "Wetter jetzt prüfen"; }
+  };
+  $("tDelete").onclick = () => actionSheet(`«${t.title}» wirklich löschen?`, [{label: "Reise löschen", red: true, fn: async () => {
+    await api("/api/trips/" + tid, undefined, "DELETE"); closeSheet("tripSheet"); loadTrips(); toast("Gelöscht"); }}]);
+  const q = s => $("tripIn").querySelectorAll(s);
+  q("[data-undo]").forEach(b => b.onclick = async () => { const r = await api(`/api/trips/${tid}/undo`, {change_id: b.dataset.undo}); reTrip(r); toast(r.ok ? "Rückgängig gemacht" : r.error); });
+  q("[data-draft]").forEach(b => b.onclick = async () => {
+    b.disabled = true; b.innerHTML = `<span class="spin"></span>Schreibe …`;
+    try { await api(`/api/actions/${b.dataset.draft}/draft`, {}); reTrip(await api("/api/trips/" + tid)); }
+    catch (e) { toast(e.message); b.disabled = false; b.textContent = "Nachricht entwerfen"; }
+  });
+  q("[data-copy]").forEach(b => b.onclick = () => { const dr = TRIP.drafts[b.dataset.copy]; copy(`${dr.subject}\n\n${dr.message}`); });
+  q("[data-done]").forEach(b => b.onclick = async () => { await api(`/api/actions/${b.dataset.done}`, {status: "erledigt"}); reTrip(await api("/api/trips/" + tid)); });
+  q("[data-drop]").forEach(b => b.onclick = async () => { await api(`/api/actions/${b.dataset.drop}`, {status: "verworfen"}); reTrip(await api("/api/trips/" + tid)); });
+  q("[data-conf]").forEach(b => b.onclick = async () => {
+    const [target, id, on] = b.dataset.conf.split(":");
+    let reference = "";
+    if (on === "1") reference = prompt("Buchungsnummer (optional):") || "";
+    reTrip(await api(`/api/trips/${tid}/confirm`, {target, item_id: id, confirmed: on === "1", reference}));
+  });
+  q("[data-cancel]").forEach(b => b.onclick = () => {
+    const seg = t.transports.find(x => x.id === b.dataset.cancel);
+    actionSheet(`${seg.origin.name} → ${seg.destination.name}: wie lange fällt sie aus?`, [1, 2, 3, 4].map(n => ({
+      label: `${n} Tag${n > 1 ? "e" : ""}`, fn: async () => {
+        const r = await api(`/api/trips/${tid}/transport`, {segment_id: seg.id, days: n, reason: "Ausfall gemeldet"});
+        reTrip(r); showOutcome(r.outcome); }})));
+  });
+  q("[data-act]").forEach(r => r.onclick = () => {
+    const a = t.days.flatMap(x => x.activities).find(x => x.id === r.dataset.act);
+    actionSheet(a.title, [
+      {label: a.fixed ? "Wieder freigeben" : "Festnageln", fn: async () => reTrip(await api(`/api/trips/${tid}/fixed`, {activity_id: a.id, fixed: !a.fixed}))},
+      {label: "Fällt aus – Ersatz suchen", red: true, fn: async () => { const x = await api(`/api/trips/${tid}/closure`, {activity_id: a.id, reason: "fällt aus"}); reTrip(x); showOutcome(x.outcome); }},
+    ]);
+  });
+  if (outcome) showOutcome(outcome);
+}
+
+function showOutcome(o) {
+  const box = $("tOut"); if (!box || !o) return;
+  const head = {angewendet: "Plan angepasst", nichts_zu_tun: "Nichts geändert", doppelt: "Schon erledigt", abgelehnt: "Nicht möglich", konflikt: "Konflikt", fehler: "Fehler"}[o.status] || o.status;
+  const lines = String(o.message || "").split("\n").filter(Boolean);
+  box.innerHTML = `<div class="t"><b>${esc(head)}</b>${o.weather ? ` · ${esc(o.weather)}` : ""}</div>` +
+    (lines.length ? `<ul>${lines.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<div class="s">Das Geplante passt zum Wetter.</div>`) +
+    ((o.warnings || []).length ? `<ul>${o.warnings.map(w => `<li class="warn">${esc(w)}</li>`).join("")}</ul>` : "");
+  box.hidden = false;
+  box.scrollIntoView({behavior: "smooth", block: "center"});
+}
+
+// ---------- Unterwegs ----------
+async function loadToday() {
+  const [t, n] = await Promise.all([api("/api/trips"), api("/api/notices")]);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const active = t.trips.find(x => x.status === "unterwegs") || t.trips.find(x => x.start <= todayIso && x.end >= todayIso);
+  if (!active) {
+    $("todaySub").textContent = "Gerade keine Reise im Gang";
+    $("todayBox").innerHTML = `<div class="card"><div class="empty">Sobald eine Reise beginnt, siehst du hier den heutigen Tag, das Wetter und alle automatischen Anpassungen.</div></div>`;
+  } else {
+    const d = await api("/api/trips/" + active.id);
+    const day = d.trip.days.find(x => x.date === d.today);
+    $("todaySub").textContent = `${d.trip.title}${day ? " · " + day.base.name : ""}`;
+    $("todayBox").innerHTML = `<div class="card">${day ? `<div class="dayh today"><span>${esc(fmtLong(day.date))}</span><span class="s">${esc(day.base.name)}</span></div>` +
+        (day.activities.map(a => `<div class="row act ${a.origin === "umplanung" ? "new" : ""}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
+          <div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${esc(EXP[a.exposure])} · ${esc(chf(a.cost))}</div>${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`).join("") || `<div class="empty">Freier Tag</div>`)
+        : `<div class="empty">Heute ist kein Reisetag.</div>`}</div>
+      <button class="btn" id="tdWeather">Wetter jetzt prüfen</button>
+      <button class="btn plain" id="tdOpen">Ganze Reise öffnen</button>
+      ${d.actions.length ? `<p class="hint warnt">${d.actions.length} Auftrag/Aufträge warten auf dich – in der Reise unter «Wartet auf dich».</p>` : ""}`;
+    $("tdOpen").onclick = () => openTrip(active.id);
+    $("tdWeather").onclick = async () => {
+      const b = $("tdWeather"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Prüfe Wetter …`;
+      try { const r = await api(`/api/trips/${active.id}/weathercheck`, {}); toast(r.outcome.weather ? `${r.outcome.weather}` : "Geprüft"); loadToday(); }
+      catch (e) { toast(e.message); b.disabled = false; }
+    };
+  }
+  $("notices").innerHTML = n.notices.length ? n.notices.map(x => `<div class="row ${x.trip_id ? "tap" : ""}" data-nt="${esc(x.trip_id || "")}"><div class="grow">
+      <div class="t">${x.read ? "" : `<span class="dot"></span>`}${esc(x.title)}</div>
+      <div class="s" style="white-space:pre-line">${esc(x.body)}</div>
+      <div class="s">${esc(new Date(x.ts).toLocaleString("de-CH", {dateStyle: "short", timeStyle: "short"}))}</div></div></div>`).join("")
+    : `<div class="empty">Keine Meldungen.</div>`;
+  $("notices").querySelectorAll("[data-nt]").forEach(r => { if (r.dataset.nt) r.onclick = () => openTrip(r.dataset.nt).catch(e => toast(e.message)); });
+}
+$("markRead").onclick = async () => { await api("/api/notices/read", {}); await loadInfo(); loadToday(); };
+
+// ---------- Helfer: Foto ----------
+let PHOTO = null;
+$("photo").onchange = async () => {
+  const f = $("photo").files[0]; if (!f) return;
+  msg($("photoMsg"), "");
+  try {
+    // als data:-Adresse lesen (die Sicherheitsregeln erlauben keine blob:-Bilder)
+    const src = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(f); });
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+    const s = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    const url = c.toDataURL("image/jpeg", 0.85);
+    PHOTO = url.split(",")[1];
+    $("photoPrev").src = url; $("photoPrev").hidden = false; $("photoGo").disabled = false;
+  } catch { msg($("photoMsg"), "Das Bild konnte nicht gelesen werden.", "err"); }
+};
+$("photoGo").onclick = async () => {
+  const b = $("photoGo"); b.disabled = true; msg($("photoMsg"), `<span class="spin"></span>Lese und übersetze …`);
+  try {
+    const r = (await api("/api/vision", {image: PHOTO, media_type: "image/jpeg", question: $("photoQ").value})).result;
+    msg($("photoMsg"), "");
+    $("visionOut").innerHTML = `<h2>${esc(r.title || "Übersetzung")} <span class="r chip">${esc(r.language)}</span></h2><div class="card">` +
+      r.items.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.translation)}${i.price ? ` <span class="chip">${esc(i.price)}</span>` : ""}</div>
+        <div class="s"><i>${esc(i.original)}</i></div>${i.explanation ? `<div class="s">${esc(i.explanation)}</div>` : ""}
+        ${i.warnings.map(w => `<div class="s warnt">⚠︎ ${esc(w)}</div>`).join("")}</div></div>`).join("") +
+      `</div>${r.summary ? `<p class="hint">${esc(r.summary)}</p>` : ""}`;
+  } catch (e) { msg($("photoMsg"), esc(e.message), "err"); }
   b.disabled = false;
 };
-async function undo(id, b) {
-  b.disabled = true;
-  try { const j = await api("/api/undo", {change_id: id}); S = j.state; render(); $("res").hidden = true; if (!j.ok) alert(j.error); }
-  catch (e) { alert(e.message); b.disabled = false; }
-}
-$("reset").onclick = async () => {
-  if (!confirm("Demo-Reise auf den Anfang zurücksetzen?")) return;
-  const j = await api("/api/demo/reset", {}); S = j.state; render(); $("res").hidden = true;
+
+// ---------- Helfer: Entwurf ----------
+$("dGo").onclick = async () => {
+  const b = $("dGo"); b.disabled = true; msg($("dMsg"), `<span class="spin"></span>Schreibe Entwurf …`);
+  try {
+    const r = (await api("/api/draft", {kind: $("dKind").value, recipient: $("dTo").value, language: $("dLang").value, details: $("dDetails").value})).draft;
+    msg($("dMsg"), r.source === "vorlage" ? "Vorlage ohne KI (kein Claude-Schlüssel hinterlegt)." : "");
+    $("draftOut").innerHTML = `<div class="card pad" style="margin-top:12px"><div class="s">${esc(r.language)}</div>
+      <div class="pre">${esc(r.subject)}\n\n${esc(r.message)}</div>
+      ${r.message_de && r.message_de !== r.message ? `<div class="s" style="margin-top:10px">Deutsche Fassung</div><div class="pre">${esc(r.message_de)}</div>` : ""}
+      <button class="btn plain" id="dCopy">Kopieren</button></div>`;
+    $("dCopy").onclick = () => copy(`${r.subject}\n\n${r.message}`);
+  } catch (e) { msg($("dMsg"), esc(e.message), "err"); }
+  b.disabled = false;
 };
+
+// ---------- Profil ----------
+let saveT = null;
+function saveSoon() { clearTimeout(saveT); $("saveState").textContent = "Speichere …"; saveT = setTimeout(saveHH, 700); }
+async function saveHH() {
+  try {
+    const r = await api("/api/household", {household: HH});
+    HH = r.household; renderMatch(r);
+    $("saveState").textContent = "Gespeichert ✓";
+  } catch (e) { $("saveState").innerHTML = `<span class="warnt">${esc(e.message)}</span>`; }
+}
+
+async function loadProfile() {
+  await loadInfo();
+  const r = await api("/api/household");
+  HH = r.household;
+  renderPeople(); renderConstraints(); renderMatch(r); renderSettings(); renderCosts();
+}
+
+function segHtml(opts, cur, attr) {
+  return `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${v}" class="${String(cur) === String(v) ? "on" : ""} v${v}">${l}</button>`).join("")}</div>`;
+}
+
+function renderPeople() {
+  $("people").innerHTML = HH.profiles.map((p, i) => `
+    <h2>${i === 0 ? "Du" : "Partnerin"}</h2>
+    <div class="card" data-p="${i}">
+      <label class="f"><span>Name</span><input data-k="name" value="${esc(p.name)}" maxlength="60"></label>
+      <div class="s" style="padding:6px 16px 2px">Vorlieben: ✕ nie · − eher nicht · · egal · + gern · ★ sehr gern</div>
+      ${Object.entries(CATS).map(([cat, label]) => `<div class="pref"><span class="t" style="font-size:15px">${esc(label)}</span>
+        ${segHtml(PREF, p.activities[cat] ?? 0, "pref-" + cat)}</div>`).join("")}
+      <div class="two" style="margin-top:6px">
+        <label class="f"><span>Wohlfühl-Temperatur von (°C)</span><input type="number" data-k="climate.temp_min_c" value="${p.climate.temp_min_c}" inputmode="numeric"></label>
+        <label class="f"><span>bis (°C)</span><input type="number" data-k="climate.temp_max_c" value="${p.climate.temp_max_c}" inputmode="numeric"></label>
+      </div>
+      <div class="row"><div class="grow t" style="font-size:15px">Regen stört</div>
+        <div style="width:200px">${segHtml([["gering", "sehr"], ["mittel", "etwas"], ["hoch", "kaum"]], p.climate.rain_tolerance, "rain")}</div></div>
+      <label class="f"><span>Unterkunft höchstens pro Nacht (CHF, leer = egal)</span><input type="number" data-k="budget.per_night_max" value="${p.budget.per_night_max ?? ""}" inputmode="numeric"></label>
+      <label class="f"><span>Sprachen (Komma-getrennt)</span><input data-k="languages" value="${esc(p.languages.join(", "))}" maxlength="60"></label>
+    </div>`).join("");
+  $("people").querySelectorAll("[data-p]").forEach(card => {
+    const p = HH.profiles[+card.dataset.p];
+    card.querySelectorAll("input[data-k]").forEach(inp => inp.oninput = () => {
+      const k = inp.dataset.k, v = inp.value;
+      if (k === "name") p.name = v;
+      else if (k === "languages") p.languages = v.split(",").map(s => s.trim()).filter(Boolean);
+      else if (k === "budget.per_night_max") p.budget.per_night_max = v === "" ? null : v;
+      else { const [a, b] = k.split("."); p[a][b] = v === "" ? 0 : Number(v); }
+      saveSoon();
+    });
+    card.querySelectorAll(".pref .seg button").forEach(b => b.onclick = () => {
+      const cat = Object.keys(b.dataset).find(x => x.startsWith("pref")).slice(4).toLowerCase();
+      const v = Number(b.dataset["pref" + cat.charAt(0).toUpperCase() + cat.slice(1)]);
+      p.activities[cat] = v;
+      b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+      saveSoon();
+    });
+    card.querySelectorAll("[data-rain]").forEach(b => b.onclick = () => {
+      p.climate.rain_tolerance = b.dataset.rain;
+      b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); saveSoon();
+    });
+  });
+}
+
+function renderConstraints() {
+  const k = HH.constraints, preg = k.pregnancy;
+  $("constraints").innerHTML = `
+    <label class="f"><span>Gesamtbudget pro Reise (CHF, leer = keins)</span><input type="number" id="cBudget" value="${k.budget_total_max ?? ""}" inputmode="numeric"></label>
+    <div class="two">
+      <label class="f"><span>Reisedauer min. (Tage)</span><input type="number" id="cDmin" value="${k.duration_days_min}" inputmode="numeric"></label>
+      <label class="f"><span>max. (Tage)</span><input type="number" id="cDmax" value="${k.duration_days_max}" inputmode="numeric"></label>
+      <label class="f"><span>Flugzeit max. (Std., leer = egal)</span><input type="number" id="cFly" value="${k.max_flight_hours ?? ""}" inputmode="decimal"></label>
+      <label class="f"><span>Umstiege max.</span><input type="number" id="cStops" value="${k.max_stops}" min="0" max="3" inputmode="numeric"></label>
+    </div>
+    <div class="row"><div class="grow t" style="font-size:15px">Anstrengung höchstens</div>
+      <div style="width:220px">${segHtml([[1, "leicht"], [2, "mittel"], [3, "hoch"]], k.max_intensity, "int")}</div></div>
+    <div class="row"><div class="grow"><div class="t">Schwangerschaft</div><div class="s">keine Sauna/Hitze, kein Tauchen, keine grossen Höhen, höchstens mittel anstrengend</div></div>
+      <input type="checkbox" class="sw" id="cPreg" ${preg ? "checked" : ""}></div>
+    <label class="f" id="cDueWrap" ${preg ? "" : "hidden"}><span>Geburtstermin (für die Schwangerschaftswoche)</span><input type="date" id="cDue" value="${preg ? preg.due_date : ""}"></label>
+    <label class="f"><span>Immer vermeiden (Merkmale, Komma-getrennt)</span><input id="cAvoid" value="${esc(k.avoid_tags.join(", "))}" placeholder="z. B. boot, lange_wege"></label>
+    <label class="f"><span>Schon besuchte Länder (Ländercodes, z. B. IT, FR, ES)</span><input id="cVisited" value="${esc(HH.history.visited_countries.join(", "))}" autocapitalize="characters"></label>`;
+  const num = v => v === "" ? null : v;
+  $("cBudget").oninput = e => { k.budget_total_max = num(e.target.value); saveSoon(); };
+  $("cDmin").oninput = e => { k.duration_days_min = Number(e.target.value) || 1; saveSoon(); };
+  $("cDmax").oninput = e => { k.duration_days_max = Number(e.target.value) || 1; saveSoon(); };
+  $("cFly").oninput = e => { k.max_flight_hours = num(e.target.value); saveSoon(); };
+  $("cStops").oninput = e => { k.max_stops = Number(e.target.value) || 0; saveSoon(); };
+  $("constraints").querySelectorAll("[data-int]").forEach(b => b.onclick = () => {
+    k.max_intensity = Number(b.dataset.int); b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); saveSoon(); });
+  $("cPreg").onchange = e => {
+    $("cDueWrap").hidden = !e.target.checked;
+    if (!e.target.checked) { k.pregnancy = null; saveSoon(); }
+    else if ($("cDue").value) { k.pregnancy = {due_date: $("cDue").value}; saveSoon(); }
+  };
+  $("cDue").onchange = e => { if (e.target.value) { k.pregnancy = {...(k.pregnancy || {}), due_date: e.target.value}; saveSoon(); } };
+  $("cAvoid").oninput = e => { k.avoid_tags = e.target.value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean); saveSoon(); };
+  $("cVisited").oninput = e => {
+    const codes = e.target.value.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z]{2}$/.test(s));
+    HH.history.visited_countries = codes; saveSoon(); };
+}
+
+function renderMatch(r) {
+  const m = r.matching;
+  const group = (kind, title) => { const xs = m.categories.filter(c => c.kind === kind); return xs.length ? `<div class="s"><b style="color:var(--text)">${title}:</b> ${xs.map(c => esc(c.label)).join(", ")}</div>` : ""; };
+  $("matchBox").innerHTML = group("beide", "Beide gern") + group("kompromiss", "Kompromiss (sparsam)") + group("veto", "Nie") +
+    `<div class="s"><b style="color:var(--text)">Klima:</b> ${m.temp_min_c.toFixed(0)}–${m.temp_max_c.toFixed(0)} °C, Regen stört ${({gering: "sehr", mittel: "etwas", hoch: "kaum"})[m.rain_tolerance]}. ${esc(m.climate_note)}</div>` +
+    (m.budget_per_night ? `<div class="s"><b style="color:var(--text)">Unterkunft:</b> höchstens CHF ${esc(m.budget_per_night)}/Nacht</div>` : "") +
+    (m.pregnancy_week != null ? `<div class="s"><b style="color:var(--text)">Schwangerschaft:</b> heute ca. Woche ${m.pregnancy_week}</div>` : "") +
+    `<details style="margin:8px -16px -14px"><summary>So sieht es die KI</summary><div class="pre" style="margin:0 16px 14px">${esc(r.prompt)}</div></details>`;
+}
+
+function renderSettings() {
+  const s = INFO.settings, k = INFO.key;
+  const price = {"claude-opus-5-5": "beste Qualität, ca. 10–30 Rp. pro Reiseplan", "claude-sonnet-5-5": "sehr gut, etwa halb so teuer", "claude-haiku-5-5": "am günstigsten, einfachere Pläne"};
+  $("settings").innerHTML = `
+    <label class="f"><span>Claude-Schlüssel ${k.set ? `(hinterlegt: ••••${esc(k.hint)}${k.source === "env" ? ", aus einstellungen.env" : ""})` : "(fehlt – ohne Schlüssel nur Vorlagen)"}</span>
+      <div style="display:flex;gap:8px"><input type="password" id="sKey" placeholder="sk-ant-…" autocomplete="off"><button class="small" id="sKeySave">Sichern</button></div></label>
+    <label class="f"><span>KI-Modell</span><select id="sModel">${INFO.models.map(m => `<option value="${m}" ${m === s.model ? "selected" : ""}>${m} – ${price[m] || ""}</option>`).join("")}</select></label>
+    <div class="row"><div class="grow t" style="font-size:15px">Sorgfalt der KI</div>
+      <div style="width:220px">${segHtml([["low", "schnell"], ["medium", "normal"], ["high", "gründlich"]], s.effort, "eff")}</div></div>
+    <div class="row"><div class="grow"><div class="t">Wetter jeden Morgen prüfen</div><div class="s">automatisch umplanen bei Schlechtwetter</div></div><input type="checkbox" class="sw" id="sAuto" ${s.auto_check ? "checked" : ""}></div>
+    <label class="f"><span>Uhrzeit (Ortszeit am Reiseziel)</span><input type="time" id="sTime" value="${esc(s.check_time)}"></label>
+    <div class="row"><div class="grow"><div class="t">Websuche beim Planen</div><div class="s">aktuelle Tipps & Trends, Öffnungszeiten – kostet ca. 1 Rp. pro Suche zusätzlich</div></div><input type="checkbox" class="sw" id="sWeb" ${s.web_search ? "checked" : ""}></div>
+    <label class="f"><span>Heimatflughafen</span><input id="sAir" value="${esc(s.home_airport)}" maxlength="3" autocapitalize="characters"></label>`;
+  const save = async body => { try { INFO = await api("/api/settings", body); toast("Gespeichert"); } catch (e) { toast(e.message); } };
+  $("sKeySave").onclick = async () => { try { INFO = await api("/api/keys", {anthropic: $("sKey").value}); renderSettings(); toast("Schlüssel gesichert"); } catch (e) { toast(e.message); } };
+  $("sModel").onchange = e => save({model: e.target.value});
+  $("settings").querySelectorAll("[data-eff]").forEach(b => b.onclick = () => { b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); save({effort: b.dataset.eff}); });
+  $("sAuto").onchange = e => save({auto_check: e.target.checked});
+  $("sTime").onchange = e => save({check_time: e.target.value});
+  $("sWeb").onchange = e => save({web_search: e.target.checked});
+  $("sAir").onchange = e => save({home_airport: e.target.value});
+  $("ver").textContent = `Kompass ${INFO.version} · ${INFO.build}${INFO.fake ? " · Testmodus" : ""}`;
+}
+
+async function renderCosts() {
+  const c = await api("/api/costs");
+  $("costs").innerHTML = `<div class="row"><div class="grow t">Letzte 24 Stunden</div><span>${esc(usd(c.spent_24h))}</span></div>
+    <div class="row"><div class="grow t">Letzte 30 Tage</div><span>${esc(usd(c.spent_30d))}</span></div>
+    <div class="row"><div class="grow s">Kostenbremse: höchstens ${esc(usd(INFO.budget_usd))} pro 24 Std.</div></div>`;
+}
+
 $("logout").onclick = async () => { await api("/api/logout", {}); location.replace("/login"); };
-load().catch(e => { $("plan").innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+$("logoutAll").onclick = () => actionSheet("Alle Geräte abmelden?", [{label: "Überall abmelden", red: true, fn: async () => { await api("/api/logout-all", {}); location.replace("/login"); }}]);
+
+// ---------- Start ----------
+(async () => {
+  try {
+    await loadInfo();
+    let v = "v-trips"; try { v = localStorage.getItem("view") || v; } catch {}
+    show($(v) ? v : "v-trips");
+    try { const j = JSON.parse(localStorage.getItem("job") || "null"); if (j) watchJob(j.id, j.label, res => { loadTrips(); if (res.trip_id) openTrip(res.trip_id); }); } catch {}
+  } catch (e) { toast(e.message); }
+})();
 </script>
 </body></html>

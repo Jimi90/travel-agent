@@ -79,6 +79,44 @@ class StatusManager:
             raise KeyError(itinerary_id)
         return Itinerary.model_validate_json(row[0])
 
+    def list(self) -> list[Itinerary]:
+        rows = self._db.execute("SELECT data FROM itineraries ORDER BY updated_at DESC").fetchall()
+        return [Itinerary.model_validate_json(r[0]) for r in rows]
+
+    def actions(self, itinerary_id: str | None = None, status: str | None = "offen") -> list[dict]:
+        q = ("SELECT o.id, o.change_id, o.action, o.status, o.created_at, c.itinerary_id FROM outbox o"
+             " JOIN changes c ON c.id = o.change_id WHERE 1=1")
+        args: list = []
+        if itinerary_id:
+            q += " AND c.itinerary_id = ?"
+            args.append(itinerary_id)
+        if status:
+            q += " AND o.status = ?"
+            args.append(status)
+        rows = self._db.execute(q + " ORDER BY o.created_at", args).fetchall()
+        return [{**json.loads(r[2]), "id": r[0], "change_id": r[1], "status": r[3], "created_at": r[4],
+                 "itinerary_id": r[5]} for r in rows]
+
+    def set_action_status(self, action_id: str, status: str) -> bool:
+        if status not in ("offen", "erledigt", "verworfen"):
+            raise ValueError(status)
+        with self._lock:
+            cur = self._db.execute("UPDATE outbox SET status = ? WHERE id = ?", (status, action_id))
+            return cur.rowcount == 1
+
+    def delete(self, itinerary_id: str) -> bool:
+        with self._lock:
+            self._db.execute("BEGIN IMMEDIATE")
+            try:
+                self._db.execute("DELETE FROM outbox WHERE change_id IN (SELECT id FROM changes WHERE itinerary_id = ?)", (itinerary_id,))
+                self._db.execute("DELETE FROM changes WHERE itinerary_id = ?", (itinerary_id,))
+                cur = self._db.execute("DELETE FROM itineraries WHERE id = ?", (itinerary_id,))
+            except BaseException:
+                self._db.execute("ROLLBACK")
+                raise
+            self._db.execute("COMMIT")
+            return cur.rowcount == 1
+
     def event_handled(self, event_id: str) -> bool:
         return self._db.execute("SELECT 1 FROM changes WHERE event_id = ?", (event_id,)).fetchone() is not None
 
@@ -154,7 +192,7 @@ class StatusManager:
             after = apply_operations(before, cs.operations)
         except PlanOperationError as e:
             return res(ChangeStatus.REJECTED, old_version=version, problems=[Problem(code="ungueltig", message=str(e))])
-        problems = self.checker.check(before, after, constraints, now)
+        problems = self.checker.check(before, after, constraints, now, set(cs.acknowledged_locked))
         if any(p.level == "fehler" for p in problems):
             return res(ChangeStatus.REJECTED, old_version=version, problems=problems)
 

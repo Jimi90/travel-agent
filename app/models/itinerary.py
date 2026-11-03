@@ -87,14 +87,44 @@ class DayPlan(Model):
         return sorted(v, key=lambda a: a.start)
 
 
+class AlternativeCandidate(Model):
+    """Ersatz-Aktivität für Schlechtwetter oder Ausfälle (vom Planer vorab erzeugt oder nachgeladen)."""
+
+    title: str = Field(min_length=1, max_length=160)
+    category: ActivityCategory
+    exposure: Exposure
+    intensity: Intensity = Intensity.LEICHT
+    duration_min: int = Field(ge=15, le=12 * 60)
+    cost: Money = Decimal("0")
+    place: Place
+    tags: set[str] = set()
+    opens: time | None = None
+    closes: time | None = None
+    booking_needed: bool = False
+    source: str = "katalog"
+
+    def fits(self, start: time, end: time) -> bool:
+        s, e = to_min(start), to_min(start) + self.duration_min
+        if e > to_min(end):
+            return False
+        if self.opens and s < to_min(self.opens):
+            return False
+        if self.closes and e > to_min(self.closes):
+            return False
+        return True
+
+
 class Accommodation(Model):
     id: str = Field(default_factory=new_id)
     name: str
     place: Place
     check_in: date
     check_out: date
-    cost: Money = Decimal("0")
+    cost: Money = Decimal("0")  # gesamt für alle Nächte
     booking: Booking | None = None
+    confirmed: bool = False  # False = Vorschlag, noch nicht gebucht
+    search_url: str | None = None
+    note: str | None = None
 
     @model_validator(mode="after")
     def _dates(self):
@@ -114,12 +144,26 @@ class TransportSegment(Model):
     number: str | None = None
     cost: Money = Decimal("0")
     booking: Booking | None = None
+    via: list[str] = []  # Zwischenstopps
+    estimated: bool = True  # Zeiten/Preis geschätzt, nicht gebucht
+    search_url: str | None = None
+    note: str | None = None
 
     @model_validator(mode="after")
     def _times(self):
         if self.arrive <= self.depart:
             raise ValueError("Ankunft muss nach der Abfahrt liegen")
         return self
+
+
+class HotelSuggestion(Model):
+    base: str  # Name des Aufenthaltsorts
+    name: str
+    area: str = ""
+    price_per_night: Money = Decimal("0")
+    why: str = ""
+    tags: set[str] = set()
+    search_url: str | None = None
 
 
 class Itinerary(Model):
@@ -131,6 +175,11 @@ class Itinerary(Model):
     days: list[DayPlan] = []
     stays: list[Accommodation] = []
     transports: list[TransportSegment] = []
+    alternatives: list[AlternativeCandidate] = []  # Schlechtwetter-Programm je Ort
+    hotel_suggestions: list[HotelSuggestion] = []
+    summary: str = ""
+    home_airport: str = "ZRH"
+    cost_note: str = ""
     status: Literal["entwurf", "gebucht", "unterwegs", "abgeschlossen"] = "entwurf"
     version: int = Field(default=1, ge=1)  # wird nur vom StatusManager erhöht
     updated_at: datetime | None = None
@@ -149,7 +198,13 @@ class Itinerary(Model):
         ids = [a.id for d in self.days for a in d.activities]
         if len(set(ids)) != len(ids):
             raise ValueError("Aktivitäts-ID doppelt")
+        self.stays.sort(key=lambda s: s.check_in)
+        self.transports.sort(key=lambda t: t.depart)
         return self
+
+    def stay_on(self, night: date) -> Accommodation | None:
+        """Unterkunft für die Nacht, die an diesem Datum beginnt."""
+        return next((s for s in self.stays if s.check_in <= night < s.check_out), None)
 
     def day(self, d: date) -> DayPlan | None:
         return next((x for x in self.days if x.date == d), None)

@@ -1,0 +1,357 @@
+"""Reiseplan erstellen: KI entwirft Tage, Orte, Hotels, Verbindungen und Schlechtwetter-Programm;
+der Code baut daraus einen geprüften Reiseplan und setzt die Randbedingungen hart durch.
+
+Ehrlich: Hotel- und Flugdaten sind Vorschläge/Schätzungen der KI. Verfügbarkeit und Preise prüft man
+über die beigelegten Suchlinks (Booking.com, Google Flights); gebucht wird nichts automatisch.
+"""
+from __future__ import annotations
+
+import urllib.parse
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from typing import Literal
+
+from pydantic import BaseModel, ValidationError
+
+from .. import llm, weather
+from ..core.plausibility import PlausibilityChecker
+from ..models import (
+    Accommodation, Activity, AlternativeCandidate, DayPlan, Household, HotelSuggestion, Itinerary, Place,
+    TransportSegment,
+)
+from ..models.common import ActivityCategory, Exposure, Intensity, new_id, to_min
+from .matching import match
+
+Cat = Literal["wandern", "natur", "strand", "wassersport", "kultur", "museum", "stadt", "kulinarik", "wellness",
+              "entspannung", "shopping", "nachtleben"]
+Exp = Literal["indoor", "outdoor", "gemischt"]
+TAGS = ["hitze", "tauchen", "hoehe", "achterbahn", "alkohol", "rohkost", "lange_wege", "boot", "reservierung"]
+
+
+class DraftActivity(BaseModel):
+    title: str
+    category: Cat
+    exposure: Exp
+    intensity: int  # 1 leicht, 2 mittel, 3 anstrengend
+    start: str  # HH:MM
+    end: str
+    cost_chf: float  # für beide zusammen
+    tags: list[str]
+    note: str
+
+
+class DraftDay(BaseModel):
+    day: int  # 1 = erster Reisetag
+    base: str
+    theme: str
+    activities: list[DraftActivity]
+
+
+class DraftBase(BaseModel):
+    name: str
+    country: str
+    lat: float
+    lon: float
+    timezone: str
+    nights: int
+
+
+class DraftAlternative(BaseModel):
+    base: str
+    title: str
+    category: Cat
+    exposure: Exp
+    intensity: int
+    duration_min: int
+    cost_chf: float
+    tags: list[str]
+    opens: str  # HH:MM oder ""
+    closes: str
+
+
+class DraftHotel(BaseModel):
+    base: str
+    name: str
+    area: str
+    price_per_night_chf: float
+    why: str
+    tags: list[str]
+
+
+class DraftTransport(BaseModel):
+    day: int
+    mode: Literal["flug", "faehre", "zug", "bus", "auto"]
+    from_place: str
+    to_place: str
+    from_code: str  # IATA-Code bei Flügen, sonst ""
+    to_code: str
+    depart: str  # HH:MM
+    duration_h: float
+    via: list[str]
+    carrier: str
+    est_price_chf: float  # für beide zusammen
+    note: str
+
+
+class PlanDraft(BaseModel):
+    title: str
+    summary: str
+    bases: list[DraftBase]
+    days: list[DraftDay]
+    alternatives: list[DraftAlternative]
+    hotels: list[DraftHotel]
+    transports: list[DraftTransport]
+    cost_note: str
+
+
+SYSTEM = f"""Du bist Kompass, ein sorgfältiger Reiseplaner für ein Paar aus der Schweiz. Schreibe Deutsch mit
+Schweizer Rechtschreibung (kein ß). Plane realistisch und konkret mit echten, existierenden Orten.
+Regeln:
+- Pro Tag 2–4 Aktivitäten zwischen 07:00 und 23:00, ohne Überschneidungen, mit Pausen und Wegzeiten.
+- An- und Abreisetage leichter planen. Wechsel zwischen Orten als Transport mit Abfahrt/Dauer angeben.
+- exposure ehrlich: outdoor = wetterabhängig, indoor = wetterfest, gemischt = teils.
+- intensity: 1 leicht, 2 mittel, 3 anstrengend. Kosten in CHF für beide zusammen (Schätzung).
+- tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
+- alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
+  Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
+- hotels: pro Aufenthaltsort 2–3 echte Hotels innerhalb des Budgets, das passendste zuerst.
+- transports: Hinflug am Tag 1 ab Heimatflughafen, Rückflug am letzten Tag, dazu alle Ortswechsel
+  (Fähre, Zug, Inlandflug). Umstiege in via. Zeiten und Preise sind Schätzungen – im note-Feld so kennzeichnen.
+- bases: Reihenfolge der Aufenthaltsorte mit Nächten; Summe der Nächte = Reisetage − 1.
+- Alle Randbedingungen strikt einhalten."""
+
+
+def generate(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
+             web_search: bool = False, trip_id: str | None = None) -> tuple[Itinerary, list[str]]:
+    m = match(h, start)
+    prompt = (f"Ziel: {destination}\nReise: {start:%d.%m.%Y} bis {start + timedelta(days=days - 1):%d.%m.%Y} "
+              f"({days} Tage, {days - 1} Nächte). Heimatflughafen: {home_airport}.\n{m.prompt_text()}\n"
+              f"Wünsche: {wishes.strip() or 'keine'}")
+    if web_search:
+        prompt += ("\nNutze die Websuche für aktuelle Empfehlungen (auch Trends aus Reiseblogs und Social Media), "
+                   "Öffnungszeiten und Hotelpreise. Nur echte Orte.")
+    draft = llm.ask("reiseplan", system=SYSTEM, content=prompt, schema=PlanDraft, trip_id=trip_id,
+                    fake=lambda: fake_draft(destination, days, home_airport), max_tokens=32000, web_search=web_search)
+    return build(draft, h, start, days, home_airport)
+
+
+# --- Entwurf → geprüfter Reiseplan ------------------------------------------------------------
+
+def _t(s: str) -> time | None:
+    try:
+        hh, mm = s.strip().split(":")[:2]
+        return time(int(hh), int(mm))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _money(v: float) -> Decimal:
+    return Decimal(str(round(max(0.0, float(v or 0)), 2)))
+
+
+def _int(v: int) -> Intensity:
+    return Intensity(min(3, max(1, int(v or 1))))
+
+
+def booking_url(hotel: str, place: str, check_in: date, check_out: date) -> str:
+    q = urllib.parse.urlencode({"ss": f"{hotel}, {place}", "checkin": check_in.isoformat(),
+                                "checkout": check_out.isoformat(), "group_adults": 2, "no_rooms": 1})
+    return f"https://www.booking.com/searchresults.html?{q}"
+
+
+def flights_url(frm: str, to: str, d: date) -> str:
+    q = urllib.parse.quote(f"Flights from {frm} to {to} on {d.isoformat()} for 2 adults")
+    return f"https://www.google.com/travel/flights?q={q}"
+
+
+def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: str) -> tuple[Itinerary, list[str]]:
+    notes: list[str] = []
+    k = h.constraints
+    avoid, max_int = k.effective_avoid_tags(), k.effective_max_intensity()
+    end = start + timedelta(days=days - 1)
+
+    places: dict[str, Place] = {}
+    for b in draft.bases:
+        cc = b.country.strip().upper()[:2]
+        try:
+            places[b.name.casefold()] = Place(name=b.name, country=cc, lat=b.lat, lon=b.lon, tz=b.timezone or None)
+        except ValidationError:
+            places[b.name.casefold()] = weather.geocode(b.name)
+    if not places:
+        raise llm.LLMError("Der Plan enthält keinen Aufenthaltsort.")
+    first = next(iter(places.values()))
+    home = Place(name=home_airport, country="CH")
+
+    def place_of(name: str) -> Place:
+        key = name.casefold()
+        if key in places:
+            return places[key]
+        for k2, p in places.items():
+            if k2 in key or key in k2:
+                return p
+        if name.upper() == home_airport.upper() or "zürich" in key or "zurich" in key:
+            return home
+        return Place(name=name, country=first.country)
+
+    # Tage
+    by_day = {d.day: d for d in draft.days}
+    plan_days, prev_base = [], first
+    for i in range(days):
+        dd = by_day.get(i + 1)
+        base = place_of(dd.base) if dd else prev_base
+        acts: list[Activity] = []
+        for a in (dd.activities if dd else []):
+            s, e = _t(a.start), _t(a.end)
+            if not s or not e or e <= s:
+                notes.append(f"Tag {i + 1}: «{a.title}» ohne gültige Zeit weggelassen")
+                continue
+            tags = {t.strip().lower() for t in a.tags if t.strip()}
+            act = Activity(title=a.title[:160], category=ActivityCategory(a.category), exposure=Exposure(a.exposure),
+                           intensity=_int(a.intensity), start=s, end=e, place=base, cost=_money(a.cost_chf),
+                           tags=tags, note=(a.note or None))
+            if act.intensity > max_int or act.tags & avoid:
+                notes.append(f"Tag {i + 1}: «{a.title}» entfernt (Randbedingung: "
+                             f"{'zu anstrengend' if act.intensity > max_int else ', '.join(sorted(act.tags & avoid))})")
+                continue
+            if acts and to_min(act.start) < to_min(acts[-1].end):
+                notes.append(f"Tag {i + 1}: «{a.title}» überschneidet sich – weggelassen")
+                continue
+            if act.start < time(7) or act.end > time(23):
+                notes.append(f"Tag {i + 1}: «{a.title}» ausserhalb 07–23 Uhr – weggelassen")
+                continue
+            acts.append(act)
+            acts.sort(key=lambda x: x.start)
+        plan_days.append(DayPlan(date=start + timedelta(days=i), base=base, activities=acts))
+        prev_base = base
+
+    # Unterkünfte: Reihenfolge der Orte mit Nächten, erstes passendes Hotel
+    stays, cursor = [], start
+    for b in draft.bases:
+        n = max(0, int(b.nights))
+        if n == 0 or cursor >= end:
+            continue
+        out = min(cursor + timedelta(days=n), end)
+        p = place_of(b.name)
+        hotels = [x for x in draft.hotels if place_of(x.base).same_area(p)]
+        if hotels:
+            ht = hotels[0]
+            nights = (out - cursor).days
+            stays.append(Accommodation(name=ht.name, place=p, check_in=cursor, check_out=out,
+                                       cost=_money(ht.price_per_night_chf * nights), confirmed=False,
+                                       search_url=booking_url(ht.name, p.name, cursor, out), note=ht.why or None))
+        else:
+            stays.append(Accommodation(name=f"Unterkunft {p.name} (noch offen)", place=p, check_in=cursor,
+                                       check_out=out, confirmed=False,
+                                       search_url=booking_url("", p.name, cursor, out)))
+        cursor = out
+    if cursor < end:
+        notes.append(f"Für die Nächte ab {cursor:%d.%m.} fehlt eine Unterkunft")
+
+    suggestions = []
+    for x in draft.hotels:
+        p = place_of(x.base)
+        st = next((s for s in stays if s.place.same_area(p)), None)
+        suggestions.append(HotelSuggestion(
+            base=p.name, name=x.name, area=x.area, price_per_night=_money(x.price_per_night_chf), why=x.why,
+            tags={t.lower() for t in x.tags},
+            search_url=booking_url(x.name, p.name, st.check_in, st.check_out) if st else None))
+
+    # Verbindungen
+    transports = []
+    for t in draft.transports:
+        dep_t = _t(t.depart) or time(9)
+        day = start + timedelta(days=max(0, min(days - 1, t.day - 1)))
+        dep = datetime.combine(day, dep_t)
+        arr = dep + timedelta(hours=max(0.25, float(t.duration_h or 1)))
+        url = None
+        if t.mode == "flug":
+            url = flights_url(t.from_code or t.from_place, t.to_code or t.to_place, day)
+        transports.append(TransportSegment(
+            mode=t.mode, origin=place_of(t.from_place), destination=place_of(t.to_place), depart=dep, arrive=arr,
+            carrier=t.carrier or None, cost=_money(t.est_price_chf), via=[v for v in t.via if v],
+            estimated=True, search_url=url, note=t.note or None))
+    transports.sort(key=lambda x: x.depart)
+    for a, b in zip(transports, transports[1:]):
+        if b.depart < a.arrive:
+            notes.append(f"Verbindung {b.origin.name} → {b.destination.name} überschneidet sich mit der vorherigen – bitte prüfen")
+
+    alts = []
+    for a in draft.alternatives:
+        tags = {t.strip().lower() for t in a.tags if t.strip()}
+        try:
+            alts.append(AlternativeCandidate(
+                title=a.title[:160], category=ActivityCategory(a.category), exposure=Exposure(a.exposure),
+                intensity=_int(a.intensity), duration_min=min(720, max(15, int(a.duration_min or 60))),
+                cost=_money(a.cost_chf), place=place_of(a.base), tags=tags, opens=_t(a.opens), closes=_t(a.closes),
+                source="plan"))
+        except ValidationError:
+            continue
+
+    itin = Itinerary(
+        id=new_id(), title=draft.title[:160] or f"Reise {draft.bases[0].name}", start_date=start, end_date=end,
+        days=plan_days, stays=stays, transports=transports, alternatives=alts, hotel_suggestions=suggestions,
+        summary=draft.summary, home_airport=home_airport, cost_note=draft.cost_note, status="entwurf",
+    )
+    empty = itin.model_copy(update={"days": [DayPlan(date=d.date, base=d.base) for d in itin.days]})
+    problems = PlausibilityChecker().check(empty, itin, k, datetime.combine(start, time(0)))
+    errors = [p for p in problems if p.level == "fehler" and p.code != "transport_reihenfolge"]
+    notes += [p.message for p in problems if p.level == "warnung" or p.code == "transport_reihenfolge"]
+    if errors:
+        raise llm.LLMError("Der Plan ist nicht stimmig: " + "; ".join(p.message for p in errors[:3]))
+    if k.budget_total_max and itin.total_cost() > k.budget_total_max:
+        notes.append(f"Geschätzte Kosten {itin.total_cost():.0f} CHF liegen über dem Budget "
+                     f"({k.budget_total_max} CHF)")
+    return itin, notes
+
+
+# --- Testmodus ------------------------------------------------------------------------------
+
+def fake_draft(destination: str, days: int, home_airport: str) -> PlanDraft:
+    """Ab 5 Tagen zwei Orte mit Fähre dazwischen – so lässt sich ein Fähr-Ausfall testen."""
+    a = destination.split(",")[0].strip() or "Ziel"
+    two = days >= 5
+    n1 = (days - 1) // 2 if two else days - 1
+    bases = [DraftBase(name=a, country="PT", lat=38.7, lon=-9.1, timezone="Europe/Lisbon", nights=n1)]
+    if two:
+        bases.append(DraftBase(name=f"{a} Insel", country="PT", lat=32.6, lon=-16.9, timezone="Atlantic/Madeira",
+                               nights=days - 1 - n1))
+    ds = []
+    for i in range(1, days + 1):
+        b = bases[0].name if (not two or i <= n1) else bases[1].name
+        acts = [DraftActivity(title=f"Küstenwanderung {i}", category="wandern", exposure="outdoor", intensity=2,
+                              start="09:00", end="12:00", cost_chf=0, tags=[], note=""),
+                DraftActivity(title=f"Altstadt-Museum {i}", category="museum", exposure="indoor", intensity=1,
+                              start="14:00", end="16:00", cost_chf=30, tags=[], note=""),
+                DraftActivity(title=f"Abendessen {i}", category="kulinarik", exposure="indoor", intensity=1,
+                              start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="")]
+        if i == 1 or i == days:
+            acts = acts[2:]
+        if two and i == n1 + 1:
+            acts = acts[1:]
+        ds.append(DraftDay(day=i, base=b, theme="Test", activities=acts))
+    alts = []
+    for b in bases:
+        alts += [DraftAlternative(base=b.name, title=f"Thermalbad & Sauna {b.name}", category="wellness",
+                                  exposure="indoor", intensity=1, duration_min=180, cost_chf=90, tags=["hitze"],
+                                  opens="", closes=""),
+                 DraftAlternative(base=b.name, title=f"Spa-Massage {b.name}", category="wellness", exposure="indoor",
+                                  intensity=1, duration_min=150, cost_chf=160, tags=["reservierung"], opens="", closes=""),
+                 DraftAlternative(base=b.name, title=f"Kochkurs {b.name}", category="kulinarik", exposure="indoor",
+                                  intensity=1, duration_min=180, cost_chf=140, tags=[], opens="", closes=""),
+                 DraftAlternative(base=b.name, title=f"Kunstmuseum {b.name}", category="museum", exposure="indoor",
+                                  intensity=1, duration_min=120, cost_chf=30, tags=[], opens="", closes="")]
+    hotels = [DraftHotel(base=b.name, name=f"Hotel {b.name} Centro", area="Zentrum", price_per_night_chf=160,
+                         why="Zentral, ruhig, gutes Frühstück", tags=[]) for b in bases]
+    hotels.append(DraftHotel(base=bases[0].name, name=f"Casa {bases[0].name}", area="Altstadt",
+                             price_per_night_chf=130, why="Günstiger, kleines Gästehaus", tags=[]))
+    tr = [DraftTransport(day=1, mode="flug", from_place="Zürich", to_place=a, from_code=home_airport, to_code="LIS",
+                         depart="07:00", duration_h=3, via=[], carrier="Testair", est_price_chf=500, note="Schätzung")]
+    if two:
+        tr.append(DraftTransport(day=n1 + 1, mode="faehre", from_place=a, to_place=f"{a} Insel", from_code="",
+                                 to_code="", depart="09:00", duration_h=3, via=[], carrier="Testfähre",
+                                 est_price_chf=120, note="Schätzung"))
+    tr.append(DraftTransport(day=days, mode="flug", from_place=bases[-1].name, to_place="Zürich", from_code="LIS",
+                             to_code=home_airport, depart="11:00", duration_h=3, via=[], carrier="Testair",
+                             est_price_chf=500, note="Schätzung"))
+    return PlanDraft(title=f"{a} ({days} Tage)", summary=f"Testplan für {a}.", bases=bases, days=ds,
+                     alternatives=alts, hotels=hotels, transports=tr, cost_note="Alle Preise sind Schätzungen.")

@@ -9,36 +9,9 @@ from datetime import date, time
 from decimal import Decimal
 from typing import Protocol
 
-from pydantic import Field
-
-from ..models import Activity, ActivityCategory, Exposure, Household, Intensity, Place, WeatherForecast
-from ..models.common import Model, Money, from_min, to_min
+from ..models import Activity, AlternativeCandidate, Exposure, Household, Place, WeatherForecast
+from ..models.common import Model, from_min, to_min
 from ..models.itinerary import DEFAULT_LIMITS
-
-
-class AlternativeCandidate(Model):
-    title: str
-    category: ActivityCategory
-    exposure: Exposure
-    intensity: Intensity = Intensity.LEICHT
-    duration_min: int = Field(ge=15, le=12 * 60)
-    cost: Money = Decimal("0")
-    place: Place
-    tags: set[str] = set()
-    opens: time | None = None
-    closes: time | None = None
-    booking_needed: bool = False
-    source: str = "katalog"
-
-    def fits(self, start: time, end: time) -> bool:
-        s, e = to_min(start), to_min(start) + self.duration_min
-        if e > to_min(end):
-            return False
-        if self.opens and s < to_min(self.opens):
-            return False
-        if self.closes and e > to_min(self.closes):
-            return False
-        return True
 
 
 class ScoredAlternative(Model):
@@ -77,12 +50,22 @@ class AlternativeActivitiesModule:
         budget_left: Decimal | None = None,
         limit: int = 3,
     ) -> list[ScoredAlternative]:
+        out = self._score(self.provider.candidates(place, day), place, day, start, end, original, forecast,
+                          exclude_titles, budget_left)
+        if not out and hasattr(self.provider, "more"):  # nichts passt: zusätzliche Vorschläge holen
+            out = self._score(self.provider.more(place, day), place, day, start, end, original, forecast,
+                              exclude_titles, budget_left)
+        out.sort(key=lambda s: (-s.score, s.candidate.title))
+        return out[:limit]
+
+    def _score(self, candidates, place, day, start, end, original, forecast, exclude_titles,
+               budget_left) -> list[ScoredAlternative]:
         k = self.household.constraints
         avoid, max_int = k.effective_avoid_tags(), k.effective_max_intensity()
         window = to_min(end) - to_min(start)
         excluded = {t.casefold() for t in exclude_titles}
         out: list[ScoredAlternative] = []
-        for c in self.provider.candidates(place, day):
+        for c in candidates:
             if c.title.casefold() in excluded or not c.fits(start, end):
                 continue
             c_end = from_min(to_min(start) + c.duration_min)
@@ -111,8 +94,7 @@ class AlternativeActivitiesModule:
                 score -= abs(int(c.intensity) - int(original.intensity)) * 0.3
             score += 0.5 * c.duration_min / window  # füllt die Lücke gut
             out.append(ScoredAlternative(candidate=c, score=round(score, 3), reasons=why))
-        out.sort(key=lambda s: (-s.score, s.candidate.title))
-        return out[:limit]
+        return out
 
     @staticmethod
     def to_activity(sa: ScoredAlternative, start: time, original: Activity | None, note: str) -> Activity:

@@ -1,25 +1,28 @@
-"""Webserver von Kompass (Standardbibliothek, wie Hörwerk).
+"""Webserver von Kompass (Standardbibliothek, Sicherheit wie Hörwerk).
 
 Jede Anfrage läuft durch ``_gate()``: ohne gültige Sitzung nur /login, /health, Manifest und Symbole.
-Schritt 2 (Testversion): Demo-Reise anzeigen, Wettercheck simulieren, Rückgängig, Demo zurücksetzen.
+Änderungen (POST/DELETE) nur mit Header ``X-Kompass: 1`` (Schutz vor fremden Seiten).
 """
 from __future__ import annotations
 
 import json
-import threading
+import re
+from datetime import date, datetime
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import auth, config, demo
-from .core.status_manager import StatusManager
-from .models import ChangeStatus
-from .planning.alternatives import AlternativeActivitiesModule
-from .planning.replanning import AutonomousRePlanningModule
+from pydantic import ValidationError
+
+from . import auth, config, drafting, llm, service, store, vision
+from .models import Household, SetConfirmed, SetFixed, SetTripStatus
+from .models.common import CATEGORY_LABELS
+from .planning.matching import match
 
 WEB = Path(__file__).parent / "web"
-MAX_BODY = 64 * 1024
+MAX_BODY = 256 * 1024
+MAX_IMAGE_BODY = 8 * 1024 * 1024
 STATIC = {
     "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
     "/icon.svg": ("icon.svg", "image/svg+xml"),
@@ -27,75 +30,77 @@ STATIC = {
     "/favicon.ico": ("icon.svg", "image/svg+xml"),
 }
 PUBLIC_GET = {"/health", "/login", *STATIC}
-
-_lock = threading.Lock()
-_sm: StatusManager | None = None
+ID = r"[A-Za-z0-9_-]{4,40}"
 
 
-def status() -> StatusManager:
-    global _sm
-    with _lock:
-        if _sm is None:
-            _sm = StatusManager(config.DB_PATH)
-            try:
-                _sm.get(demo.DEMO_ID)
-            except KeyError:
-                _sm.create(demo.itinerary())
-        return _sm
+class BadRequest(Exception):
+    pass
 
 
-def reset_demo() -> None:
-    global _sm
-    with _lock:
-        if _sm is not None:
-            _sm.close()
-            _sm = None
-        for suffix in ("", "-wal", "-shm"):
-            Path(str(config.DB_PATH) + suffix).unlink(missing_ok=True)
-    status()
+def _date(v) -> date:
+    try:
+        return date.fromisoformat(str(v))
+    except ValueError:
+        raise BadRequest("Ungültiges Datum.")
 
 
-def state() -> dict:
-    sm = status()
-    itin = sm.get(demo.DEMO_ID)
-    now = demo.demo_clock(itin)
-    plan = itin.model_dump(mode="json")
-    for day, raw in zip(itin.days, plan["days"]):
+def _int(v, lo: int, hi: int, name: str) -> int:
+    try:
+        n = int(v)
+    except (TypeError, ValueError):
+        raise BadRequest(f"{name}: Zahl erwartet.")
+    if not lo <= n <= hi:
+        raise BadRequest(f"{name}: {lo}–{hi} erlaubt.")
+    return n
+
+
+def _text(v, maxlen: int) -> str:
+    s = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", str(v or "")).strip()
+    return s[:maxlen]
+
+
+# --- Antworten zusammenstellen ----------------------------------------------------------------
+
+def trip_summary(it) -> dict:
+    return {"id": it.id, "title": it.title, "start": it.start_date.isoformat(), "end": it.end_date.isoformat(),
+            "status": it.status, "version": it.version, "total": str(it.total_cost()),
+            "place": it.days[0].base.name if it.days else "", "favorite": bool(store.get("fav", it.id))}
+
+
+def trip_detail(trip_id: str) -> dict:
+    sm = service.sm()
+    it = sm.get(trip_id)
+    now, today = service.current_day(it)
+    data = it.model_dump(mode="json")
+    for day, raw in zip(it.days, data["days"]):
         for a, ra in zip(day.activities, raw["activities"]):
             ra["locked"] = a.locked(now)
-    hist = [h.model_dump(mode="json") for h in sm.history(itin.id)]
+    hist = [h.model_dump(mode="json") for h in sm.history(it.id)]
     for h in hist:
-        h["can_undo"] = h["undone_by"] is None and h["to_version"] == itin.version and h["operations"] != []
-    return {
-        "version": config.APP_VERSION, "build": config.APP_BUILD, "plan": plan,
-        "total": str(itin.total_cost()), "now": now.isoformat(),
-        "history": list(reversed(hist)), "actions": sm.pending_actions(), "scenarios": demo.SCENARIOS,
-    }
+        h["can_undo"] = h["undone_by"] is None and h["to_version"] == it.version and h["operations"] != []
+    return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
+            "today": today.date.isoformat() if today else None, "history": list(reversed(hist)),
+            "actions": sm.actions(it.id, status="offen"), "notes": store.get("plan_notes", it.id, []),
+            "favorite": bool(store.get("fav", it.id)), "ai_cost": round(store.spent_for_trip(it.id), 4),
+            "drafts": {k.split(":", 1)[1]: v for k, v in store.all_of("draft").items() if k.startswith(it.id + ":")}}
 
 
-def run_check(scenario: str, pregnant: bool, dry_next_day: bool) -> dict:
-    sm = status()
-    itin = sm.get(demo.DEMO_ID)
-    hh = demo.household(pregnant)
-    mod = AutonomousRePlanningModule(
-        sm, AlternativeActivitiesModule(demo.CATALOG, hh), hh,
-        forecast_lookup=demo.lookup_dry_next_day(itin) if dry_next_day else None,
-        clock=lambda: demo.demo_clock(itin),
-    )
-    ev = demo.event(itin, scenario)
-    out = mod.handle(ev)
-    print(f"[Umplanung] {ev.description}: {out.status.value}, Versuche {out.attempts}", flush=True)
-    return {
-        "status": out.status.value, "applied": out.status is ChangeStatus.APPLIED,
-        "message": out.message(), "needs_user": out.needs_user,
-        "decisions": [d.model_dump(mode="json") for d in out.decisions],
-        "problems": [p.model_dump(mode="json") for p in (out.result.problems if out.result else [])],
-    }
+def info() -> dict:
+    s = store.settings()
+    return {"version": config.APP_VERSION, "build": config.APP_BUILD, "fake": config.FAKE_MODE,
+            "settings": s, "models": config.MODELS, "key": store.key_info(), "ai": llm.available(),
+            "spent_24h": round(store.spent_since(24), 4), "spent_30d": round(store.spent_since(24 * 30), 4),
+            "budget_usd": config.DAILY_BUDGET_USD, "unread": store.unread(),
+            "categories": {k.value: v for k, v in CATEGORY_LABELS.items()}}
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "Kompass/0"
+    server_version = "Kompass/1"
     protocol_version = "HTTP/1.1"
+
+    def log_message(self, fmt, *args):
+        if "/api/jobs/" not in (str(args[0]) if args else ""):
+            super().log_message(fmt, *args)
 
     def end_headers(self):
         for k, v in auth.SECURITY_HEADERS.items():
@@ -117,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send(self, code, body, ctype="application/json; charset=utf-8", extra=None):
         if isinstance(body, (dict, list)):
-            body = json.dumps(body, ensure_ascii=False)
+            body = json.dumps(body, ensure_ascii=False, default=str)
         if isinstance(body, str):
             body = body.encode()
         self.send_response(code)
@@ -143,11 +148,12 @@ class Handler(BaseHTTPRequestHandler):
             html = (WEB / "setup.html").read_text("utf-8").replace("{{GRUND}}", problem)
             self._send(503, html, "text/html; charset=utf-8")
             return False
-        if method == "POST":
+        if method in ("POST", "DELETE"):
             if self.headers.get(auth.CSRF_HEADER) != "1":
                 self._send(403, {"error": "Anfrage nicht erlaubt."})
                 return False
-            if int(self.headers.get("Content-Length") or 0) > MAX_BODY:
+            limit = MAX_IMAGE_BODY if path == "/api/vision" else MAX_BODY
+            if int(self.headers.get("Content-Length") or 0) > limit:
                 self._send(413, {"error": "Anfrage zu gross."})
                 return False
             if path == "/api/login":
@@ -162,6 +168,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(401, {"error": "Bitte anmelden."})
         return False
 
+    # ---------- GET ----------
     def do_HEAD(self):
         self.do_GET()
 
@@ -169,6 +176,12 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if not self._gate("GET", p):
             return
+        try:
+            return self._get(p)
+        except KeyError:
+            return self._send(404, {"error": "nicht gefunden"})
+
+    def _get(self, p):
         if p == "/health":
             return self._send(200, "ok", "text/plain; charset=utf-8")
         if p == "/login":
@@ -181,10 +194,31 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, f.read_bytes(), ctype, {"Cache-Control": "public, max-age=86400"})
         if p == "/":
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
-        if p == "/api/state":
-            return self._send(200, state())
+        if p == "/api/info":
+            return self._send(200, info())
+        if p == "/api/trips":
+            return self._send(200, {"trips": [trip_summary(t) for t in service.sm().list()]})
+        if m := re.fullmatch(rf"/api/trips/({ID})", p):
+            return self._send(200, trip_detail(m.group(1)))
+        if p == "/api/household":
+            h = store.household()
+            return self._send(200, {"household": h.model_dump(mode="json"),
+                                    "matching": match(h).model_dump(mode="json"), "prompt": match(h).prompt_text()})
+        if p == "/api/ideas":
+            ideas = store.all_of("ideas")
+            return self._send(200, {"ideas": list(ideas.values())[:5],
+                                    "saved": list(store.all_of("fav_dest").values())})
+        if m := re.fullmatch(rf"/api/jobs/({ID})", p):
+            j = service.job(m.group(1))
+            return self._send(200, j) if j else self._send(404, {"error": "Auftrag unbekannt (Neustart?)"})
+        if p == "/api/notices":
+            return self._send(200, {"notices": store.notices()})
+        if p == "/api/costs":
+            return self._send(200, {"recent": store.recent_costs(), "spent_24h": store.spent_since(24),
+                                    "spent_30d": store.spent_since(24 * 30)})
         return self._send(404, {"error": "nicht gefunden"})
 
+    # ---------- POST ----------
     def do_POST(self):
         p = urlparse(self.path).path
         if not self._gate("POST", p):
@@ -196,7 +230,20 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError
         except ValueError:
             return self._send(400, {"error": "ungültige Anfrage"})
+        try:
+            return self._post(p, body)
+        except BadRequest as e:
+            return self._send(400, {"error": str(e)})
+        except ValidationError as e:
+            err = e.errors()[0]
+            loc = ".".join(str(x) for x in err.get("loc", ()))
+            return self._send(400, {"error": f"Ungültige Angabe ({loc}): {err.get('msg')}"})
+        except llm.LLMError as e:
+            return self._send(502, {"error": str(e)})
+        except KeyError:
+            return self._send(404, {"error": "nicht gefunden"})
 
+    def _post(self, p, body):
         if p == "/api/login":
             ip = self._ip()
             wait = auth.lock_seconds(ip)
@@ -208,27 +255,152 @@ class Handler(BaseHTTPRequestHandler):
             auth.register_success(ip)
             return self._send(200, {"ok": True}, extra={
                 "Set-Cookie": auth.cookie_header(auth.make_cookie(), auth.SESSION_DAYS * 86400)})
-        if p == "/api/logout":
+        if p in ("/api/logout", "/api/logout-all"):
+            if p == "/api/logout-all":
+                auth.logout_everywhere()
             return self._send(200, {"ok": True}, extra={"Set-Cookie": auth.cookie_header("", 0)})
-        if p == "/api/logout-all":
-            auth.logout_everywhere()
-            return self._send(200, {"ok": True}, extra={"Set-Cookie": auth.cookie_header("", 0)})
-        if p == "/api/demo/check":
-            scenario = str(body.get("scenario") or "")
-            if scenario not in demo.SCENARIOS:
-                return self._send(400, {"error": "unbekanntes Wetter"})
-            out = run_check(scenario, bool(body.get("pregnant")), bool(body.get("dry_next_day")))
-            return self._send(200, {"outcome": out, "state": state()})
-        if p == "/api/undo":
-            try:
-                res = status().undo(str(body.get("change_id") or ""))
-            except KeyError:
-                return self._send(404, {"error": "Änderung nicht gefunden"})
-            ok = res.status is ChangeStatus.APPLIED
-            return self._send(200 if ok else 409, {"ok": ok, "error": "" if ok else "Geht nicht mehr – der Plan wurde danach weiter geändert.", "state": state()})
-        if p == "/api/demo/reset":
-            reset_demo()
-            return self._send(200, {"state": state()})
+
+        if p == "/api/household":
+            h = Household.model_validate({**body.get("household", {}), "id": "main"})
+            store.save_household(h)
+            return self._send(200, {"household": h.model_dump(mode="json"),
+                                    "matching": match(h).model_dump(mode="json"), "prompt": match(h).prompt_text()})
+        if p == "/api/settings":
+            allowed = {}
+            if "model" in body:
+                if body["model"] not in config.MODELS:
+                    raise BadRequest("Unbekanntes Modell.")
+                allowed["model"] = body["model"]
+            if "effort" in body:
+                if body["effort"] not in ("low", "medium", "high"):
+                    raise BadRequest("Unbekannte Stufe.")
+                allowed["effort"] = body["effort"]
+            if "check_time" in body:
+                if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(body["check_time"])):
+                    raise BadRequest("Zeit als HH:MM angeben.")
+                allowed["check_time"] = body["check_time"]
+            for k in ("auto_check", "web_search"):
+                if k in body:
+                    allowed[k] = bool(body[k])
+            if "home_airport" in body:
+                code = str(body["home_airport"]).strip().upper()
+                if not re.fullmatch(r"[A-Z]{3}", code):
+                    raise BadRequest("Flughafen als 3-Buchstaben-Code (z. B. ZRH).")
+                allowed["home_airport"] = code
+            store.save_settings(allowed)
+            return self._send(200, info())
+        if p == "/api/keys":
+            key = _text(body.get("anthropic"), 300)
+            if key and not key.startswith("sk-"):
+                raise BadRequest("Das sieht nicht wie ein Claude-Schlüssel aus (beginnt mit «sk-»).")
+            store.save_anthropic_key(key)
+            return self._send(200, info())
+
+        if p == "/api/destinations":
+            start = _date(body.get("start"))
+            days = _int(body.get("days"), 2, 30, "Tage")
+            if start < date.today():
+                raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
+            return self._send(200, {"job": service.start_destinations(start, days, _text(body.get("wish"), 400))})
+        if p == "/api/trips":
+            start = _date(body.get("start"))
+            days = _int(body.get("days"), 2, 30, "Tage")
+            dest = _text(body.get("destination"), 200)
+            if not dest:
+                raise BadRequest("Bitte ein Ziel angeben oder vorschlagen lassen.")
+            return self._send(200, {"job": service.start_plan(dest, start, days, _text(body.get("wishes"), 800))})
+        if p == "/api/fav-destination":
+            item = body.get("idea") or {}
+            if not isinstance(item, dict) or not item.get("id"):
+                raise BadRequest("Vorschlag fehlt.")
+            if body.get("remove"):
+                store.delete("fav_dest", str(item["id"]))
+            else:
+                keep = {k: item.get(k) for k in ("id", "name", "country", "why", "highlights", "climate_text",
+                                                 "est_total_chf", "typical_flight_hours")}
+                store.put("fav_dest", str(item["id"]), keep)
+            return self._send(200, {"saved": list(store.all_of("fav_dest").values())})
+
+        if m := re.fullmatch(rf"/api/trips/({ID})/(\w[\w-]*)", p):
+            return self._trip_post(m.group(1), m.group(2), body)
+        if m := re.fullmatch(rf"/api/actions/({ID})", p):
+            status = body.get("status")
+            if status not in ("erledigt", "verworfen", "offen"):
+                raise BadRequest("Status unbekannt.")
+            ok = service.sm().set_action_status(m.group(1), status)
+            return self._send(200 if ok else 404, {"ok": ok})
+        if m := re.fullmatch(rf"/api/actions/({ID})/draft", p):
+            act = next((a for a in service.sm().actions(status=None) if a["id"] == m.group(1)), None)
+            if not act:
+                raise KeyError
+            d = drafting.write(act["kind"], act.get("payload", {}), _text(body.get("language"), 40),
+                               trip_id=act["itinerary_id"])
+            store.put("draft", f"{act['itinerary_id']}:{act['id']}", d.model_dump())
+            return self._send(200, {"draft": d.model_dump()})
+        if p == "/api/draft":
+            kind = _text(body.get("kind"), 40) or "nachricht"
+            d = drafting.write(kind, {k: _text(v, 200) for k, v in (body.get("payload") or {}).items()},
+                               _text(body.get("language"), 40), _text(body.get("recipient"), 120),
+                               _text(body.get("details"), 1200), trip_id=body.get("trip_id") or None)
+            return self._send(200, {"draft": d.model_dump()})
+        if p == "/api/vision":
+            img = str(body.get("image") or "")
+            mt = str(body.get("media_type") or "image/jpeg")
+            res = vision.analyse(img, mt, _text(body.get("question"), 300), body.get("trip_id") or None)
+            return self._send(200, {"result": res.model_dump()})
+        if p == "/api/notices/read":
+            store.mark_read()
+            return self._send(200, {"ok": True})
+        return self._send(404, {"error": "nicht gefunden"})
+
+    def _trip_post(self, trip_id: str, action: str, body: dict):
+        sm = service.sm()
+        it = sm.get(trip_id)  # KeyError → 404
+        if action == "weathercheck":
+            return self._send(200, {"outcome": service.weather_check(trip_id), **trip_detail(trip_id)})
+        if action == "transport":
+            days = _int(body.get("days"), 1, 14, "Tage")
+            out = service.report_transport(trip_id, str(body.get("segment_id") or ""), days,
+                                           _text(body.get("reason"), 200))
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "closure":
+            out = service.report_closure(trip_id, str(body.get("activity_id") or ""), _text(body.get("reason"), 200))
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "undo":
+            res = sm.undo(str(body.get("change_id") or ""))
+            ok = res.status.value == "angewendet"
+            return self._send(200, {"ok": ok, "error": "" if ok else "Geht nicht mehr – der Plan wurde danach weiter "
+                                    "geändert.", **trip_detail(trip_id)})
+        if action == "status":
+            out = service.change(trip_id, [SetTripStatus(status=body.get("status"))], "Status geändert")
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "fixed":
+            aid = str(body.get("activity_id") or "")
+            out = service.change(trip_id, [SetFixed(activity_id=aid, fixed=bool(body.get("fixed")))],
+                                 "Programmpunkt festgenagelt" if body.get("fixed") else "Programmpunkt freigegeben", [aid])
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "confirm":
+            op = SetConfirmed(target=body.get("target"), item_id=str(body.get("item_id") or ""),
+                              confirmed=bool(body.get("confirmed")), reference=_text(body.get("reference"), 60) or None)
+            out = service.change(trip_id, [op], "Als gebucht markiert" if op.confirmed else "Buchung zurückgesetzt")
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "favorite":
+            if store.get("fav", trip_id):
+                store.delete("fav", trip_id)
+            else:
+                store.put("fav", trip_id, {"saved_at": datetime.now().isoformat(), "title": it.title})
+            return self._send(200, trip_detail(trip_id))
+        return self._send(404, {"error": "nicht gefunden"})
+
+    # ---------- DELETE ----------
+    def do_DELETE(self):
+        p = urlparse(self.path).path
+        if not self._gate("DELETE", p):
+            return
+        if m := re.fullmatch(rf"/api/trips/({ID})", p):
+            ok = service.sm().delete(m.group(1))
+            store.delete("fav", m.group(1))
+            return self._send(200 if ok else 404, {"ok": ok})
         return self._send(404, {"error": "nicht gefunden"})
 
 
@@ -237,9 +409,12 @@ def main():
     problem = auth.password_problem()
     if problem:
         print(f"ACHTUNG: {problem} Die App bleibt gesperrt, bis das behoben ist.", flush=True)
-    status()
+    if service.sm().delete("demo-lissabon"):  # Überbleibsel der Testversion 0.2
+        print("Alte Demo-Reise entfernt.", flush=True)
+    service.start_scheduler()
     srv = ThreadingHTTPServer(("0.0.0.0", config.PORT), Handler)
-    print(f"Kompass {config.APP_VERSION} ({config.APP_BUILD}) läuft auf Port {config.PORT}", flush=True)
+    print(f"Kompass {config.APP_VERSION} ({config.APP_BUILD}) läuft auf Port {config.PORT} "
+          f"(Testmodus: {config.FAKE_MODE}, KI: {'ja' if llm.available() else 'kein Schlüssel'})", flush=True)
     srv.serve_forever()
 
 

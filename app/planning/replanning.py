@@ -20,8 +20,8 @@ from ..core.operations import PlanOperationError, apply_operations
 from ..core.plausibility import MiddlewareConfig
 from ..core.status_manager import StatusManager
 from ..models import (
-    Activity, AddActivity, ChangeResult, ChangeSet, ChangeStatus, DayPlan, ExternalAction, Household,
-    Itinerary, MoveActivity, Place, ReplaceActivity, WeatherDisruption, WeatherForecast,
+    Activity, AddActivity, ChangeResult, ChangeSet, ChangeStatus, ClosureDisruption, DayPlan, ExternalAction,
+    Household, Itinerary, MoveActivity, Place, ReplaceActivity, WeatherDisruption, WeatherForecast,
 )
 from ..models.changes import PlanOperation
 from ..models.common import Model, from_min, to_min
@@ -110,6 +110,50 @@ class AutonomousRePlanningModule:
                                  needs_user=needs_user, result=res, attempts=attempt)
         return ReplanOutcome(event_id=event.id, status=ChangeStatus.CONFLICT, attempts=self.max_attempts,
                              needs_user=["Der Plan wurde mehrmals gleichzeitig geändert – bitte selbst prüfen."])
+
+    def handle_closure(self, event: ClosureDisruption) -> ReplanOutcome:
+        """Ein Programmpunkt fällt aus (geschlossen, abgesagt): durch die beste Alternative ersetzen."""
+        if self.status.event_handled(event.id):
+            return ReplanOutcome(event_id=event.id, status=ChangeStatus.DUPLICATE)
+        for attempt in range(1, self.max_attempts + 1):
+            now = self.clock()
+            itin = self.status.get(event.itinerary_id)
+            found = itin.find_activity(event.activity_id or "")
+            if not found:
+                return ReplanOutcome(event_id=event.id, status=ChangeStatus.REJECTED,
+                                     needs_user=["Diesen Programmpunkt gibt es im Plan nicht (mehr)."])
+            day, a = found
+            why = event.description or "fällt aus"
+            planned = {x.title for d in itin.days for x in d.activities}
+            chosen = None
+            for sa in self.alternatives.suggest(place=day.base, day=day.date, start=a.start, end=a.end, original=a,
+                                                exclude_titles=planned, budget_left=self._budget_left(itin), limit=5):
+                new = self.alternatives.to_activity(sa, a.start, a, f"Ersatz für «{a.title}» ({why})")
+                op = ReplaceActivity(activity_id=a.id, new=new)
+                try:
+                    trial = apply_operations(itin, [op])
+                except PlanOperationError:
+                    continue
+                if any(p.level == "fehler" for p in self.status.checker.check(
+                        itin, trial, self.household.constraints, now, {a.id})):
+                    continue
+                chosen = (op, new, sa)
+                break
+            if chosen is None:
+                return ReplanOutcome(event_id=event.id, status=ChangeStatus.NOOP, needs_user=[
+                    f"«{a.title}»: keine passende Alternative gefunden."])
+            op, new, sa = chosen
+            actions = self._booking_actions(a, datetime.min) + self._request_actions(sa, new)
+            res = self.status.apply(ChangeSet(
+                itinerary_id=itin.id, base_version=itin.version, operations=[op], event_id=event.id,
+                reason=f"«{a.title}» {why}: ersetzt durch «{new.title}»", actor="autonom",
+                external_actions=actions, acknowledged_locked=[a.id]), self.household.constraints, now)
+            if res.status is ChangeStatus.CONFLICT:
+                continue
+            dec = ReplanDecision(activity_id=a.id, title=a.title, date=day.date, action="ersetzt", reason=why,
+                                 new_activity_id=new.id, detail=f"ersetzt durch «{new.title}»")
+            return ReplanOutcome(event_id=event.id, status=res.status, decisions=[dec], result=res, attempts=attempt)
+        return ReplanOutcome(event_id=event.id, status=ChangeStatus.CONFLICT, attempts=self.max_attempts)
 
     # --- Planung ------------------------------------------------------------------------------
 

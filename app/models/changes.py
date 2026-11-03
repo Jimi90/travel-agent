@@ -12,7 +12,8 @@ from typing import Annotated, Any, Literal, Union
 from pydantic import Field
 
 from .common import Model, new_id
-from .itinerary import Activity
+from .common import Place
+from .itinerary import Accommodation, Activity
 
 
 class ReplaceActivity(Model):
@@ -40,9 +41,58 @@ class RemoveActivity(Model):
     activity_id: str
 
 
-# Später (ExtendedDisruptionHandler): ExtendStay, ShiftDays, RebookTransport.
+class ExtendStay(Model):
+    """Unterkunft verlängern (neues Abreisedatum)."""
+
+    op: Literal["unterkunft_verlaengern"] = "unterkunft_verlaengern"
+    stay_id: str
+    new_check_out: date
+
+
+class AddStay(Model):
+    op: Literal["unterkunft_hinzufuegen"] = "unterkunft_hinzufuegen"
+    stay: Accommodation
+
+
+class ShiftSchedule(Model):
+    """Alles ab ``from_date`` um ``days`` Tage nach hinten schieben (Tage, Unterkünfte, Transporte, Reiseende).
+
+    Die entstehende Lücke wird mit leeren Tagen am Ort ``gap_base`` gefüllt.
+    """
+
+    op: Literal["plan_verschieben"] = "plan_verschieben"
+    from_date: date
+    days: int = Field(ge=1, le=14)
+    gap_base: Place
+
+
+class SetTripStatus(Model):
+    op: Literal["status_setzen"] = "status_setzen"
+    status: Literal["entwurf", "gebucht", "unterwegs", "abgeschlossen"]
+
+
+class SetFixed(Model):
+    """Aktivität festnageln (die Automatik fasst sie nie an) oder wieder freigeben."""
+
+    op: Literal["festnageln"] = "festnageln"
+    activity_id: str
+    fixed: bool
+
+
+class SetConfirmed(Model):
+    """Unterkunft/Verbindung als gebucht markieren (oder wieder als Vorschlag)."""
+
+    op: Literal["bestaetigen"] = "bestaetigen"
+    target: Literal["unterkunft", "verbindung"]
+    item_id: str
+    confirmed: bool
+    reference: str | None = None
+
+
 PlanOperation = Annotated[
-    Union[ReplaceActivity, MoveActivity, AddActivity, RemoveActivity], Field(discriminator="op")
+    Union[ReplaceActivity, MoveActivity, AddActivity, RemoveActivity, ExtendStay, AddStay, ShiftSchedule,
+          SetTripStatus, SetFixed, SetConfirmed],
+    Field(discriminator="op"),
 ]
 
 
@@ -54,7 +104,8 @@ class ExternalAction(Model):
     """
 
     id: str = Field(default_factory=new_id)
-    kind: Literal["buchung_stornieren", "buchung_aendern", "buchung_anfragen", "hotel_verlaengern", "nachricht"]
+    kind: Literal["buchung_stornieren", "buchung_aendern", "buchung_anfragen", "hotel_verlaengern",
+                  "transport_umbuchen", "nachricht"]
     description: str
     payload: dict[str, Any] = {}
     needs_confirmation: bool = True  # Geld/Buchungen nie ohne Bestätigung
@@ -68,6 +119,9 @@ class ChangeSet(Model):
     event_id: str | None = None  # gleiche Störung nie zweimal anwenden
     actor: Literal["autonom", "nutzer"] = "nutzer"
     external_actions: list[ExternalAction] = []
+    # Feste/gebuchte Aktivitäten, die dieses ChangeSet bewusst verändert (z. B. Plan nach hinten schieben).
+    # Für jede muss eine ExternalAction mit Bestätigung beiliegen.
+    acknowledged_locked: list[str] = []
 
 
 class ChangeStatus(StrEnum):
