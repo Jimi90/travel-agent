@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, bookings, config, drafting, llm, photos, prices, service, store, vision
+from . import auth, bookings, config, drafting, llm, photos, prices, service, store, tiles, vision
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -69,6 +69,15 @@ def trip_summary(it) -> dict:
             "place": it.days[0].base.name if it.days else "", "favorite": bool(store.get("fav", it.id))}
 
 
+def hotel_options(it, stay) -> list:
+    """Die 2–3 Hotelvorschläge des Plans für den Ort dieser Unterkunft."""
+    name = stay.place.name.casefold()
+    exact = [h for h in it.hotel_suggestions if h.base.casefold() == name]
+    if exact:  # zuerst genau dieser Ort («Lissabon» darf nicht die Hotels von «Lissabon Insel» zeigen)
+        return exact
+    return [h for h in it.hotel_suggestions if h.base.casefold() in name or name in h.base.casefold()]
+
+
 def trip_detail(trip_id: str) -> dict:
     sm = service.sm()
     it = sm.get(trip_id)
@@ -86,7 +95,19 @@ def trip_detail(trip_id: str) -> dict:
     tp = photos.trip_photos(it.id)
     hero = next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
     hero_meta = (store.get("photo", hero) or {}) if hero else {}
+    hotel_opts = {}
+    for st in it.stays:
+        nights = (st.check_out - st.check_in).days
+        hotel_opts[st.id] = [{"name": h.name, "area": h.area, "night": float(h.price_per_night),
+                              "total": float(h.price_per_night) * nights, "why": h.why,
+                              "tier": next((t for t in ("guenstig", "mittel", "gehoben") if t in h.tags), ""),
+                              "url": h.search_url, "chosen": h.name == st.name} for h in hotel_options(it, st)]
+    costs = {"Flüge & Verbindungen": float(sum(t.cost for t in it.transports)),
+             "Unterkünfte": float(sum(s.cost for s in it.stays)),
+             "Programm": float(sum(a.cost for d in it.days for a in d.activities))}
+    budget = store.household().constraints.budget_total_max
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
+            "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
             "photos": tp, "photos_pending": pending,
             "hero": {"id": hero, "title": hero_meta.get("title", ""), "page": hero_meta.get("page", ""),
                      "source": hero_meta.get("source", "")} if hero else None,
@@ -211,6 +232,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, (WEB / "index.html").read_bytes(), "text/html; charset=utf-8")
         if p == "/api/info":
             return self._send(200, info())
+        if m := re.fullmatch(r"/api/tile/(\d{1,2})/(\d{1,6})/(\d{1,6})", p):
+            got = tiles.get(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            if not got:
+                return self._send(404, {"error": "nicht gefunden"})
+            return self._send(200, got[0], got[1], {"Cache-Control": "private, max-age=2592000"})
         if m := re.fullmatch(r"/api/photo/([0-9a-f]{24})", p):
             got = photos.get(m.group(1))
             if not got:
@@ -340,7 +366,25 @@ class Handler(BaseHTTPRequestHandler):
             if start < date.today():
                 raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
             return self._send(200, {"job": service.start_destinations(start, days, _text(body.get("wish"), 400))})
+        if p == "/api/variants":
+            start = _date(body.get("start"))
+            days = _int(body.get("days"), 2, 30, "Tage")
+            dest = _text(body.get("destination"), 200)
+            if not dest:
+                raise BadRequest("Bitte das Ziel eingeben.")
+            if start < date.today():
+                raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
+            return self._send(200, {"job": service.start_variants(dest, start, days, _text(body.get("wishes"), 800))})
         if p == "/api/trips":
+            if body.get("variant_set"):  # gewählte Routen-Variante: Daten nur aus der gemerkten Liste
+                vs = store.get("variants", str(body["variant_set"]))
+                if not vs:
+                    raise KeyError(body["variant_set"])
+                idx = _int(body.get("index"), 0, len(vs["variants"]) - 1, "Variante")
+                v = vs["variants"][idx]
+                return self._send(200, {"job": service.start_plan(
+                    vs["destination"], date.fromisoformat(vs["start"]), vs["days"], vs["wishes"],
+                    route=v["route"], summary=f"{v['name']}: {v['summary']}")})
             start = _date(body.get("start"))
             days = _int(body.get("days"), 2, 30, "Tage")
             dest = _text(body.get("destination"), 200)
@@ -485,6 +529,20 @@ class Handler(BaseHTTPRequestHandler):
                                 note=f"CHF {opt['night']:.0f}/Nacht laut Google Hotels am {date.today():%d.%m.%Y}")
                 reason = f"Unterkunft aus echten Preisen übernommen ({opt['name']})"
             out = service.change(trip_id, [op], reason)
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "choose-hotel":
+            stay = next((x for x in it.stays if x.id == str(body.get("stay_id") or "")), None)
+            if stay is None:
+                raise KeyError("stay")
+            opts = hotel_options(it, stay)
+            idx = _int(body.get("index"), 0, max(0, len(opts) - 1), "Hotel")
+            if not opts:
+                raise BadRequest("Für diesen Ort gibt es keine Hotelvorschläge.")
+            h = opts[idx]
+            nights = (stay.check_out - stay.check_in).days
+            op = UpdateStay(stay_id=stay.id, name=h.name, cost=round(h.price_per_night * nights, 2),
+                            search_url=h.search_url, note=h.why or None)
+            out = service.change(trip_id, [op], f"Hotel gewählt: {h.name}")
             return self._send(200, {"outcome": out, **trip_detail(trip_id)})
         if action == "favorite":
             if store.get("fav", trip_id):

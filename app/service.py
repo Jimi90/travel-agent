@@ -16,7 +16,7 @@ from .models import (
     ChangeSet, ChangeStatus, ClosureDisruption, Itinerary, Place, SetTripStatus, TransportDisruption,
     WeatherDisruption, new_id,
 )
-from .planning import destinations, generator
+from .planning import destinations, generator, variants
 from .planning.alternatives import AlternativeActivitiesModule
 from .planning.disruption_ext import ExtendedDisruptionHandler
 from .planning.providers import PlanAlternatives
@@ -203,12 +203,26 @@ def start_destinations(start: date, days: int, wish: str) -> str:
     return _start_job("ziele", run)
 
 
-def start_plan(destination: str, start: date, days: int, wishes: str) -> str:
+def start_variants(destination: str, start: date, days: int, wishes: str) -> str:
+    s = store.settings()
+
+    def run():
+        res = variants.suggest(store.household(), destination, start, days, wishes, s["home_airport"])
+        store.put("variants", res["id"], res)
+        return res
+
+    return _start_job("varianten", run)
+
+
+def start_plan(destination: str, start: date, days: int, wishes: str, route: list[dict] | None = None,
+               summary: str = "") -> str:
     s = store.settings()
 
     def run():
         itin, notes = generator.generate(store.household(), destination, start, days, wishes, s["home_airport"],
-                                         web_search=bool(s.get("web_search")))
+                                         web_search=bool(s.get("web_search")), route=route)
+        if summary:  # gewählte Variante zuerst, dann der Überblick des Planers
+            itin = itin.model_copy(update={"summary": f"{summary} {itin.summary}".strip()})
         sm().create(itin)
         store.put("plan_notes", itin.id, notes)
         photos.fill_trip(itin)

@@ -114,7 +114,8 @@ Regeln:
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
-- hotels: pro Aufenthaltsort 2–3 echte Hotels innerhalb des Budgets, das passendste zuerst.
+- hotels: pro Aufenthaltsort genau 3 echte Hotels in verschiedenen Preisklassen; tags enthält genau eines von
+  «guenstig», «mittel», «gehoben». Das am besten passende (im Budget) zuerst.
 - transports: Hinflug am Tag 1 ab Heimatflughafen, Rückflug am letzten Tag, dazu alle Ortswechsel
   (Fähre, Zug, Inlandflug). Umstiege in via. Zeiten und Preise sind Schätzungen – im note-Feld so kennzeichnen.
 - bases: Reihenfolge der Aufenthaltsorte mit Nächten; Summe der Nächte = Reisetage − 1.
@@ -122,17 +123,28 @@ Regeln:
 
 
 def generate(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
-             web_search: bool = False, trip_id: str | None = None) -> tuple[Itinerary, list[str]]:
+             web_search: bool = False, trip_id: str | None = None,
+             route: list[dict] | None = None) -> tuple[Itinerary, list[str]]:
     m = match(h, start)
     prompt = (f"Ziel: {destination}\nReise: {start:%d.%m.%Y} bis {start + timedelta(days=days - 1):%d.%m.%Y} "
               f"({days} Tage, {days - 1} Nächte). Heimatflughafen: {home_airport}.\n{m.prompt_text()}\n"
               f"Wünsche: {wishes.strip() or 'keine'}")
+    if route:
+        prompt += ("\nGewählte Route – genau so einhalten (Orte, Reihenfolge, Nächte): "
+                   + " → ".join(f"{s['name']} ({s['nights']} Nächte)" for s in route))
     if web_search:
         prompt += ("\nNutze die Websuche für aktuelle Empfehlungen (auch Trends aus Reiseblogs und Social Media), "
                    "Öffnungszeiten und Hotelpreise. Nur echte Orte.")
     draft = llm.ask("reiseplan", system=SYSTEM, content=prompt, schema=PlanDraft, trip_id=trip_id,
-                    fake=lambda: fake_draft(destination, days, home_airport), max_tokens=32000, web_search=web_search)
-    return build(draft, h, start, days, home_airport)
+                    fake=lambda: fake_draft(destination, days, home_airport, route), max_tokens=32000,
+                    web_search=web_search)
+    itin, notes = build(draft, h, start, days, home_airport)
+    if route:
+        want = [s["name"].casefold() for s in route]
+        got = [b.name.casefold() for b in draft.bases]
+        if not all(any(w in g or g in w for g in got) for w in want):
+            notes.append("Der Plan weicht von der gewählten Route ab – bitte prüfen.")
+    return itin, notes
 
 
 # --- Entwurf → geprüfter Reiseplan ------------------------------------------------------------
@@ -312,18 +324,21 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
 
 # --- Testmodus ------------------------------------------------------------------------------
 
-def fake_draft(destination: str, days: int, home_airport: str) -> PlanDraft:
-    """Ab 5 Tagen zwei Orte mit Fähre dazwischen – so lässt sich ein Fähr-Ausfall testen."""
+def fake_draft(destination: str, days: int, home_airport: str, route: list[dict] | None = None) -> PlanDraft:
+    """Ab 5 Tagen zwei Orte mit Fähre dazwischen – so lässt sich ein Fähr-Ausfall testen. Mit Route: deren Orte."""
     a = destination.split(",")[0].strip() or "Ziel"
-    two = days >= 5
-    n1 = (days - 1) // 2 if two else days - 1
+    if route and len(route) == 1:
+        a = route[0]["name"]
+    two = days >= 5 if not route else len(route) >= 2
+    n1 = ((days - 1) // 2 if not route else route[0]["nights"]) if two else days - 1
     bases = [DraftBase(name=a, country="PT", lat=38.7, lon=-9.1, timezone="Europe/Lisbon", nights=n1)]
     if two:
-        bases.append(DraftBase(name=f"{a} Insel", country="PT", lat=32.6, lon=-16.9, timezone="Atlantic/Madeira",
+        second = route[1]["name"] if route else f"{a} Insel"
+        bases.append(DraftBase(name=second, country="PT", lat=32.6, lon=-16.9, timezone="Atlantic/Madeira",
                                nights=days - 1 - n1))
     ds = []
     for i in range(1, days + 1):
-        b = bases[0].name if (not two or i <= n1) else bases[1].name
+        b = bases[0].name if (not two or i <= n1) else bases[1].name  # (Testplan: höchstens 2 Orte)
         acts = [DraftActivity(title=f"Küstenwanderung {i}", category="wandern", exposure="outdoor", intensity=2,
                               start="09:00", end="12:00", cost_chf=0, tags=[], note=""),
                 DraftActivity(title=f"Altstadt-Museum {i}", category="museum", exposure="indoor", intensity=1,
@@ -332,7 +347,7 @@ def fake_draft(destination: str, days: int, home_airport: str) -> PlanDraft:
                               start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="")]
         if i == 1 or i == days:
             acts = acts[2:]
-        if two and i == n1 + 1:
+        if two and i == n1 + 1:  # Fähre am Wechseltag
             acts = acts[1:]
         ds.append(DraftDay(day=i, base=b, theme="Test", activities=acts))
     alts = []
@@ -346,14 +361,18 @@ def fake_draft(destination: str, days: int, home_airport: str) -> PlanDraft:
                                   intensity=1, duration_min=180, cost_chf=140, tags=[], opens="", closes=""),
                  DraftAlternative(base=b.name, title=f"Kunstmuseum {b.name}", category="museum", exposure="indoor",
                                   intensity=1, duration_min=120, cost_chf=30, tags=[], opens="", closes="")]
-    hotels = [DraftHotel(base=b.name, name=f"Hotel {b.name} Centro", area="Zentrum", price_per_night_chf=160,
-                         why="Zentral, ruhig, gutes Frühstück", tags=[]) for b in bases]
-    hotels.append(DraftHotel(base=bases[0].name, name=f"Casa {bases[0].name}", area="Altstadt",
-                             price_per_night_chf=130, why="Günstiger, kleines Gästehaus", tags=[]))
+    hotels = []
+    for b in bases:
+        hotels += [DraftHotel(base=b.name, name=f"Hotel {b.name} Centro", area="Zentrum", price_per_night_chf=160,
+                              why="Zentral, ruhig, gutes Frühstück", tags=["mittel"]),
+                   DraftHotel(base=b.name, name=f"Casa {b.name}", area="Altstadt", price_per_night_chf=95,
+                              why="Kleines Gästehaus, sehr persönlich", tags=["guenstig"]),
+                   DraftHotel(base=b.name, name=f"Palácio {b.name}", area="Am Wasser", price_per_night_chf=290,
+                              why="Spa ohne Sauna, Meerblick", tags=["gehoben"])]
     tr = [DraftTransport(day=1, mode="flug", from_place="Zürich", to_place=a, from_code=home_airport, to_code="LIS",
                          depart="07:00", duration_h=3, via=[], carrier="Testair", est_price_chf=500, note="Schätzung")]
     if two:
-        tr.append(DraftTransport(day=n1 + 1, mode="faehre", from_place=a, to_place=f"{a} Insel", from_code="",
+        tr.append(DraftTransport(day=n1 + 1, mode="faehre", from_place=a, to_place=bases[1].name, from_code="",
                                  to_code="", depart="09:00", duration_h=3, via=[], carrier="Testfähre",
                                  est_price_chf=120, note="Schätzung"))
     tr.append(DraftTransport(day=days, mode="flug", from_place=bases[-1].name, to_place="Zürich", from_code="LIS",
