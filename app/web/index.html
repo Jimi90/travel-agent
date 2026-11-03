@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="de"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kompass">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Kompass</title>
+<style>
+:root{color-scheme:dark;--bg:#0f1417;--card:#182024;--card2:#212b30;--line:#2a353b;--text:#eef2f1;--muted:#93a1a0;
+  --accent:#3fb6a8;--onaccent:#06201d;--warn:#f0b04a;--err:#ef6a6a;--new:rgba(63,182,168,.12);
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme: light){:root{color-scheme:light;--bg:#f2f4f3;--card:#fff;--card2:#e8eceb;--line:#e1e6e5;
+  --text:#14201e;--muted:#6b7877;--accent:#14877a;--onaccent:#fff;--warn:#b26b00;--err:#c43c3c;--new:rgba(20,135,122,.08)}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 40px)}
+h1{font-size:34px;font-weight:700;letter-spacing:-.5px;margin:8px 4px 2px}
+.sub{color:var(--muted);font-size:14px;margin:0 4px 22px}
+h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);margin:26px 16px 8px;display:flex;justify-content:space-between;gap:8px}
+h2 span{text-transform:none;letter-spacing:0;font-weight:500}
+.card{background:var(--card);border-radius:14px;overflow:hidden}
+.pad{padding:14px 16px}
+.hint{color:var(--muted);font-size:13px;line-height:1.45;margin:8px 16px 0}
+.row{display:flex;align-items:center;gap:12px;padding:12px 16px;min-height:48px;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:1px solid var(--line)}
+.row .grow{flex:1;min-width:0}
+.row .t{font-size:16px}
+.row .s{font-size:13px;color:var(--muted);margin-top:2px;line-height:1.35}
+label.row{cursor:pointer}
+input[type=radio]{appearance:none;width:22px;height:22px;margin:0;flex:none;border-radius:50%;border:2px solid var(--line)}
+input[type=radio]:checked{border:7px solid var(--accent)}
+.sw{appearance:none;flex:none;width:51px;height:31px;border-radius:16px;background:var(--card2);position:relative;margin:0;cursor:pointer;transition:background .2s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.25);transition:transform .2s}
+.sw:checked{background:var(--accent)}.sw:checked::after{transform:translateX(20px)}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:14px;background:var(--accent);color:var(--onaccent);font:inherit;font-weight:600;font-size:17px;cursor:pointer;margin-top:12px}
+.btn:disabled{opacity:.5}
+.btn.plain{background:var(--card);color:var(--accent);font-weight:500}
+.btn.danger{background:var(--card);color:var(--err);font-weight:500}
+.small{border:0;background:var(--card2);color:var(--accent);font:inherit;font-size:14px;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer;flex:none}
+.res{margin-top:14px}
+.res .head{font-weight:600;font-size:16px;margin-bottom:6px}
+.res ul{margin:6px 0 0;padding-left:20px;line-height:1.5;font-size:15px}
+.res li.warn{color:var(--warn)}
+.time{width:52px;flex:none;font-variant-numeric:tabular-nums;font-size:15px;align-self:flex-start;padding-top:1px}
+.time small{display:block;color:var(--muted);font-size:12px}
+.act.new{background:var(--new)}
+.act.new::after{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:2px;background:var(--accent)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 7px;border-radius:999px;background:var(--card2);color:var(--muted);margin-left:6px;vertical-align:2px}
+.badge.new{background:var(--accent);color:var(--onaccent)}
+.note{font-size:13px;color:var(--accent);margin-top:3px}
+.dayh{font-weight:600;font-size:15px;padding:12px 16px 4px;color:var(--text)}
+.empty{color:var(--muted);font-size:14px;padding:10px 16px 14px}
+.chip{background:var(--card2);color:var(--muted);border-radius:999px;padding:2px 8px;font-size:12px}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:24px}
+.err{color:var(--err);font-size:14px;margin-top:10px}
+</style>
+</head>
+<body><main>
+  <h1>Kompass</h1>
+  <p class="sub" id="sub">Testversion</p>
+
+  <h2>Wettercheck simulieren</h2>
+  <div class="card" id="scen"></div>
+  <div class="card" style="margin-top:12px">
+    <label class="row"><div class="grow"><div class="t">Schwangerschaft berücksichtigen</div>
+      <div class="s">keine Sauna/Hitze, höchstens mittel anstrengend</div></div>
+      <input type="checkbox" class="sw" id="preg"></label>
+    <label class="row"><div class="grow"><div class="t">Folgetag ist trocken</div>
+      <div class="s">dann darf Draussen-Programm verschoben statt ersetzt werden</div></div>
+      <input type="checkbox" class="sw" id="dry"></label>
+  </div>
+  <p class="hint" id="when"></p>
+  <button class="btn" id="run">Wettercheck auslösen</button>
+  <div class="card pad res" id="res" hidden></div>
+
+  <h2>Reiseplan <span id="ver"></span></h2>
+  <div class="card" id="plan"></div>
+
+  <div id="actWrap" hidden>
+    <h2>Wartet auf deine Bestätigung</h2>
+    <div class="card" id="acts"></div>
+    <p class="hint">In der Testversion wird nichts gebucht oder storniert – die Aufträge werden nur vorgemerkt.</p>
+  </div>
+
+  <h2>Verlauf</h2>
+  <div class="card" id="hist"></div>
+
+  <button class="btn plain" id="reset" style="margin-top:28px">Demo zurücksetzen</button>
+  <button class="btn danger" id="logout">Abmelden</button>
+  <footer id="foot"></footer>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const EXP = {indoor: "drinnen", outdoor: "draussen", gemischt: "drinnen & draussen"};
+const CAT = {wandern:"Wandern", natur:"Natur", strand:"Strand", wassersport:"Wassersport", kultur:"Kultur", museum:"Museum",
+  stadt:"Stadt", kulinarik:"Essen", wellness:"Wellness", entspannung:"Entspannung", shopping:"Shopping", nachtleben:"Ausgang"};
+const KIND = {buchung_stornieren:"Stornieren", buchung_aendern:"Umbuchen", buchung_anfragen:"Reservieren",
+  hotel_verlaengern:"Hotel verlängern", nachricht:"Nachricht"};
+let S = null, scenario = "regen";
+
+const dayLabel = iso => new Date(iso + "T12:00").toLocaleDateString("de-CH", {weekday: "long", day: "numeric", month: "long"});
+const hm = t => t.slice(0, 5);
+const chf = v => Number(v) ? `CHF ${Number(v).toLocaleString("de-CH", {maximumFractionDigits: 0})}` : "gratis";
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {credentials: "same-origin"} : {method: "POST", credentials: "same-origin",
+    headers: {"Content-Type": "application/json", "X-Kompass": "1"}, body: JSON.stringify(body)});
+  if (r.status === 401) { location.replace("/login"); throw new Error("abgemeldet"); }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok && !j.state) throw new Error(j.error || "Fehler " + r.status);
+  return j;
+}
+
+function renderScenarios() {
+  $("scen").innerHTML = Object.entries(S.scenarios).map(([k, v]) =>
+    `<label class="row"><div class="grow t">${esc(v)}</div><input type="radio" name="sc" value="${k}" ${k === scenario ? "checked" : ""}></label>`).join("");
+  $("scen").querySelectorAll("input").forEach(i => i.onchange = () => scenario = i.value);
+}
+
+function render() {
+  const p = S.plan, now = new Date(S.now);
+  $("sub").textContent = `${p.title} · Testversion ${S.version}`;
+  $("when").textContent = `Simuliert wird der Morgen von ${dayLabel(S.now.slice(0, 10))}, ${now.toTimeString().slice(0, 5)} Uhr – so, wie es die App später jeden Morgen von selbst macht.`;
+  $("ver").innerHTML = `<span class="chip">Version ${p.version}</span> <span class="chip">${esc(chf(S.total))}</span>`;
+  $("plan").innerHTML = p.days.map(d => `<div class="dayh">${esc(dayLabel(d.date))} · ${esc(d.base.name)}</div>` + (d.activities.length ? d.activities.map(a => {
+    const isNew = a.origin === "umplanung";
+    const badge = isNew ? `<span class="badge new">neu</span>` : a.locked ? `<span class="badge">fest</span>` : a.booking ? `<span class="badge">gebucht</span>` : "";
+    return `<div class="row act ${isNew ? "new" : ""}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
+      <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
+      <div class="s">${esc(CAT[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(chf(a.cost))}</div>
+      ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
+  }).join("") : `<div class="empty">Noch nichts geplant</div>`)).join("");
+
+  $("actWrap").hidden = !S.actions.length;
+  $("acts").innerHTML = S.actions.map(a => `<div class="row"><div class="grow"><div class="t">${esc(a.description)}</div>
+    <div class="s">${esc(KIND[a.kind] || a.kind)} · braucht Bestätigung</div></div></div>`).join("");
+
+  $("hist").innerHTML = S.history.length ? S.history.map(h => `<div class="row"><div class="grow">
+      <div class="t">${esc(h.reason)}</div>
+      <div class="s">${h.actor === "autonom" ? "automatisch" : "von dir"} · Version ${h.from_version} → ${h.to_version}${h.undone_by ? " · rückgängig gemacht" : ""}</div></div>
+      ${h.can_undo ? `<button class="small" data-undo="${esc(h.id)}">Rückgängig</button>` : ""}</div>`).join("")
+    : `<div class="empty">Noch keine Änderungen</div>`;
+  $("hist").querySelectorAll("[data-undo]").forEach(b => b.onclick = () => undo(b.dataset.undo, b));
+  $("foot").textContent = `Kompass ${S.version} · ${S.build}`;
+}
+
+function showResult(o) {
+  const head = o.applied ? "Plan angepasst" : o.status === "nichts_zu_tun" ? (o.needs_user.length ? "Nichts automatisch geändert" : "Nichts betroffen – das Geplante passt zu diesem Wetter") : "Nicht geändert";
+  const lines = o.decisions.filter(d => d.action !== "unveraendert")
+    .map(d => `<li><b>${esc(d.title)}</b>: ${esc(d.detail)} <span style="color:var(--muted)">(${esc(d.reason)})</span></li>`);
+  const warn = o.needs_user.map(n => `<li class="warn">${esc(n)}</li>`);
+  const probs = o.problems.filter(p => p.level === "fehler").map(p => `<li class="warn">${esc(p.message)}</li>`);
+  $("res").innerHTML = `<div class="head">${head}</div>` + (lines.length + warn.length + probs.length ? `<ul>${lines.join("")}${warn.join("")}${probs.join("")}</ul>` : "");
+  $("res").hidden = false;
+}
+
+async function load() { S = await api("/api/state"); renderScenarios(); render(); }
+
+$("run").onclick = async () => {
+  const b = $("run"); b.disabled = true;
+  try {
+    const j = await api("/api/demo/check", {scenario, pregnant: $("preg").checked, dry_next_day: $("dry").checked});
+    S = j.state; render(); showResult(j.outcome);
+  } catch (e) { $("res").innerHTML = `<div class="err">${esc(e.message)}</div>`; $("res").hidden = false; }
+  b.disabled = false;
+};
+async function undo(id, b) {
+  b.disabled = true;
+  try { const j = await api("/api/undo", {change_id: id}); S = j.state; render(); $("res").hidden = true; if (!j.ok) alert(j.error); }
+  catch (e) { alert(e.message); b.disabled = false; }
+}
+$("reset").onclick = async () => {
+  if (!confirm("Demo-Reise auf den Anfang zurücksetzen?")) return;
+  const j = await api("/api/demo/reset", {}); S = j.state; render(); $("res").hidden = true;
+};
+$("logout").onclick = async () => { await api("/api/logout", {}); location.replace("/login"); };
+load().catch(e => { $("plan").innerHTML = `<div class="empty">${esc(e.message)}</div>`; });
+</script>
+</body></html>

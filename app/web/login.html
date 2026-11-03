@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="de"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Kompass">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Anmelden – Kompass</title>
+<style>
+:root{color-scheme:dark;--bg:#0f1417;--card:#182024;--card2:#212b30;--text:#eef2f1;--muted:#9a98a4;
+  --accent:#3fb6a8;--onaccent:#06201d;--err:#ef6a6a;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme: light){:root{color-scheme:light;--bg:#f2f4f3;--card:#fff;--card2:#e8eceb;
+  --text:#1f1d1a;--muted:#77736c;--accent:#14877a;--onaccent:#fff;--err:#c43c3c}}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-text-size-adjust:100%}
+main{max-width:400px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 18vh) 24px 40px}
+h1{font-family:var(--serif);font-weight:600;font-size:38px;margin:0 0 6px;text-align:center}
+h1 span{color:var(--accent)}
+p{color:var(--muted);text-align:center;margin:0 0 30px;font-size:15px;line-height:1.45}
+.card{background:var(--card);border-radius:20px;padding:20px}
+input{width:100%;background:var(--card2);border:1px solid transparent;border-radius:12px;color:var(--text);font:inherit;font-size:17px;padding:14px}
+input:focus{outline:none;border-color:var(--accent)}
+button{width:100%;margin-top:14px;padding:14px;border:0;border-radius:14px;background:var(--accent);color:var(--onaccent);font:inherit;font-weight:700;font-size:16px;cursor:pointer}
+button:disabled{opacity:.5}
+.msg{min-height:22px;margin-top:12px;text-align:center;font-size:14px;color:var(--err)}
+code{background:var(--card2);padding:2px 6px;border-radius:6px;font-size:14px}
+</style>
+</head>
+<body><main>
+  <h1>Kom<span>pass</span></h1>
+  <p>Bitte melde dich an.</p>
+  <form class="card" id="f">
+    <input type="password" id="pw" name="password" autocomplete="current-password" placeholder="Passwort" required autofocus>
+    <button id="b" type="submit">Anmelden</button>
+    <div class="msg" id="m" role="alert"></div>
+  </form>
+</main>
+<script>
+document.getElementById("f").addEventListener("submit", async e => {
+  e.preventDefault();
+  const b = document.getElementById("b"), m = document.getElementById("m"), pw = document.getElementById("pw");
+  b.disabled = true; m.textContent = "";
+  try {
+    const r = await fetch("/api/login", {method: "POST", credentials: "same-origin",
+      headers: {"Content-Type": "application/json", "X-Kompass": "1"},
+      body: JSON.stringify({password: pw.value})});
+    if (r.ok) { location.replace("/"); return; }
+    const j = await r.json().catch(() => ({}));
+    m.textContent = j.error || "Anmeldung fehlgeschlagen."; pw.value = ""; pw.focus();
+  } catch (err) { m.textContent = "Keine Verbindung."; }
+  b.disabled = false;
+});
+</script>
+</body></html>
