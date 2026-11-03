@@ -48,6 +48,10 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Tag Wettercheck, Event-ID `wetter:<reise>:<datum>`; setzt Status unterwegs/abgeschlossen).
 - `app/store.py` kv-Ablage (Haushalt, Einstellungen, Favoriten, Entwürfe, Ideen), Meldungen, Kosten. RLock (verschachtelt).
 - `app/web/index.html` ganze Oberfläche (Vanilla-JS), Leiste: Reisen · Unterwegs · Helfer · Profil; Reise als Vollbild-Blatt.
+  Profil (seit 1.1.0) wie die iPhone-Einstellungen: Hauptliste mit Wert rechts + «›», Unterseiten im Blatt `#subSheet`
+  (`openSub(page)`, `PAGES`, `personPage(i)`), Auswahl per Aktionsblatt, Häkchen-Listen, automatisch speichern
+  (`saveSoon`, HH bleibt lokale Wahrheit). Besuchte Länder: Liste aller Länder mit Flagge, Suche Deutsch/Englisch/Code,
+  Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
 - `python -m unittest -v` (19 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
@@ -56,7 +60,8 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.0.0)
+## Stand (03.11.2026, Version 1.1.0)
+- 1.1.0: Profil aufgeräumt (iPhone-Stil), Länderauswahl mit Suche. Mit Playwright bei 390 px hell/dunkel geprüft.
 - Vollständige App: Profile + Matching, Zielvorschläge mit Klima, Reiseplan mit Hotels/Verbindungen/Schlechtwetter-
   Programm, Favoriten, Morgen-Wettercheck mit Umplanung, Ausfall mehrtägig, «fällt aus», festnageln, als gebucht
   markieren, Aufträge mit Entwürfen, Rückgängig, Foto-Übersetzung, Nachrichten, Kosten. Im Testmodus geprüft.

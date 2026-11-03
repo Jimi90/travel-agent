@@ -100,6 +100,19 @@ img.prev{max-width:100%;max-height:260px;border-radius:10px;display:block;margin
 #toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 80px);max-width:560px;margin:0 auto;background:var(--text);color:var(--bg);border-radius:12px;padding:12px 14px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
 /* Aktionsblatt */
+.val{color:var(--muted);font-size:16px;text-align:right;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.val.pos{color:var(--accent)}.val.neg{color:var(--err)}.val.warn{color:var(--warn)}
+input.inl{background:none;border:0;border-radius:0;padding:0;text-align:right;flex:1;min-width:0;max-width:58%;color:var(--muted)}
+input.inl:focus{color:var(--text);border:0}
+input.inl::placeholder{color:var(--muted);opacity:.7}
+.row.center{justify-content:center;font-size:17px}
+.avatar{width:44px;height:44px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:17px;flex:none;background:linear-gradient(135deg,#2bb3a3,#0f6f86)}
+.avatar.a1{background:linear-gradient(135deg,#f0a35e,#d9653b)}
+.check{color:var(--accent);font-size:19px;font-weight:600;width:20px;text-align:center;flex:none}
+.flag{font-size:24px;width:30px;text-align:center;flex:none;line-height:1}
+input.inl::-webkit-outer-spin-button,input.inl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input.inl[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 #asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
 #asheet.open{display:flex}
 #asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
@@ -173,22 +186,23 @@ img.prev{max-width:100%;max-height:260px;border-radius:10px;display:block;margin
 <!-- ============ PROFIL ============ -->
 <main id="v-profile" class="view" hidden>
   <h1>Profil</h1>
-  <p class="sub" id="saveState">Änderungen werden automatisch gespeichert.</p>
-  <div id="people"></div>
-  <h2>Feste Randbedingungen</h2>
-  <div class="card" id="constraints"></div>
-  <h2>Gemeinsame Schnittmenge</h2>
-  <div class="card pad" id="matchBox"></div>
-
+  <div class="card" id="pPeople" style="margin-top:14px"></div>
+  <h2>Reise-Regeln</h2>
+  <div class="card" id="pRules"></div>
+  <p class="hint">Gelten für jede Planung und jede automatische Änderung.</p>
+  <h2>Gemeinsam</h2>
+  <div class="card" id="pShared"></div>
   <h2>Einstellungen</h2>
-  <div class="card" id="settings"></div>
-  <h2>Kosten</h2>
-  <div class="card" id="costs"></div>
-  <p class="hint">Jede KI-Aktion (Planen, Übersetzen, Entwurf) kostet ein paar Rappen. Wetter und Matching sind gratis.</p>
-  <button class="btn plain" id="logout" style="margin-top:24px">Abmelden</button>
-  <button class="btn danger" id="logoutAll">Überall abmelden</button>
+  <div class="card" id="pSettings"></div>
+  <div class="card" style="margin-top:28px">
+    <div class="row tap center" id="logout" style="color:var(--accent)">Abmelden</div>
+    <div class="row tap center" id="logoutAll" style="color:var(--err)">Überall abmelden</div>
+  </div>
   <p class="hint" id="ver" style="text-align:center;margin-top:16px"></p>
 </main>
+
+<!-- Unterseiten des Profils (wie in den iPhone-Einstellungen) -->
+<div class="sheet" id="subSheet"><div class="in" id="subIn"></div></div>
 
 <!-- ============ BLATT: NEUE REISE ============ -->
 <div class="sheet" id="newSheet"><div class="in">
@@ -607,146 +621,294 @@ $("dGo").onclick = async () => {
   b.disabled = false;
 };
 
-// ---------- Profil ----------
-let saveT = null;
-function saveSoon() { clearTimeout(saveT); $("saveState").textContent = "Speichere …"; saveT = setTimeout(saveHH, 700); }
+// ---------- Profil (aufgebaut wie die iPhone-Einstellungen) ----------
+const PREF_TXT = {"2": "★ sehr gern", "1": "gern", "0": "egal", "-1": "eher nicht", "-2": "✕ nie"};
+const RAIN_TXT = {gering: "stört sehr", mittel: "stört etwas", hoch: "stört kaum"};
+const INT_TXT = {1: "höchstens leicht", 2: "höchstens mittel", 3: "auch anstrengend"};
+const AVOID = {hitze: "Sauna & Hitze", tauchen: "Tauchen", hoehe: "Grosse Höhen (über 2500 m)", achterbahn: "Achterbahn & Nervenkitzel",
+  alkohol: "Alkohol (z. B. Weinproben)", rohkost: "Rohes (Sushi, Rohmilchkäse)", lange_wege: "Lange Fussmärsche", boot: "Bootsfahrten"};
+const PREG_AVOID = ["hitze", "tauchen", "hoehe", "achterbahn"];
+const MODEL_TXT = {"claude-opus-5-5": ["Claude Opus", "Beste Qualität · ca. 10–30 Rp. pro Reiseplan"],
+  "claude-sonnet-5-5": ["Claude Sonnet", "Sehr gut · etwa halb so teuer"], "claude-haiku-5-5": ["Claude Haiku", "Am günstigsten · einfachere Pläne"]};
+const EFFORT_TXT = {low: ["Schnell", "Kürzer nachdenken, günstiger"], medium: ["Normal", "Empfohlen"], high: ["Gründlich", "Mehr Sorgfalt, teurer"]};
+const CODES = ("AD AE AF AG AI AL AM AO AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK HN HR HT HU ID IE IL IM IN IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW").split(" ");
+let COUNTRIES = null, MATCH = null, saveT = null, SUBPAGE = null;
+
+function countries() {
+  if (COUNTRIES) return COUNTRIES;
+  let de = null, en = null;
+  try { de = new Intl.DisplayNames(["de-CH", "de"], {type: "region"}); en = new Intl.DisplayNames(["en"], {type: "region"}); } catch {}
+  COUNTRIES = CODES.map(c => ({code: c, name: (de && de.of(c)) || c, en: (en && en.of(c)) || c,
+    flag: String.fromCodePoint(...[...c].map(x => 127397 + x.charCodeAt(0)))}))
+    .sort((a, b) => a.name.localeCompare(b.name, "de"));
+  return COUNTRIES;
+}
+const cName = c => (countries().find(x => x.code === c) || {name: c}).name;
+const initials = n => (n || "?").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase() || "?";
+const fold = s => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+// Bausteine für Listen-Zeilen
+const rNav = (label, value, attr, cls = "") => `<div class="row tap chev" ${attr}><div class="grow t">${esc(label)}</div><span class="val ${cls}">${esc(value)}</span></div>`;
+const rIn = (label, id, value, attrs = "") => `<label class="row"><div class="grow t">${esc(label)}</div><input class="inl" id="${id}" value="${esc(value ?? "")}" ${attrs}></label>`;
+const rSw = (label, id, on, sub = "") => `<label class="row"><div class="grow"><div class="t">${esc(label)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div><input type="checkbox" class="sw" id="${id}" ${on ? "checked" : ""}></label>`;
+const rCheck = (label, sub, on, attr, disabled = false) => `<div class="row ${disabled ? "" : "tap"}" ${attr}><div class="grow"><div class="t" ${disabled ? 'style="color:var(--muted)"' : ""}>${esc(label)}</div>${sub ? `<div class="s">${esc(sub)}</div>` : ""}</div><span class="check">${on ? "✓" : ""}</span></div>`;
+
+function saveSoon() { clearTimeout(saveT); subState("Speichere …"); saveT = setTimeout(saveHH, 600); }
 async function saveHH() {
   try {
-    const r = await api("/api/household", {household: HH});
-    HH = r.household; renderMatch(r);
-    $("saveState").textContent = "Gespeichert ✓";
-  } catch (e) { $("saveState").innerHTML = `<span class="warnt">${esc(e.message)}</span>`; }
+    MATCH = await api("/api/household", {household: HH});  // HH bleibt die lokale Wahrheit
+    subState("Gespeichert ✓"); renderProfileMain();
+  } catch (e) { subState(e.message, true); }
 }
+function subState(t, err) { const e = $("subState"); if (e) { e.textContent = t; e.style.color = err ? "var(--err)" : ""; } }
 
 async function loadProfile() {
   await loadInfo();
-  const r = await api("/api/household");
-  HH = r.household;
-  renderPeople(); renderConstraints(); renderMatch(r); renderSettings(); renderCosts();
+  MATCH = await api("/api/household");
+  HH = MATCH.household;
+  renderProfileMain();
 }
 
-function segHtml(opts, cur, attr) {
-  return `<div class="seg">${opts.map(([v, l]) => `<button data-${attr}="${v}" class="${String(cur) === String(v) ? "on" : ""} v${v}">${l}</button>`).join("")}</div>`;
+function personSummary(p) {
+  const fav = Object.entries(p.activities).filter(([, v]) => v >= 2).map(([c]) => CATS[c]);
+  return (fav.length ? "Liebt " + fav.slice(0, 3).join(", ") : "Vorlieben eintragen") + ` · ${p.climate.temp_min_c}–${p.climate.temp_max_c} °C`;
 }
 
-function renderPeople() {
-  $("people").innerHTML = HH.profiles.map((p, i) => `
-    <h2>${i === 0 ? "Du" : "Partnerin"}</h2>
-    <div class="card" data-p="${i}">
-      <label class="f"><span>Name</span><input data-k="name" value="${esc(p.name)}" maxlength="60"></label>
-      <div class="s" style="padding:6px 16px 2px">Vorlieben: ✕ nie · − eher nicht · · egal · + gern · ★ sehr gern</div>
-      ${Object.entries(CATS).map(([cat, label]) => `<div class="pref"><span class="t" style="font-size:15px">${esc(label)}</span>
-        ${segHtml(PREF, p.activities[cat] ?? 0, "pref-" + cat)}</div>`).join("")}
-      <div class="two" style="margin-top:6px">
-        <label class="f"><span>Wohlfühl-Temperatur von (°C)</span><input type="number" data-k="climate.temp_min_c" value="${p.climate.temp_min_c}" inputmode="numeric"></label>
-        <label class="f"><span>bis (°C)</span><input type="number" data-k="climate.temp_max_c" value="${p.climate.temp_max_c}" inputmode="numeric"></label>
-      </div>
-      <div class="row"><div class="grow t" style="font-size:15px">Regen stört</div>
-        <div style="width:200px">${segHtml([["gering", "sehr"], ["mittel", "etwas"], ["hoch", "kaum"]], p.climate.rain_tolerance, "rain")}</div></div>
-      <label class="f"><span>Unterkunft höchstens pro Nacht (CHF, leer = egal)</span><input type="number" data-k="budget.per_night_max" value="${p.budget.per_night_max ?? ""}" inputmode="numeric"></label>
-      <label class="f"><span>Sprachen (Komma-getrennt)</span><input data-k="languages" value="${esc(p.languages.join(", "))}" maxlength="60"></label>
-    </div>`).join("");
-  $("people").querySelectorAll("[data-p]").forEach(card => {
-    const p = HH.profiles[+card.dataset.p];
-    card.querySelectorAll("input[data-k]").forEach(inp => inp.oninput = () => {
-      const k = inp.dataset.k, v = inp.value;
-      if (k === "name") p.name = v;
-      else if (k === "languages") p.languages = v.split(",").map(s => s.trim()).filter(Boolean);
-      else if (k === "budget.per_night_max") p.budget.per_night_max = v === "" ? null : v;
-      else { const [a, b] = k.split("."); p[a][b] = v === "" ? 0 : Number(v); }
-      saveSoon();
-    });
-    card.querySelectorAll(".pref .seg button").forEach(b => b.onclick = () => {
-      const cat = Object.keys(b.dataset).find(x => x.startsWith("pref")).slice(4).toLowerCase();
-      const v = Number(b.dataset["pref" + cat.charAt(0).toUpperCase() + cat.slice(1)]);
-      p.activities[cat] = v;
-      b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
-      saveSoon();
-    });
-    card.querySelectorAll("[data-rain]").forEach(b => b.onclick = () => {
-      p.climate.rain_tolerance = b.dataset.rain;
-      b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); saveSoon();
-    });
-  });
-}
-
-function renderConstraints() {
-  const k = HH.constraints, preg = k.pregnancy;
-  $("constraints").innerHTML = `
-    <label class="f"><span>Gesamtbudget pro Reise (CHF, leer = keins)</span><input type="number" id="cBudget" value="${k.budget_total_max ?? ""}" inputmode="numeric"></label>
-    <div class="two">
-      <label class="f"><span>Reisedauer min. (Tage)</span><input type="number" id="cDmin" value="${k.duration_days_min}" inputmode="numeric"></label>
-      <label class="f"><span>max. (Tage)</span><input type="number" id="cDmax" value="${k.duration_days_max}" inputmode="numeric"></label>
-      <label class="f"><span>Flugzeit max. (Std., leer = egal)</span><input type="number" id="cFly" value="${k.max_flight_hours ?? ""}" inputmode="decimal"></label>
-      <label class="f"><span>Umstiege max.</span><input type="number" id="cStops" value="${k.max_stops}" min="0" max="3" inputmode="numeric"></label>
-    </div>
-    <div class="row"><div class="grow t" style="font-size:15px">Anstrengung höchstens</div>
-      <div style="width:220px">${segHtml([[1, "leicht"], [2, "mittel"], [3, "hoch"]], k.max_intensity, "int")}</div></div>
-    <div class="row"><div class="grow"><div class="t">Schwangerschaft</div><div class="s">keine Sauna/Hitze, kein Tauchen, keine grossen Höhen, höchstens mittel anstrengend</div></div>
-      <input type="checkbox" class="sw" id="cPreg" ${preg ? "checked" : ""}></div>
-    <label class="f" id="cDueWrap" ${preg ? "" : "hidden"}><span>Geburtstermin (für die Schwangerschaftswoche)</span><input type="date" id="cDue" value="${preg ? preg.due_date : ""}"></label>
-    <label class="f"><span>Immer vermeiden (Merkmale, Komma-getrennt)</span><input id="cAvoid" value="${esc(k.avoid_tags.join(", "))}" placeholder="z. B. boot, lange_wege"></label>
-    <label class="f"><span>Schon besuchte Länder (Ländercodes, z. B. IT, FR, ES)</span><input id="cVisited" value="${esc(HH.history.visited_countries.join(", "))}" autocapitalize="characters"></label>`;
-  const num = v => v === "" ? null : v;
-  $("cBudget").oninput = e => { k.budget_total_max = num(e.target.value); saveSoon(); };
-  $("cDmin").oninput = e => { k.duration_days_min = Number(e.target.value) || 1; saveSoon(); };
-  $("cDmax").oninput = e => { k.duration_days_max = Number(e.target.value) || 1; saveSoon(); };
-  $("cFly").oninput = e => { k.max_flight_hours = num(e.target.value); saveSoon(); };
-  $("cStops").oninput = e => { k.max_stops = Number(e.target.value) || 0; saveSoon(); };
-  $("constraints").querySelectorAll("[data-int]").forEach(b => b.onclick = () => {
-    k.max_intensity = Number(b.dataset.int); b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); saveSoon(); });
-  $("cPreg").onchange = e => {
-    $("cDueWrap").hidden = !e.target.checked;
-    if (!e.target.checked) { k.pregnancy = null; saveSoon(); }
-    else if ($("cDue").value) { k.pregnancy = {due_date: $("cDue").value}; saveSoon(); }
-  };
-  $("cDue").onchange = e => { if (e.target.value) { k.pregnancy = {...(k.pregnancy || {}), due_date: e.target.value}; saveSoon(); } };
-  $("cAvoid").oninput = e => { k.avoid_tags = e.target.value.split(",").map(s => s.trim().toLowerCase()).filter(Boolean); saveSoon(); };
-  $("cVisited").oninput = e => {
-    const codes = e.target.value.split(/[,\s]+/).map(s => s.trim().toUpperCase()).filter(s => /^[A-Z]{2}$/.test(s));
-    HH.history.visited_countries = codes; saveSoon(); };
-}
-
-function renderMatch(r) {
-  const m = r.matching;
-  const group = (kind, title) => { const xs = m.categories.filter(c => c.kind === kind); return xs.length ? `<div class="s"><b style="color:var(--text)">${title}:</b> ${xs.map(c => esc(c.label)).join(", ")}</div>` : ""; };
-  $("matchBox").innerHTML = group("beide", "Beide gern") + group("kompromiss", "Kompromiss (sparsam)") + group("veto", "Nie") +
-    `<div class="s"><b style="color:var(--text)">Klima:</b> ${m.temp_min_c.toFixed(0)}–${m.temp_max_c.toFixed(0)} °C, Regen stört ${({gering: "sehr", mittel: "etwas", hoch: "kaum"})[m.rain_tolerance]}. ${esc(m.climate_note)}</div>` +
-    (m.budget_per_night ? `<div class="s"><b style="color:var(--text)">Unterkunft:</b> höchstens CHF ${esc(m.budget_per_night)}/Nacht</div>` : "") +
-    (m.pregnancy_week != null ? `<div class="s"><b style="color:var(--text)">Schwangerschaft:</b> heute ca. Woche ${m.pregnancy_week}</div>` : "") +
-    `<details style="margin:8px -16px -14px"><summary>So sieht es die KI</summary><div class="pre" style="margin:0 16px 14px">${esc(r.prompt)}</div></details>`;
-}
-
-function renderSettings() {
-  const s = INFO.settings, k = INFO.key;
-  const price = {"claude-opus-5-5": "beste Qualität, ca. 10–30 Rp. pro Reiseplan", "claude-sonnet-5-5": "sehr gut, etwa halb so teuer", "claude-haiku-5-5": "am günstigsten, einfachere Pläne"};
-  $("settings").innerHTML = `
-    <label class="f"><span>Claude-Schlüssel ${k.set ? `(hinterlegt: ••••${esc(k.hint)}${k.source === "env" ? ", aus einstellungen.env" : ""})` : "(fehlt – ohne Schlüssel nur Vorlagen)"}</span>
-      <div style="display:flex;gap:8px"><input type="password" id="sKey" placeholder="sk-ant-…" autocomplete="off"><button class="small" id="sKeySave">Sichern</button></div></label>
-    <label class="f"><span>KI-Modell</span><select id="sModel">${INFO.models.map(m => `<option value="${m}" ${m === s.model ? "selected" : ""}>${m} – ${price[m] || ""}</option>`).join("")}</select></label>
-    <div class="row"><div class="grow t" style="font-size:15px">Sorgfalt der KI</div>
-      <div style="width:220px">${segHtml([["low", "schnell"], ["medium", "normal"], ["high", "gründlich"]], s.effort, "eff")}</div></div>
-    <div class="row"><div class="grow"><div class="t">Wetter jeden Morgen prüfen</div><div class="s">automatisch umplanen bei Schlechtwetter</div></div><input type="checkbox" class="sw" id="sAuto" ${s.auto_check ? "checked" : ""}></div>
-    <label class="f"><span>Uhrzeit (Ortszeit am Reiseziel)</span><input type="time" id="sTime" value="${esc(s.check_time)}"></label>
-    <div class="row"><div class="grow"><div class="t">Websuche beim Planen</div><div class="s">aktuelle Tipps & Trends, Öffnungszeiten – kostet ca. 1 Rp. pro Suche zusätzlich</div></div><input type="checkbox" class="sw" id="sWeb" ${s.web_search ? "checked" : ""}></div>
-    <label class="f"><span>Heimatflughafen</span><input id="sAir" value="${esc(s.home_airport)}" maxlength="3" autocapitalize="characters"></label>`;
-  const save = async body => { try { INFO = await api("/api/settings", body); toast("Gespeichert"); } catch (e) { toast(e.message); } };
-  $("sKeySave").onclick = async () => { try { INFO = await api("/api/keys", {anthropic: $("sKey").value}); renderSettings(); toast("Schlüssel gesichert"); } catch (e) { toast(e.message); } };
-  $("sModel").onchange = e => save({model: e.target.value});
-  $("settings").querySelectorAll("[data-eff]").forEach(b => b.onclick = () => { b.parentNode.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); save({effort: b.dataset.eff}); });
-  $("sAuto").onchange = e => save({auto_check: e.target.checked});
-  $("sTime").onchange = e => save({check_time: e.target.value});
-  $("sWeb").onchange = e => save({web_search: e.target.checked});
-  $("sAir").onchange = e => save({home_airport: e.target.value});
+function renderProfileMain() {
+  const k = HH.constraints, s = INFO.settings, m = MATCH.matching;
+  $("pPeople").innerHTML = HH.profiles.map((p, i) => `<div class="row tap chev" data-person="${i}">
+      <div class="avatar a${i}">${esc(initials(p.name))}</div>
+      <div class="grow"><div class="t">${esc(p.name || (i ? "Partnerin" : "Du"))}</div><div class="s">${esc(personSummary(p))}</div></div></div>`).join("");
+  const fly = (k.max_flight_hours ? `max. ${k.max_flight_hours} Std.` : "beliebig lang") + ` · ${k.max_stops} Umstieg${k.max_stops === 1 ? "" : "e"}`;
+  const avoidN = k.avoid_tags.length;
+  $("pRules").innerHTML =
+    rNav("Budget", k.budget_total_max ? chf(k.budget_total_max) : "Kein Limit", 'data-sub="budget"') +
+    rNav("Reisedauer", `${k.duration_days_min}–${k.duration_days_max} Tage`, 'data-sub="dauer"') +
+    rNav("Flüge", fly, 'data-sub="fluege"') +
+    rNav("Anstrengung", INT_TXT[k.max_intensity], 'data-sub="anstrengung"') +
+    rNav("Schwangerschaft", k.pregnancy ? (m.pregnancy_week != null ? `Woche ${m.pregnancy_week}` : "Ein") : "Aus", 'data-sub="schwanger"') +
+    rNav("Immer vermeiden", avoidN ? `${avoidN} Punkt${avoidN > 1 ? "e" : ""}` : "Nichts", 'data-sub="vermeiden"');
+  const both = m.categories.filter(c => c.kind === "beide").length, veto = m.categories.filter(c => c.kind === "veto").length;
+  const vc = HH.history.visited_countries.length;
+  $("pShared").innerHTML =
+    rNav("Schnittmenge", `${both} gemeinsam${veto ? ` · ${veto} nie` : ""}`, 'data-sub="match"') +
+    rNav("Besuchte Länder", vc ? `${vc}` : "Keine", 'data-sub="laender"');
+  $("pSettings").innerHTML =
+    rNav("KI", INFO.key.set ? (MODEL_TXT[s.model] || [s.model])[0] : "Kein Schlüssel", 'data-sub="ki"', INFO.key.set ? "" : "warn") +
+    rNav("Wettercheck", s.auto_check ? `täglich ${s.check_time}` : "Aus", 'data-sub="wetter"') +
+    rIn("Heimatflughafen", "sAir", s.home_airport, 'maxlength="3" autocapitalize="characters" style="max-width:70px"') +
+    rNav("Kosten", `${usd(INFO.spent_30d)} · 30 Tage`, 'data-sub="kosten"');
   $("ver").textContent = `Kompass ${INFO.version} · ${INFO.build}${INFO.fake ? " · Testmodus" : ""}`;
+  $("v-profile").querySelectorAll("[data-person]").forEach(r => r.onclick = () => openSub(personPage(+r.dataset.person)));
+  $("v-profile").querySelectorAll("[data-sub]").forEach(r => r.onclick = () => {
+    const key = r.dataset.sub;
+    if (key === "anstrengung") return actionSheet("Körperliche Anstrengung", [1, 2, 3].map(v => ({label: INT_TXT[v], fn: () => { k.max_intensity = v; renderProfileMain(); saveSoon(); }})));
+    openSub(PAGES[key]());
+  });
+  $("sAir").onchange = e => saveSettings({home_airport: e.target.value});
 }
 
-async function renderCosts() {
-  const c = await api("/api/costs");
-  $("costs").innerHTML = `<div class="row"><div class="grow t">Letzte 24 Stunden</div><span>${esc(usd(c.spent_24h))}</span></div>
-    <div class="row"><div class="grow t">Letzte 30 Tage</div><span>${esc(usd(c.spent_30d))}</span></div>
-    <div class="row"><div class="grow s">Kostenbremse: höchstens ${esc(usd(INFO.budget_usd))} pro 24 Std.</div></div>`;
+async function saveSettings(body) {
+  try { INFO = await api("/api/settings", body); toast("Gespeichert"); renderProfileMain(); if (SUBPAGE) openSub(SUBPAGE, true); }
+  catch (e) { toast(e.message); }
 }
+
+// Unterseite öffnen: {title, html(), bind()}; keep = Scrollposition behalten
+function openSub(page, keep) {
+  SUBPAGE = page;
+  const y = $("subSheet").scrollTop;
+  $("subIn").innerHTML = `<div class="topbar"><button class="back" id="subBack">‹ Profil</button><span class="s" id="subState"></span></div>
+    <h1>${esc(page.title)}</h1>${page.html()}`;
+  $("subBack").onclick = () => { SUBPAGE = null; closeSheet("subSheet"); renderProfileMain(); };
+  page.bind();
+  if (!$("subSheet").classList.contains("open")) openSheet("subSheet");
+  else if (keep) $("subSheet").scrollTop = y;
+}
+const rerender = () => SUBPAGE && openSub(SUBPAGE, true);
+
+function personPage(i) {
+  const p = HH.profiles[i];
+  return {
+    title: p.name || (i ? "Partnerin" : "Du"),
+    html: () => `<div class="card">${rIn("Name", "pName", p.name, 'maxlength="60" autocomplete="off"')}</div>
+      <h2>Vorlieben</h2>
+      <div class="card">${Object.entries(CATS).map(([c, label]) => {
+        const v = String(p.activities[c] ?? 0);
+        return rNav(label, PREF_TXT[v], `data-cat="${c}"`, v === "2" ? "pos" : v === "-2" ? "neg" : "");
+      }).join("")}</div>
+      <p class="hint">«✕ nie» gilt als Veto: Das fällt dann für euch beide weg.</p>
+      <h2>Klima</h2>
+      <div class="card">${rIn("Angenehm ab (°C)", "pTmin", p.climate.temp_min_c, 'type="number" inputmode="numeric" style="max-width:80px"')}
+        ${rIn("Angenehm bis (°C)", "pTmax", p.climate.temp_max_c, 'type="number" inputmode="numeric" style="max-width:80px"')}
+        ${rNav("Regen", RAIN_TXT[p.climate.rain_tolerance], 'data-rain="1"')}</div>
+      <h2>Budget &amp; Sprachen</h2>
+      <div class="card">${rIn("Unterkunft pro Nacht (CHF)", "pNight", p.budget.per_night_max ?? "", 'type="number" inputmode="numeric" placeholder="egal" style="max-width:90px"')}
+        ${rIn("Sprachen", "pLang", p.languages.join(", "), 'maxlength="60" placeholder="de, en"')}</div>`,
+    bind: () => {
+      $("pName").oninput = e => { p.name = e.target.value; saveSoon(); };
+      $("pTmin").oninput = e => { p.climate.temp_min_c = Number(e.target.value) || 0; saveSoon(); };
+      $("pTmax").oninput = e => { p.climate.temp_max_c = Number(e.target.value) || 0; saveSoon(); };
+      $("pNight").oninput = e => { p.budget.per_night_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
+      $("pLang").oninput = e => { p.languages = e.target.value.split(",").map(x => x.trim()).filter(Boolean); saveSoon(); };
+      $("subIn").querySelectorAll("[data-cat]").forEach(r => r.onclick = () => {
+        const c = r.dataset.cat;
+        actionSheet(CATS[c], [2, 1, 0, -1, -2].map(v => ({label: PREF_TXT[v], red: v === -2,
+          fn: () => { p.activities[c] = v; rerender(); saveSoon(); }})));
+      });
+      $("subIn").querySelector("[data-rain]").onclick = () => actionSheet("Regen", Object.entries(RAIN_TXT).map(([v, l]) => ({label: l,
+        fn: () => { p.climate.rain_tolerance = v; rerender(); saveSoon(); }})));
+    },
+  };
+}
+
+const PAGES = {
+  budget: () => ({
+    title: "Budget",
+    html: () => `<div class="card">${rIn("Pro Reise (CHF)", "cBudget", HH.constraints.budget_total_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
+      <p class="hint">Für beide zusammen: Flüge, Unterkünfte und Programm. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`,
+    bind: () => { $("cBudget").oninput = e => { HH.constraints.budget_total_max = e.target.value === "" ? null : e.target.value; saveSoon(); }; },
+  }),
+  dauer: () => ({
+    title: "Reisedauer",
+    html: () => `<div class="card">${rIn("Mindestens (Tage)", "cDmin", HH.constraints.duration_days_min, 'type="number" inputmode="numeric" style="max-width:70px"')}
+      ${rIn("Höchstens (Tage)", "cDmax", HH.constraints.duration_days_max, 'type="number" inputmode="numeric" style="max-width:70px"')}</div>
+      <p class="hint">Verlängert sich eine Reise wegen eines Ausfalls über das Maximum, meldet Kompass das.</p>`,
+    bind: () => {
+      $("cDmin").oninput = e => { HH.constraints.duration_days_min = Number(e.target.value) || 1; saveSoon(); };
+      $("cDmax").oninput = e => { HH.constraints.duration_days_max = Number(e.target.value) || 1; saveSoon(); };
+    },
+  }),
+  fluege: () => ({
+    title: "Flüge",
+    html: () => `<div class="card">${rIn("Flugzeit höchstens (Std.)", "cFly", HH.constraints.max_flight_hours ?? "", 'type="number" inputmode="decimal" placeholder="egal" style="max-width:70px"')}</div>
+      <h2>Umstiege höchstens</h2>
+      <div class="card">${[0, 1, 2, 3].map(n => rCheck(n === 0 ? "Nur Direktflüge" : `${n} Umstieg${n > 1 ? "e" : ""}`, "", HH.constraints.max_stops === n, `data-stops="${n}"`)).join("")}</div>
+      <p class="hint">Pro Strecke. Ziele, die das nicht erfüllen, schlägt Kompass nicht vor.</p>`,
+    bind: () => {
+      $("cFly").oninput = e => { HH.constraints.max_flight_hours = e.target.value === "" ? null : Number(e.target.value); saveSoon(); };
+      $("subIn").querySelectorAll("[data-stops]").forEach(r => r.onclick = () => { HH.constraints.max_stops = +r.dataset.stops; rerender(); saveSoon(); });
+    },
+  }),
+  schwanger: () => ({
+    title: "Schwangerschaft",
+    html: () => { const pr = HH.constraints.pregnancy; return `<div class="card">${rSw("Schwanger", "cPreg", !!pr)}
+      ${pr ? `<label class="row"><div class="grow t">Geburtstermin</div><input class="inl" type="date" id="cDue" value="${esc(pr.due_date)}" style="max-width:160px"></label>` : ""}</div>
+      <p class="hint">Kompass plant dann automatisch: keine Sauna oder Hitzebäder, kein Tauchen, keine grossen Höhen, höchstens mittel anstrengend, Pausen und kurze Wege. Bei Speisekarten gibt es Hinweise. Das sind Vorgaben, keine medizinische Beratung – bitte mit Ärztin oder Hebamme abstimmen.</p>`; },
+    bind: () => {
+      $("cPreg").onchange = e => {
+        if (e.target.checked) { const d = new Date(); d.setDate(d.getDate() + 180); HH.constraints.pregnancy = {due_date: d.toISOString().slice(0, 10)}; }
+        else HH.constraints.pregnancy = null;
+        rerender(); saveSoon();
+      };
+      if ($("cDue")) $("cDue").onchange = e => { if (e.target.value) { HH.constraints.pregnancy.due_date = e.target.value; saveSoon(); } };
+    },
+  }),
+  vermeiden: () => ({
+    title: "Immer vermeiden",
+    html: () => { const preg = !!HH.constraints.pregnancy, tags = HH.constraints.avoid_tags; return `<div class="card">${Object.entries(AVOID).map(([t, l]) => {
+        const auto = preg && PREG_AVOID.includes(t);
+        return rCheck(l, auto ? "automatisch wegen Schwangerschaft" : "", auto || tags.includes(t), auto ? "" : `data-tag="${t}"`, auto);
+      }).join("")}</div><p class="hint">Solches plant Kompass nie ein – auch nicht als Ersatz bei Schlechtwetter.</p>`; },
+    bind: () => $("subIn").querySelectorAll("[data-tag]").forEach(r => r.onclick = () => {
+      const t = r.dataset.tag, tags = HH.constraints.avoid_tags;
+      HH.constraints.avoid_tags = tags.includes(t) ? tags.filter(x => x !== t) : [...tags, t];
+      rerender(); saveSoon();
+    }),
+  }),
+  match: () => ({
+    title: "Schnittmenge",
+    html: () => {
+      const m = MATCH.matching;
+      const grp = (kind, title, foot) => { const xs = m.categories.filter(c => c.kind === kind); return xs.length ? `<h2>${title}</h2><div class="card">${xs.map(c =>
+        `<div class="row"><div class="grow t">${esc(c.label)}</div><span class="val">${c.prefs.map(v => PREF_TXT[String(v)].replace(/^[★✕] /, "")).join(" / ")}</span></div>`).join("")}</div>${foot ? `<p class="hint">${foot}</p>` : ""}` : ""; };
+      return `<p class="sub">So plant Kompass für euch beide (${esc(m.names.join(" / "))}).</p>` +
+        grp("beide", "Mögt ihr beide") + grp("kompromiss", "Kompromiss", "Kommt vor, aber sparsam.") + grp("egal", "Ab und zu") + grp("veto", "Nie", "Mindestens eine Person hat «nie» gewählt.") +
+        `<h2>Rahmen</h2><div class="card">
+          <div class="row"><div class="grow t">Klima</div><span class="val">${m.temp_min_c.toFixed(0)}–${m.temp_max_c.toFixed(0)} °C</span></div>
+          <div class="row"><div class="grow t">Regen</div><span class="val">${esc(RAIN_TXT[m.rain_tolerance])}</span></div>
+          <div class="row"><div class="grow t">Unterkunft</div><span class="val">${m.budget_per_night ? "max. " + esc(chf(m.budget_per_night)) + "/Nacht" : "egal"}</span></div>
+          ${m.pregnancy_week != null ? `<div class="row"><div class="grow t">Schwangerschaft</div><span class="val">Woche ${m.pregnancy_week}</span></div>` : ""}</div>
+        <p class="hint">${esc(m.climate_note)}</p>
+        <div class="card" style="margin-top:12px"><details><summary>So sieht es die KI</summary><div class="pre" style="margin:0 16px 14px">${esc(MATCH.prompt)}</div></details></div>`;
+    },
+    bind: () => {},
+  }),
+  laender: () => {
+    let q = "", only = false;
+    const sel = () => new Set(HH.history.visited_countries);
+    const list = () => {
+      const s = sel(), f = fold(q.trim());
+      let xs = countries().filter(c => (!only || s.has(c.code)) && (!f || fold(c.name).includes(f) || fold(c.en).includes(f) || c.code.toLowerCase() === f));
+      if (!xs.length) return `<div class="empty">${only ? "Noch keine Länder gewählt." : "Kein Land gefunden."}</div>`;
+      let out = "", letter = "";
+      for (const c of xs) {
+        const L = fold(c.name)[0].toUpperCase();
+        if (!f && !only && L !== letter) { letter = L; out += `<div class="dayh"><span class="s" style="font-weight:600">${esc(L)}</span></div>`; }
+        out += `<div class="row tap" data-cc="${c.code}"><span class="flag">${c.flag}</span><div class="grow t">${esc(c.name)}</div><span class="check">${s.has(c.code) ? "✓" : ""}</span></div>`;
+      }
+      return out;
+    };
+    const head = () => `${HH.history.visited_countries.length} gewählt`;
+    return {
+      title: "Besuchte Länder",
+      html: () => `<input type="search" id="cQ" placeholder="Land suchen (Deutsch oder Englisch)" autocomplete="off" value="${esc(q)}">
+        <div class="seg" style="margin-top:10px"><button id="cAll" class="${only ? "" : "on"}">Alle</button><button id="cSel" class="${only ? "on" : ""}">Ausgewählt (${HH.history.visited_countries.length})</button></div>
+        <p class="hint" id="cHead">${esc(head())} – Kompass schlägt diese Länder nicht mehr vor.</p>
+        <div class="card" id="cList" style="margin-top:10px">${list()}</div>`,
+      bind: () => {
+        const draw = () => { $("cList").innerHTML = list(); $("cSel").textContent = `Ausgewählt (${HH.history.visited_countries.length})`;
+          $("cHead").textContent = `${head()} – Kompass schlägt diese Länder nicht mehr vor.`; wire(); };
+        const wire = () => $("cList").querySelectorAll("[data-cc]").forEach(r => r.onclick = () => {
+          const c = r.dataset.cc, v = HH.history.visited_countries;
+          HH.history.visited_countries = v.includes(c) ? v.filter(x => x !== c) : [...v, c].sort();
+          r.querySelector(".check").textContent = HH.history.visited_countries.includes(c) ? "✓" : "";
+          $("cSel").textContent = `Ausgewählt (${HH.history.visited_countries.length})`;
+          $("cHead").textContent = `${head()} – Kompass schlägt diese Länder nicht mehr vor.`;
+          saveSoon();
+        });
+        $("cQ").oninput = e => { q = e.target.value; draw(); };
+        $("cAll").onclick = () => { only = false; $("cAll").classList.add("on"); $("cSel").classList.remove("on"); draw(); };
+        $("cSel").onclick = () => { only = true; $("cSel").classList.add("on"); $("cAll").classList.remove("on"); draw(); };
+        wire();
+      },
+    };
+  },
+  ki: () => ({
+    title: "KI",
+    html: () => { const s = INFO.settings, k = INFO.key; return `
+      <div class="card"><label class="row"><div class="grow t">Claude-Schlüssel</div>
+        <input class="inl" type="password" id="sKey" placeholder="${k.set ? "••••" + esc(k.hint) : "sk-ant-…"}" autocomplete="off"></label></div>
+      <p class="hint">${k.set ? `Hinterlegt${k.source === "env" ? " (aus einstellungen.env)" : ""}. Zum Ändern neuen Schlüssel eingeben.` : "Ohne Schlüssel kann Kompass nicht planen und übersetzen; Nachrichten gibt es dann nur als Vorlage."} Schlüssel gibt es auf platform.claude.com → API Keys.</p>
+      <button class="btn plain" id="sKeySave" style="margin-top:8px">Schlüssel sichern</button>
+      <h2>Modell</h2><div class="card">${INFO.models.map(m => rCheck((MODEL_TXT[m] || [m])[0], (MODEL_TXT[m] || ["", ""])[1], s.model === m, `data-model="${m}"`)).join("")}</div>
+      <h2>Sorgfalt</h2><div class="card">${Object.entries(EFFORT_TXT).map(([v, [l, d]]) => rCheck(l, d, s.effort === v, `data-eff="${v}"`)).join("")}</div>
+      <div class="card" style="margin-top:24px">${rSw("Websuche beim Planen", "sWeb", s.web_search, "Aktuelle Tipps, Trends, Öffnungszeiten · ca. 1 Rp. pro Suche")}</div>`; },
+    bind: () => {
+      $("sKeySave").onclick = async () => { try { INFO = await api("/api/keys", {anthropic: $("sKey").value}); toast("Schlüssel gesichert"); rerender(); } catch (e) { toast(e.message); } };
+      $("subIn").querySelectorAll("[data-model]").forEach(r => r.onclick = () => saveSettings({model: r.dataset.model}));
+      $("subIn").querySelectorAll("[data-eff]").forEach(r => r.onclick = () => saveSettings({effort: r.dataset.eff}));
+      $("sWeb").onchange = e => saveSettings({web_search: e.target.checked});
+    },
+  }),
+  wetter: () => ({
+    title: "Wettercheck",
+    html: () => { const s = INFO.settings; return `<div class="card">${rSw("Jeden Morgen prüfen", "sAuto", s.auto_check)}
+      <label class="row"><div class="grow t">Uhrzeit</div><input class="inl" type="time" id="sTime" value="${esc(s.check_time)}" style="max-width:110px"></label></div>
+      <p class="hint">Ortszeit am Reiseziel. Gilt für Reisen mit Status «Gebucht» oder «Unterwegs». Bei Regen stellt Kompass den Tag selbst um und meldet es unter «Unterwegs».</p>`; },
+    bind: () => {
+      $("sAuto").onchange = e => saveSettings({auto_check: e.target.checked});
+      $("sTime").onchange = e => saveSettings({check_time: e.target.value});
+    },
+  }),
+  kosten: () => ({
+    title: "Kosten",
+    html: () => `<div class="card"><div class="row"><div class="grow t">Letzte 24 Stunden</div><span class="val">${esc(usd(INFO.spent_24h))}</span></div>
+      <div class="row"><div class="grow t">Letzte 30 Tage</div><span class="val">${esc(usd(INFO.spent_30d))}</span></div>
+      <div class="row"><div class="grow t">Kostenbremse</div><span class="val">${esc(usd(INFO.budget_usd))} / 24 Std.</span></div></div>
+      <p class="hint">Jede KI-Aktion (Planen, Übersetzen, Entwurf) kostet ein paar Rappen. Wetter und Matching sind gratis.</p>`,
+    bind: () => {},
+  }),
+};
 
 $("logout").onclick = async () => { await api("/api/logout", {}); location.replace("/login"); };
 $("logoutAll").onclick = () => actionSheet("Alle Geräte abmelden?", [{label: "Überall abmelden", red: true, fn: async () => { await api("/api/logout-all", {}); location.replace("/login"); }}]);
