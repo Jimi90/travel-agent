@@ -16,7 +16,30 @@ from .models import Household, UserProfile
 from .models.common import new_id
 
 _lock = threading.RLock()  # verschachtelt nutzbar (db() wird unter der Sperre aufgerufen)
-_db: sqlite3.Connection | None = None
+_conn: sqlite3.Connection | None = None
+
+
+class _Result:
+    def __init__(self, rows: list, rowcount: int):
+        self._rows, self.rowcount = rows, rowcount
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows
+
+
+class _LockedDB:
+    """Eine Verbindung für alle Threads (Webseite, Zeitplan, Foto-Abruf): jeder Zugriff – auch Lesen – unter der Sperre."""
+
+    def execute(self, sql: str, args=()) -> _Result:
+        with _lock:
+            cur = _connect().execute(sql, args)
+            return _Result(cur.fetchall(), cur.rowcount)
+
+
+_DB = _LockedDB()
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS kv (kind TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, updated TEXT NOT NULL,
@@ -28,24 +51,28 @@ CREATE TABLE IF NOT EXISTS notices (id TEXT PRIMARY KEY, ts TEXT NOT NULL, trip_
 """
 
 
-def db() -> sqlite3.Connection:
-    global _db
+def _connect() -> sqlite3.Connection:
+    global _conn
     with _lock:
-        if _db is None:
+        if _conn is None:
             config.ensure_dirs()
-            _db = sqlite3.connect(str(config.DB_PATH), isolation_level=None, check_same_thread=False)
-            _db.execute("PRAGMA journal_mode = WAL")
-            _db.executescript(SCHEMA)
-        return _db
+            _conn = sqlite3.connect(str(config.DB_PATH), isolation_level=None, check_same_thread=False)
+            _conn.execute("PRAGMA journal_mode = WAL")
+            _conn.executescript(SCHEMA)
+        return _conn
+
+
+def db() -> _LockedDB:
+    return _DB
 
 
 def reset_connection() -> None:
     """Nur für Tests: Verbindung schliessen (anderer DATA_DIR)."""
-    global _db
+    global _conn
     with _lock:
-        if _db is not None:
-            _db.close()
-        _db = None
+        if _conn is not None:
+            _conn.close()
+        _conn = None
 
 
 # --- Schlüssel/Werte ------------------------------------------------------------------------
@@ -90,7 +117,7 @@ def save_household(h: Household) -> None:
 
 DEFAULT_SETTINGS = {"model": config.MODEL, "effort": config.EFFORT, "check_time": config.CHECK_TIME,
                     "auto_check": True, "web_search": False, "home_airport": config.HOME_AIRPORT,
-                    "prefer": "gratis"}  # gratis = Gemini/Groq zuerst, Claude nur als Reserve
+                    "prefer": "gratis", "gemini_model": ""}  # gratis = Gemini/Groq zuerst, Claude nur als Reserve
 
 
 def settings() -> dict:

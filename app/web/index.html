@@ -992,6 +992,8 @@ const PAGES = {
         <b>Gemini</b> (aistudio.google.com → «Get API key») übernimmt Reisepläne, Zielvorschläge und Fotos.
         <b>Groq</b> (console.groq.com → «API Keys») übernimmt kleine Aufgaben wie Nachrichten – sehr schnell.
         Fällt einer aus, springt der andere ein. Google darf Inhalte aus dem Gratis-Kontingent zur Verbesserung nutzen.</p>
+      <h2>Gemini-Modell</h2>
+      <div class="card">${INFO.gemini_models.map(m => rCheck(m, m.includes("lite") ? "Kleiner, eigenes Kontingent – wenn das andere am Limit ist" : "Standard", (s.gemini_model || INFO.free_models.gemini) === m, `data-gmodel="${m}"`)).join("")}</div>
       <h2>Claude (kostenpflichtig)</h2>
       <div class="card">${keyRow("anthropic", "Claude", "sk-ant-…")}</div>
       <p class="hint">Claude: ${status("anthropic")}. Optional – beste Qualität, kostet ein paar Rappen pro Aufgabe (platform.claude.com → API Keys). Websuche gibt es nur mit Claude.</p>
@@ -1016,6 +1018,7 @@ const PAGES = {
           toast(n ? "Schlüssel gesichert" : "Kein neuer Schlüssel eingegeben"); rerender();
         } catch (e) { toast(e.message); }
       };
+      $("subIn").querySelectorAll("[data-gmodel]").forEach(r => r.onclick = () => saveSettings({gemini_model: r.dataset.gmodel}));
       $("subIn").querySelectorAll("[data-prefer]").forEach(r => r.onclick = () => saveSettings({prefer: r.dataset.prefer}));
       $("subIn").querySelectorAll("[data-model]").forEach(r => r.onclick = () => saveSettings({model: r.dataset.model}));
       $("subIn").querySelectorAll("[data-eff]").forEach(r => r.onclick = () => saveSettings({effort: r.dataset.eff}));

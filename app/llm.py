@@ -92,9 +92,13 @@ def ask(
         except _Skip as e:
             reasons.append(f"{LABEL[prov]}: {e}")
             print(f"[KI] {LABEL[prov]} für «{purpose}» nicht möglich: {e}", flush=True)
+    hint = ""
+    if any("Tageslimit" in r for r in reasons):
+        hint = (" Tipp: Teilt sich Kompass den Gemini-Schlüssel mit Hörwerk? Dann teilen sich beide das Tageslimit – "
+                "für Kompass in AI Studio einen eigenen Schlüssel in einem neuen Projekt anlegen.")
     if len(reasons) == 1:
-        raise LLMError(reasons[0])
-    raise LLMError("Alle KI-Anbieter sind ausgefallen – " + " · ".join(reasons))
+        raise LLMError(reasons[0] + hint)
+    raise LLMError("Alle KI-Anbieter sind ausgefallen – " + " · ".join(reasons) + hint)
 
 
 # --- Gemini / Groq (OpenAI-kompatibel) ----------------------------------------------------------
@@ -139,27 +143,60 @@ def _api_msg(body: str) -> str:
         j = json.loads(body)
         j = j[0] if isinstance(j, list) and j else j
         e = j.get("error", j)
-        return str(e.get("message") if isinstance(e, dict) else e)[:200]
+        msg = e.get("message") if isinstance(e, dict) else e
+        return str(msg)[:200] if msg else "keine Details"
     except (ValueError, AttributeError):
         return re.sub(r"\s+", " ", body)[:200] or "unbekannter Fehler"
 
 
+def _limit_info(body: str, headers) -> tuple[bool, float, bool]:
+    """429-Antwort deuten → (Tageslimit?, Wartezeit in s, Modell ohne Gratis-Kontingent?).
+
+    Google schreibt bei JEDEM Limit «quota»; massgebend ist die Kennung (…PerDay… / …PerMinute…).
+    """
+    daily = bool(re.search(r"PerDay|per[ _-]?day|daily|\bRPD\b|\bTPD\b", body, re.I))
+    no_free = bool(re.search(r"limit:\s*0\b", body))
+    wait = 30.0
+    m = re.search(r'"retryDelay"\s*:\s*"([\d.]+)s"', body) or re.search(r"retry in ([\d.]+)\s*s", body, re.I) \
+        or re.search(r"try again in (?:(\d+)m)?([\d.]+)s", body, re.I)
+    if m:
+        g = [x for x in m.groups() if x]
+        wait = float(g[-1]) + (60 * float(m.group(1)) if len(m.groups()) == 2 and m.group(1) else 0)
+    elif headers and headers.get("retry-after"):
+        try:
+            wait = float(headers.get("retry-after"))
+        except ValueError:
+            pass
+    return daily, wait, no_free
+
+
 def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip_id, max_tokens: int) -> T:
     c = config.FREE_PROVIDERS[prov]
+    model = store.settings().get(f"{prov}_model") or c["model"]
     key = store.key(prov)
     schema_txt = json.dumps(schema.model_json_schema(), ensure_ascii=False, separators=(",", ":"))
     sys = (f"{system}\n\nAntworte ausschliesslich mit einem JSON-Objekt (kein Text davor oder danach), "
            f"das genau diesem JSON-Schema entspricht:\n{schema_txt}")
     messages = [{"role": "system", "content": sys}, {"role": "user", "content": _to_openai(content)}]
-    payload = {"model": c["model"], "messages": messages, "max_tokens": max_tokens,
+    # Minutenkontingent (Groq gratis ca. 8000 Tokens/Min. inkl. Antwort): zu grosse Aufgaben gar nicht erst schicken
+    est_in = int(len(json.dumps(messages, ensure_ascii=False)) / 3.2)
+    if c.get("tpm") and est_in + max_tokens > c["tpm"]:
+        room = c["tpm"] - est_in - 300
+        if room < 1500 or room < max_tokens // 3:  # Antwort müsste zu stark gekürzt werden – wird nichts
+            raise _Skip(f"Aufgabe zu gross für das Gratis-Kontingent (ca. {est_in + max_tokens:,} Tokens, "
+                        f"erlaubt {c['tpm']:,} pro Minute)".replace(",", "'"))
+        max_tokens = room
+    payload = {"model": model, "messages": messages, "max_tokens": max_tokens,
                "response_format": {"type": "json_object"}, "reasoning_effort": "low"}
     url = c["base_url"].rstrip("/") + "/chat/completions"
     tin = tout = 0
-    for attempt in range(3):
+    fixes = waits = errors5 = 0
+    for _ in range(8):
         try:
             data = _post(url, payload, key)
         except urllib.error.HTTPError as e:
-            body = e.read().decode(errors="replace")[:800]
+            body = e.read().decode(errors="replace")[:1500]
+            print(f"[KI] {LABEL[prov]} HTTP {e.code}: {re.sub(chr(10), ' ', body)[:600]}", flush=True)
             if e.code == 400 and any(k in payload for k in ("response_format", "reasoning_effort")) and \
                     re.search(r"response_format|reasoning|json", body, re.I):
                 payload.pop("reasoning_effort", None)  # nicht jedes Modell kennt diese Felder
@@ -169,12 +206,19 @@ def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip
             if e.code in (401, 403):
                 raise _Skip("Schlüssel abgelehnt – bitte prüfen")
             if e.code == 429:
-                daily = re.search(r"per day|perday|daily|quota", body, re.I)
-                raise _Skip("Tageslimit erreicht" if daily else "Tempolimit (zu viele Anfragen)")
+                daily, wait, no_free = _limit_info(body, e.headers)
+                if no_free:
+                    raise _Skip(f"Modell «{model}» hat kein Gratis-Kontingent – in Profil → KI ein anderes wählen")
+                if not daily and wait <= 65 and waits < 2:  # Minutenlimit: kurz warten, dann nochmals
+                    waits += 1
+                    time.sleep(wait + 1)
+                    continue
+                raise _Skip(("Tageslimit erreicht" if daily else "Tempolimit") + f" ({_api_msg(body)[:140]})")
             if e.code == 413:
                 raise _Skip("Anfrage zu gross für das Gratis-Kontingent")
-            if e.code in (500, 502, 503, 529) and attempt == 0:
-                time.sleep(3)
+            if e.code in (500, 502, 503, 529) and errors5 < 1:
+                errors5 += 1
+                time.sleep(5)
                 continue
             raise _Skip(f"Fehler {e.code}: {_api_msg(body)}")
         except (urllib.error.URLError, TimeoutError) as e:
@@ -190,20 +234,21 @@ def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip
         except (KeyError, IndexError, TypeError):
             raise _Skip("unerwartete Antwort")
         if choice.get("finish_reason") == "length":
-            store.add_cost(purpose, f"{prov}:{c['model']}", 0.0, tin, tout, trip_id)
+            store.add_cost(purpose, f"{prov}:{model}", 0.0, tin, tout, trip_id)
             raise _Skip("Antwort zu lang und abgeschnitten")
         try:
             result = schema.model_validate_json(_json_text(text))
         except (ValidationError, ValueError) as e:
-            if attempt < 2:  # einmal mit Fehlerhinweis korrigieren lassen
+            if fixes < 1:  # einmal mit Fehlerhinweis korrigieren lassen
+                fixes += 1
                 err = e.errors()[0] if isinstance(e, ValidationError) else {"msg": str(e)[:200]}
                 messages += [{"role": "assistant", "content": text[:20000]},
                              {"role": "user", "content": f"Das JSON passt nicht zum Schema ({err.get('loc', '')}: "
                                                          f"{err.get('msg')}). Bitte vollständig und korrekt neu senden."}]
                 continue
-            store.add_cost(purpose, f"{prov}:{c['model']}", 0.0, tin, tout, trip_id)
+            store.add_cost(purpose, f"{prov}:{model}", 0.0, tin, tout, trip_id)
             raise _Skip("Antwort passte nicht zum erwarteten Format")
-        store.add_cost(purpose, f"{prov}:{c['model']}", 0.0, tin, tout, trip_id)
+        store.add_cost(purpose, f"{prov}:{model}", 0.0, tin, tout, trip_id)
         return result
     raise _Skip("keine gültige Antwort")
 
