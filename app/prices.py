@@ -145,6 +145,8 @@ def parse_hotels(data: dict, nights: int, max_night: float | None, limit: int = 
                     "stars": p.get("extracted_hotel_class") or p.get("hotel_class"),
                     "link": p.get("link") or p.get("serpapi_property_details_link"),
                     "area": p.get("neighborhood") or "",
+                    "image": next((i.get("thumbnail") or i.get("original_image") for i in p.get("images") or []
+                                   if isinstance(i, dict) and (i.get("thumbnail") or i.get("original_image"))), None),
                     "over_budget": bool(max_night and night > max_night)})
     out.sort(key=lambda h: (h["over_budget"], -(h["rating"] or 0), h["night"]))
     return out[:limit]
@@ -166,6 +168,9 @@ def hotels(stay: Accommodation, max_night: float | None, trip_id: str) -> dict:
         params["q"] = f"Hotels {stay.place.name}"
         data = _fake_hotels(stay) if config.FAKE_MODE else _search(params, "preise_hotel", trip_id)
         opts = parse_hotels(data, nights, max_night)
+    from . import photos  # Bilder der Angebote selbst holen (nur erlaubte Bild-Server)
+    for o in opts:
+        o["photo"] = photos.download(o.pop("image"), "Google Hotels", o["name"]) if o.get("image") else None
     return {"options": opts, "nights": nights,
             "note": "Preise für 2 Erwachsene laut Google Hotels, Stand jetzt – Verfügbarkeit beim Buchen prüfen."}
 
@@ -209,7 +214,8 @@ def _fake_hotels(stay: Accommodation) -> dict:
     return {"properties": [
         {"name": f"Hotel {stay.place.name} Mar", "rate_per_night": {"lowest": "CHF 145", "extracted_lowest": 145},
          "total_rate": {"extracted_lowest": 145 * (stay.check_out - stay.check_in).days}, "overall_rating": 4.6,
-         "reviews": 812, "extracted_hotel_class": 4, "link": "https://example.com/mar"},
+         "reviews": 812, "extracted_hotel_class": 4, "link": "https://example.com/mar",
+         "images": [{"thumbnail": "https://lh3.googleusercontent.com/fake-hotel-mar"}]},
         {"name": f"Pousada {stay.place.name}", "rate_per_night": {"extracted_lowest": 98}, "overall_rating": 4.4,
          "reviews": 210, "link": "https://example.com/pousada"},
         {"name": f"Grand {stay.place.name}", "rate_per_night": {"extracted_lowest": 420}, "overall_rating": 4.8,

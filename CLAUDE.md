@@ -56,6 +56,13 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   `google_hotels`; Feldnamen aus Doku/Fremdprojekten (serpapi.com aus der Cloud gesperrt). 6 Std. Zwischenspeicher, jede
   Suche als Kosten-Zeile `model=serpapi` gezählt (Gratis 250/Monat). Übernehmen nur per gemerkter Kennung + Index, nie mit
   Daten aus dem Browser; übernommene Preise bleiben «Vorschlag». Flughafen-Codes an `TransportSegment.origin_code/destination_code`.
+- `app/photos.py` (1.4.0) Fotos: Wikipedia-Suche (`generator=search`, `prop=pageimages`, `pilicense=free`, de vor en),
+  Titel muss ein Wort des Suchbegriffs enthalten (sonst kein Bild); Allgemeines («Abendessen», «Ankunft» …, `GENERIC`)
+  bekommt keins. Hotels: Bild aus Google Hotels (SerpApi `images[].thumbnail`). Der Server lädt selbst (nur https von
+  `ALLOWED_HOSTS`, auch bei Weiterleitungen, ≤ 2 MB, JPEG/PNG/WebP) nach `data/photos/`, Auslieferung `/api/photo/<id>`
+  (30 Tage zwischenspeichern). CSP bleibt `img-src 'self' data:` – nie lockern. Zuordnung pro Reise in kv «trip_photos»
+  (Orte, Programmpunkte nach Titel, Unterkünfte); `fill_trip` im Hintergrund nach dem Planen und wenn etwas fehlt.
+  Titelbild mit Quellenangabe (Wikipedia-Lizenzen). Wikipedia aus der Cloud gesperrt: nur mit nachgebildeten Antworten geprüft.
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -68,13 +75,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (30 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (33 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.3.0)
+## Stand (03.11.2026, Version 1.4.0)
+- 1.4.0: Fotos (Wikipedia, Google Hotels) zu Zielen, Orten, Programmpunkten, Hotels. Im Testmodus mit Platzhaltern geprüft;
+  echte Bildqualität/Trefferquote nur auf dem NAS prüfbar. Dabei behoben: doppelte Cache-Kopfzeile (no-store gewann).
 - 1.3.0: Buchung importieren + echte Preise (SerpApi). Im Testmodus und mit nachgebildeten Antworten geprüft; echte
   SerpApi-Antworten und wie gut Gemini Bestätigungen liest, nur auf dem NAS prüfbar.
 - 1.2.0: Gemini + Groq gratis mit Aufgabenteilung und gegenseitiger Reserve; Profil → KI. Mit nachgebildetem Server

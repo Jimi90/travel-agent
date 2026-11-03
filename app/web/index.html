@@ -113,6 +113,13 @@ input.inl::placeholder{color:var(--muted);opacity:.7}
 input.inl::-webkit-outer-spin-button,input.inl::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input.inl[type=number]{-moz-appearance:textfield;appearance:textfield}
 input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
+.hero{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:14px;background:var(--card2);margin:10px 0 2px}
+.credit{font-size:11px;color:var(--muted);margin:0 4px 8px;text-align:right}
+.credit a{color:var(--muted)}
+.band{display:block;width:100%;height:120px;object-fit:cover;background:var(--card2)}
+.thumb{width:54px;height:54px;border-radius:10px;object-fit:cover;flex:none;background:var(--card2)}
+.thumb.s{width:44px;height:44px;border-radius:9px}
+.idea-img{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--card2)}
 #asheet{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.35);display:none;align-items:flex-end}
 #asheet.open{display:flex}
 #asheet .box{width:100%;max-width:600px;margin:0 auto;padding:0 8px calc(env(safe-area-inset-bottom) + 8px)}
@@ -259,6 +266,8 @@ const fmtLong = iso => fmtD(iso, {weekday: "long", day: "numeric", month: "long"
 const hm = t => (t || "").slice(0, 5);
 const chf = v => Number(v) ? `CHF ${Math.round(Number(v)).toLocaleString("de-CH")}` : "gratis";
 const usd = v => `${Number(v || 0).toFixed(2)} USD`;
+const photo = (id, cls = "thumb", alt = "") => id ? `<img class="${cls}" src="/api/photo/${esc(id)}" alt="${esc(alt)}" loading="lazy" decoding="async">` : "";
+const actKey = t => t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 2600); }
 function msg(el, text, kind = "") { el.className = "msg " + kind; el.innerHTML = text; }
 
@@ -337,7 +346,7 @@ function clearJob() { try { localStorage.removeItem("job"); } catch {} }
 async function loadTrips() {
   const [t, ideas] = await Promise.all([api("/api/trips"), api("/api/ideas")]);
   $("tripList").innerHTML = t.trips.length ? t.trips.map(x => `<div class="row tap chev" data-trip="${esc(x.id)}">
-      <div class="grow"><div class="t">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
+      ${photo(x.photo, "thumb s")}<div class="grow"><div class="t">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
       <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div>
       <span class="chip">${esc(STATUS[x.status])}</span></div>`).join("")
     : `<div class="empty">Noch keine Reise. Tippe auf «Neue Reise planen».<br>Tipp: Zuerst unter «Profil» eure Vorlieben eintragen.</div>`;
@@ -388,7 +397,7 @@ $("nSuggest").onclick = async () => {
 function renderIdeas(res) {
   const saved = new Set();
   $("ideas").innerHTML = `<h2>Vorschläge für euch</h2><div class="card">` + res.ideas.map((i, n) => `<div class="row idea">
-      <div class="grow"><div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
+      <div class="grow">${photo(i.photo, "idea-img", i.name)}<div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
       <div class="s">${esc(i.why)}</div>
       <div class="s">${esc((i.highlights || []).join(" · "))}</div>
       <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
@@ -424,20 +433,24 @@ function renderTrip(outcome) {
       </div></div>`;
   }).join("");
 
+  const P = d.photos || {places: {}, activities: {}, stays: {}};
+  let lastBase = "";
   const days = t.days.map(day => {
     const isToday = day.date === d.today;
-    return `<div class="dayh ${isToday ? "today" : ""}"><span>${esc(fmtLong(day.date))}${isToday ? " · heute" : ""}</span><span class="s">${esc(day.base.name)}</span></div>` +
+    const band = day.base.name !== lastBase && P.places[day.base.name] ? photo(P.places[day.base.name], "band", day.base.name) : "";
+    lastBase = day.base.name;
+    return band + `<div class="dayh ${isToday ? "today" : ""}"><span>${esc(fmtLong(day.date))}${isToday ? " · heute" : ""}</span><span class="s">${esc(day.base.name)}</span></div>` +
       (day.activities.length ? day.activities.map(a => {
         const isNew = a.origin === "umplanung";
         const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
         return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
           <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
           <div class="s">${esc(CATS[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(INT[a.intensity])} · ${esc(chf(a.cost))}</div>
-          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
+          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div>${photo(P.activities[actKey(a.title)], "thumb", a.title)}</div>`;
       }).join("") : `<div class="empty">Freier Tag</div>`);
   }).join("");
 
-  const stays = t.stays.map(s => `<div class="row"><div class="grow">
+  const stays = t.stays.map(s => `<div class="row">${photo(P.stays[s.id], "thumb")}<div class="grow">
       <div class="t">${esc(s.name)}${s.confirmed ? `<span class="badge ok">gebucht</span>` : `<span class="badge warn">Vorschlag</span>`}</div>
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in))} – ${esc(fmtD(s.check_out))} · ${esc(chf(s.cost))}${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div>
       ${s.note ? `<div class="s">${esc(s.note)}</div>` : ""}
@@ -469,6 +482,7 @@ function renderTrip(outcome) {
   $("tripIn").innerHTML = `
     <div class="topbar"><button class="back" data-close="tripSheet">‹ Reisen</button>
       <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></div>
+    ${d.hero ? `${photo(d.hero.id, "hero", t.title)}<div class="credit">Foto: ${d.hero.page ? `<a href="${esc(d.hero.page)}" target="_blank" rel="noopener noreferrer">${esc(d.hero.source)} – ${esc(d.hero.title)}</a>` : esc(d.hero.source)}</div>` : ""}
     <h1>${esc(t.title)}</h1>
     <p class="sub">${esc(fmtD(t.start_date, {day: "numeric", month: "long"}))} – ${esc(fmtD(t.end_date, {day: "numeric", month: "long", year: "numeric"}))} · ${t.days.length} Tage · ca. ${esc(chf(d.total))} · Version ${t.version}</p>
     <div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
@@ -535,6 +549,15 @@ function renderTrip(outcome) {
     ]);
   });
   if (outcome) showOutcome(outcome);
+  clearTimeout(renderTrip.photoT);
+  if (d.photos_pending && (renderTrip.tries = (renderTrip.tid === tid ? renderTrip.tries : 0) + 1) <= 3) {
+    renderTrip.tid = tid;
+    renderTrip.photoT = setTimeout(async () => {
+      if (!$("tripSheet").classList.contains("open") || !TRIP || TRIP.trip.id !== tid) return;
+      const y = $("tripSheet").scrollTop; const nd = await api("/api/trips/" + tid).catch(() => null);
+      if (nd && $("tripSheet").classList.contains("open")) { TRIP = nd; renderTrip(); $("tripSheet").scrollTop = y; }
+    }, 6000);
+  }
 }
 
 function showOutcome(o) {
@@ -608,7 +631,7 @@ async function openPrices(tid, target, id) {
       ? `<div class="row"><div class="grow"><div class="t">CHF ${Math.round(o.price).toLocaleString("de-CH")} · ${esc(o.carrier)}</div>
           <div class="s">${esc(o.depart.slice(11, 16))} – ${esc(o.arrive.slice(11, 16))}${o.arrive.slice(0, 10) !== o.depart.slice(0, 10) ? " (+1)" : ""} · ${Math.floor(o.duration_min / 60)} Std. ${o.duration_min % 60} Min. · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"}</div>
           <div class="s">${esc(o.number)}</div></div><button class="small" data-pick="${i}">Übernehmen</button></div>`
-      : `<div class="row"><div class="grow"><div class="t">${esc(o.name)}${o.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div>
+      : `<div class="row">${photo(o.photo, "thumb")}<div class="grow"><div class="t">${esc(o.name)}${o.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div>
           <div class="s">CHF ${Math.round(o.night)}/Nacht${o.total ? ` · CHF ${Math.round(o.total).toLocaleString("de-CH")} total` : ""}${o.rating ? ` · ★ ${o.rating}` : ""}${o.reviews ? ` (${o.reviews})` : ""}${o.stars ? ` · ${o.stars}-Sterne` : ""}</div>
           ${o.link ? `<div class="btns"><a class="small" href="${esc(o.link)}" target="_blank" rel="noopener noreferrer">Ansehen</a></div>` : ""}</div>
           <button class="small" data-pick="${i}">Übernehmen</button></div>`).join("");

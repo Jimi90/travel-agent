@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .. import llm, weather
+from .. import llm, photos, weather
 from ..models import Household
 from ..models.common import new_id
 from .matching import climate_score, match
@@ -67,6 +67,8 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str) 
             item["climate_score"], item["climate_text"] = climate_score(m, clim)
         except weather.WeatherError as e:
             item["climate_score"], item["climate_text"] = None, f"Klimadaten nicht verfügbar ({e})"
+        short = idea.name.split("(")[0].strip()
+        item["photo"] = photos.wiki_photo(short, must_match=short)
         if m.budget_total and idea.est_total_chf > float(m.budget_total):
             item["warning"] = f"Geschätzt {idea.est_total_chf} CHF – über dem Budget"
         out.append(item)
