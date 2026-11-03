@@ -55,17 +55,34 @@ CREATE TABLE IF NOT EXISTS outbox (
 """
 
 
+class _Result:
+    def __init__(self, rows: list, rowcount: int):
+        self._rows, self.rowcount = rows, rowcount
+
+    def fetchone(self):
+        return self._rows[0] if self._rows else None
+
+    def fetchall(self):
+        return self._rows
+
+
 class StatusManager:
     def __init__(self, db_path: str | Path, checker: PlausibilityChecker | None = None):
         self.checker = checker or PlausibilityChecker()
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # auch Lesen läuft darunter (eine Verbindung für alle Threads)
         # isolation_level=None: Transaktionen steuern wir selbst mit BEGIN/COMMIT/ROLLBACK.
         self._db = sqlite3.connect(str(db_path), isolation_level=None, check_same_thread=False)
-        self._db.execute("PRAGMA foreign_keys = ON")
+        self._ex("PRAGMA foreign_keys = ON")
         if str(db_path) != ":memory:":
-            self._db.execute("PRAGMA journal_mode = WAL")
-            self._db.execute("PRAGMA synchronous = FULL")
+            self._ex("PRAGMA journal_mode = WAL")
+            self._ex("PRAGMA synchronous = FULL")
         self._db.executescript(SCHEMA)
+
+    def _ex(self, sql: str, args=()):
+        """Jeder Zugriff unter der Sperre; Ergebnis sofort vollständig gelesen."""
+        with self._lock:
+            cur = self._db.execute(sql, args)
+            return _Result(cur.fetchall(), cur.rowcount)
 
     def close(self) -> None:
         with self._lock:
@@ -74,13 +91,13 @@ class StatusManager:
     # --- Lesen --------------------------------------------------------------------------------
 
     def get(self, itinerary_id: str) -> Itinerary:
-        row = self._db.execute("SELECT data FROM itineraries WHERE id = ?", (itinerary_id,)).fetchone()
+        row = self._ex("SELECT data FROM itineraries WHERE id = ?", (itinerary_id,)).fetchone()
         if not row:
             raise KeyError(itinerary_id)
         return Itinerary.model_validate_json(row[0])
 
     def list(self) -> list[Itinerary]:
-        rows = self._db.execute("SELECT data FROM itineraries ORDER BY updated_at DESC").fetchall()
+        rows = self._ex("SELECT data FROM itineraries ORDER BY updated_at DESC").fetchall()
         return [Itinerary.model_validate_json(r[0]) for r in rows]
 
     def actions(self, itinerary_id: str | None = None, status: str | None = "offen") -> list[dict]:
@@ -93,7 +110,7 @@ class StatusManager:
         if status:
             q += " AND o.status = ?"
             args.append(status)
-        rows = self._db.execute(q + " ORDER BY o.created_at", args).fetchall()
+        rows = self._ex(q + " ORDER BY o.created_at", args).fetchall()
         return [{**json.loads(r[2]), "id": r[0], "change_id": r[1], "status": r[3], "created_at": r[4],
                  "itinerary_id": r[5]} for r in rows]
 
@@ -101,27 +118,27 @@ class StatusManager:
         if status not in ("offen", "erledigt", "verworfen"):
             raise ValueError(status)
         with self._lock:
-            cur = self._db.execute("UPDATE outbox SET status = ? WHERE id = ?", (status, action_id))
+            cur = self._ex("UPDATE outbox SET status = ? WHERE id = ?", (status, action_id))
             return cur.rowcount == 1
 
     def delete(self, itinerary_id: str) -> bool:
         with self._lock:
-            self._db.execute("BEGIN IMMEDIATE")
+            self._ex("BEGIN IMMEDIATE")
             try:
-                self._db.execute("DELETE FROM outbox WHERE change_id IN (SELECT id FROM changes WHERE itinerary_id = ?)", (itinerary_id,))
-                self._db.execute("DELETE FROM changes WHERE itinerary_id = ?", (itinerary_id,))
-                cur = self._db.execute("DELETE FROM itineraries WHERE id = ?", (itinerary_id,))
+                self._ex("DELETE FROM outbox WHERE change_id IN (SELECT id FROM changes WHERE itinerary_id = ?)", (itinerary_id,))
+                self._ex("DELETE FROM changes WHERE itinerary_id = ?", (itinerary_id,))
+                cur = self._ex("DELETE FROM itineraries WHERE id = ?", (itinerary_id,))
             except BaseException:
-                self._db.execute("ROLLBACK")
+                self._ex("ROLLBACK")
                 raise
-            self._db.execute("COMMIT")
+            self._ex("COMMIT")
             return cur.rowcount == 1
 
     def event_handled(self, event_id: str) -> bool:
-        return self._db.execute("SELECT 1 FROM changes WHERE event_id = ?", (event_id,)).fetchone() is not None
+        return self._ex("SELECT 1 FROM changes WHERE event_id = ?", (event_id,)).fetchone() is not None
 
     def history(self, itinerary_id: str) -> list[ChangeRecord]:
-        rows = self._db.execute(
+        rows = self._ex(
             "SELECT id, itinerary_id, from_version, to_version, event_id, actor, reason, operations,"
             " created_at, undone_by FROM changes WHERE itinerary_id = ? ORDER BY to_version",
             (itinerary_id,),
@@ -134,7 +151,7 @@ class StatusManager:
         ]
 
     def pending_actions(self) -> list[dict]:
-        rows = self._db.execute("SELECT id, change_id, action FROM outbox WHERE status = 'offen' ORDER BY created_at").fetchall()
+        rows = self._ex("SELECT id, change_id, action FROM outbox WHERE status = 'offen' ORDER BY created_at").fetchall()
         return [{"id": r[0], "change_id": r[1], **json.loads(r[2])} for r in rows]
 
     # --- Schreiben ----------------------------------------------------------------------------
@@ -142,7 +159,7 @@ class StatusManager:
     def create(self, itin: Itinerary) -> Itinerary:
         itin = Itinerary.model_validate({**itin.model_dump(), "version": 1})
         with self._lock:
-            self._db.execute(
+            self._ex(
                 "INSERT INTO itineraries (id, version, data, updated_at) VALUES (?, 1, ?, ?)",
                 (itin.id, itin.model_dump_json(), datetime.now().isoformat()),
             )
@@ -152,26 +169,26 @@ class StatusManager:
               now: datetime | None = None) -> ChangeResult:
         now = now or datetime.now()
         with self._lock:
-            self._db.execute("BEGIN IMMEDIATE")
+            self._ex("BEGIN IMMEDIATE")
             try:
                 result = self._apply_in_tx(cs, constraints, now)
             except BaseException:
-                self._db.execute("ROLLBACK")
+                self._ex("ROLLBACK")
                 raise
-            self._db.execute("COMMIT" if result.status is ChangeStatus.APPLIED else "ROLLBACK")
+            self._ex("COMMIT" if result.status is ChangeStatus.APPLIED else "ROLLBACK")
             return result
 
     def undo(self, change_id: str, now: datetime | None = None) -> ChangeResult:
         """Macht eine Änderung rückgängig – nur wenn danach nichts anderes geändert wurde."""
         now = now or datetime.now()
         with self._lock:
-            self._db.execute("BEGIN IMMEDIATE")
+            self._ex("BEGIN IMMEDIATE")
             try:
                 result = self._undo_in_tx(change_id, now)
             except BaseException:
-                self._db.execute("ROLLBACK")
+                self._ex("ROLLBACK")
                 raise
-            self._db.execute("COMMIT" if result.status is ChangeStatus.APPLIED else "ROLLBACK")
+            self._ex("COMMIT" if result.status is ChangeStatus.APPLIED else "ROLLBACK")
             return result
 
     # --- intern (läuft immer innerhalb einer offenen Transaktion) --------------------------------
@@ -180,7 +197,7 @@ class StatusManager:
         res = lambda status, **kw: ChangeResult(status=status, itinerary_id=cs.itinerary_id, **kw)  # noqa: E731
         if cs.event_id and self.event_handled(cs.event_id):
             return res(ChangeStatus.DUPLICATE)
-        row = self._db.execute("SELECT version, data FROM itineraries WHERE id = ?", (cs.itinerary_id,)).fetchone()
+        row = self._ex("SELECT version, data FROM itineraries WHERE id = ?", (cs.itinerary_id,)).fetchone()
         if not row:
             return res(ChangeStatus.REJECTED, problems=[Problem(code="unbekannt", message="Reiseplan nicht gefunden")])
         version, data = row
@@ -198,7 +215,7 @@ class StatusManager:
 
         new_version = version + 1
         after = Itinerary.model_validate({**after.model_dump(), "version": new_version, "updated_at": now})
-        cur = self._db.execute(
+        cur = self._ex(
             "UPDATE itineraries SET version = ?, data = ?, updated_at = ? WHERE id = ? AND version = ?",
             (new_version, after.model_dump_json(), now.isoformat(), cs.itinerary_id, version),
         )
@@ -212,7 +229,7 @@ class StatusManager:
 
     def _write_change(self, change_id: str, cs: ChangeSet, v_from: int, v_to: int, before: str, now: datetime) -> None:
         ops = json.dumps([op.model_dump(mode="json") for op in cs.operations], ensure_ascii=False)
-        self._db.execute(
+        self._ex(
             "INSERT INTO changes (id, itinerary_id, from_version, to_version, event_id, actor, reason,"
             " operations, before, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (change_id, cs.itinerary_id, v_from, v_to, cs.event_id, cs.actor, cs.reason, ops, before, now.isoformat()),
@@ -220,13 +237,13 @@ class StatusManager:
 
     def _write_outbox(self, change_id: str, cs: ChangeSet, now: datetime) -> None:
         for a in cs.external_actions:
-            self._db.execute(
+            self._ex(
                 "INSERT INTO outbox (id, change_id, action, created_at) VALUES (?, ?, ?, ?)",
                 (a.id, change_id, a.model_dump_json(), now.isoformat()),
             )
 
     def _undo_in_tx(self, change_id: str, now: datetime) -> ChangeResult:
-        row = self._db.execute(
+        row = self._ex(
             "SELECT itinerary_id, to_version, before, undone_by, reason FROM changes WHERE id = ?", (change_id,)
         ).fetchone()
         if not row:
@@ -235,21 +252,21 @@ class StatusManager:
         res = lambda status, **kw: ChangeResult(status=status, itinerary_id=itin_id, **kw)  # noqa: E731
         if undone_by:
             return res(ChangeStatus.DUPLICATE)
-        (current,) = self._db.execute("SELECT version FROM itineraries WHERE id = ?", (itin_id,)).fetchone()
+        (current,) = self._ex("SELECT version FROM itineraries WHERE id = ?", (itin_id,)).fetchone()
         if current != to_version:
             return res(ChangeStatus.CONFLICT, old_version=current, problems=[Problem(
                 code="konflikt", message="Nach dieser Änderung wurde der Plan weiter verändert")])
         new_version = current + 1
         restored = Itinerary.model_validate({**json.loads(before), "version": new_version, "updated_at": now})
-        cur_data = self._db.execute("SELECT data FROM itineraries WHERE id = ?", (itin_id,)).fetchone()[0]
-        self._db.execute("UPDATE itineraries SET version = ?, data = ?, updated_at = ? WHERE id = ?",
+        cur_data = self._ex("SELECT data FROM itineraries WHERE id = ?", (itin_id,)).fetchone()[0]
+        self._ex("UPDATE itineraries SET version = ?, data = ?, updated_at = ? WHERE id = ?",
                          (new_version, restored.model_dump_json(), now.isoformat(), itin_id))
         undo_id = new_id()
-        self._db.execute(
+        self._ex(
             "INSERT INTO changes (id, itinerary_id, from_version, to_version, event_id, actor, reason,"
             " operations, before, created_at) VALUES (?, ?, ?, ?, NULL, 'nutzer', ?, '[]', ?, ?)",
             (undo_id, itin_id, current, new_version, f"Rückgängig: {reason}", cur_data, now.isoformat()),
         )
-        self._db.execute("UPDATE changes SET undone_by = ? WHERE id = ?", (undo_id, change_id))
-        self._db.execute("UPDATE outbox SET status = 'verworfen' WHERE change_id = ? AND status = 'offen'", (change_id,))
+        self._ex("UPDATE changes SET undone_by = ? WHERE id = ?", (undo_id, change_id))
+        self._ex("UPDATE outbox SET status = 'verworfen' WHERE change_id = ? AND status = 'offen'", (change_id,))
         return res(ChangeStatus.APPLIED, old_version=current, new_version=new_version, change_id=undo_id)

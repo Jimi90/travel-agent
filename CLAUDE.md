@@ -46,6 +46,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   wie Hörwerk; eigener `User-Agent` wegen Cloudflare/Groq – nicht entfernen), `response_format: json_object` + Schema im
   Systemtext, Antwort per Pydantic geprüft, einmal Korrektur mit Fehlerhinweis; unbekannte Felder (response_format,
   reasoning_effort) werden bei 400 weggelassen. Limit/Fehler → nächster Anbieter (`_Skip`), Meldung nennt jeden Grund.
+  429 (seit 1.4.1, `_limit_info`): Google schreibt bei JEDEM Limit «quota» – massgebend ist die Kennung (…PerDay… vs.
+  …PerMinute…); Minutenlimit → `retryDelay` abwarten (≤ 65 s, höchstens 2×) und denselben Anbieter nochmals fragen;
+  «limit: 0» = Modell ohne Gratis-Kontingent. Groq: `tpm` 8000 (Frage + Antwort) – zu grosse Aufgaben (Antwort müsste
+  um > 2/3 gekürzt werden, z. B. ganzer Reiseplan) gehen gar nicht erst an Groq. Jeder Anbieterfehler mit Rohtext im
+  Container-Protokoll («[KI] … HTTP …»). Gemini-Modell in Profil → KI wählbar (`settings.gemini_model`; Limits gelten
+  pro Projekt UND Modell). Tageslimit-Hinweis: eigener Gemini-Schlüssel/Projekt für Kompass, nicht den von Hörwerk teilen.
   Claude über `client.beta.messages.parse`, `fallbacks="default"` bei Opus/Sonnet 5.5, Websuche nur Claude, Kostenbremse
   nur für Claude. Schlüssel: `store.key(provider)`, `data/keys.json` (chmod 600) vor `.env`; `key_info()` nur letzte 4 Zeichen.
 - `app/bookings.py` (1.3.0) Buchungsbestätigung (Foto oder Mailtext) → KI liest `BookingExtract` → `propose()` ordnet
@@ -67,7 +73,9 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
   Tag Wettercheck, Event-ID `wetter:<reise>:<datum>`; setzt Status unterwegs/abgeschlossen).
-- `app/store.py` kv-Ablage (Haushalt, Einstellungen, Favoriten, Entwürfe, Ideen), Meldungen, Kosten. RLock (verschachtelt).
+- `app/store.py` kv-Ablage (Haushalt, Einstellungen, Favoriten, Entwürfe, Ideen), Meldungen, Kosten. Eine SQLite-Verbindung
+  für alle Threads: JEDER Zugriff (auch Lesen) unter einer RLock (`_LockedDB`); StatusManager ebenso (`_ex`). Ohne das
+  gab es sporadisch «InterfaceError: bad parameter or other API misuse» (Foto-Thread + Webseite gleichzeitig).
 - `app/web/index.html` ganze Oberfläche (Vanilla-JS), Leiste: Reisen · Unterwegs · Helfer · Profil; Reise als Vollbild-Blatt.
   Profil (seit 1.1.0) wie die iPhone-Einstellungen: Hauptliste mit Wert rechts + «›», Unterseiten im Blatt `#subSheet`
   (`openSub(page)`, `PAGES`, `personPage(i)`), Auswahl per Aktionsblatt, Häkchen-Listen, automatisch speichern
@@ -75,13 +83,16 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (33 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (38 Tests, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.4.0)
+## Stand (03.11.2026, Version 1.4.1)
+- 1.4.1: Erster echter Lauf (James) scheiterte: «Gemini: Tageslimit · Groq: Tempolimit». Behoben: Minutenlimit wurde als
+  Tageslimit gedeutet, Groq bekam ganze Reisepläne (passt nie ins Minutenkontingent). Ob Gemini echt am Tageslimit war
+  (evtl. gleicher Schlüssel wie Hörwerk), zeigt jetzt Googles Text in der Meldung. Ausserdem DB-Zugriffe threadsicher.
 - 1.4.0: Fotos (Wikipedia, Google Hotels) zu Zielen, Orten, Programmpunkten, Hotels. Im Testmodus mit Platzhaltern geprüft;
   echte Bildqualität/Trefferquote nur auf dem NAS prüfbar. Dabei behoben: doppelte Cache-Kopfzeile (no-store gewann).
 - 1.3.0: Buchung importieren + echte Preise (SerpApi). Im Testmodus und mit nachgebildeten Antworten geprüft; echte

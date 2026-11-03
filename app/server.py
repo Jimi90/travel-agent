@@ -101,6 +101,7 @@ def info() -> dict:
     return {"version": config.APP_VERSION, "build": config.APP_BUILD, "fake": config.FAKE_MODE,
             "settings": s, "models": config.MODELS, "keys": store.key_info(), "ai": llm.available(),
             "free_models": {k: v["model"] for k, v in config.FREE_PROVIDERS.items()},
+            "gemini_models": config.FREE_PROVIDERS["gemini"]["models"],
             "prices": {"available": prices.available(), "month": prices.month_usage(), "free_quota": 250},
             "spent_24h": round(store.spent_since(24), 4), "spent_30d": round(store.spent_since(24 * 30), 4),
             "budget_usd": config.DAILY_BUDGET_USD, "unread": store.unread(),
@@ -299,6 +300,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", str(body["check_time"])):
                     raise BadRequest("Zeit als HH:MM angeben.")
                 allowed["check_time"] = body["check_time"]
+            if "gemini_model" in body:
+                if body["gemini_model"] not in ("", *config.FREE_PROVIDERS["gemini"]["models"]):
+                    raise BadRequest("Unbekanntes Gemini-Modell.")
+                allowed["gemini_model"] = body["gemini_model"]
             if "prefer" in body:
                 if body["prefer"] not in ("gratis", "claude"):
                     raise BadRequest("Unbekannte Reihenfolge.")

@@ -11,7 +11,7 @@ def _env(name, default=None):
 DATA_DIR = Path(_env("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "kompass.db"
 PORT = int(_env("PORT", "8000"))
-APP_VERSION = "1.4.0"  # von Hand erhöhen
+APP_VERSION = "1.4.1"  # von Hand erhöhen
 APP_BUILD = _env("APP_BUILD", "entwicklung")[:7]  # von GitHub gesetzt
 APP_PASSWORD = _env("APP_PASSWORD", "")  # Pflicht, mindestens 16 Zeichen
 
@@ -38,10 +38,13 @@ WEB_SEARCH_USD = 0.01  # pro Websuche (Schätzung)
 FREE_PROVIDERS = {
     "gemini": {"label": "Gemini", "key": _env("GEMINI_API_KEY", ""),
                "base_url": _env("GEMINI_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai"),
-               "model": _env("GEMINI_MODEL", "gemini-3.8-flash"), "vision": True},
+               "model": _env("GEMINI_MODEL", "gemini-3.8-flash"), "vision": True, "tpm": 0,
+               "models": ["gemini-3.8-flash", "gemini-3.5-flash-lite"]},
     "groq": {"label": "Groq", "key": _env("GROQ_API_KEY", ""),
              "base_url": _env("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
-             "model": _env("GROQ_MODEL", "openai/gpt-oss-120b"), "vision": False},
+             "model": _env("GROQ_MODEL", "openai/gpt-oss-120b"), "vision": False,
+             # Gratis-Konto: ca. 8000 Tokens pro Minute (Frage + Antwort zusammen) – zu klein für ganze Reisepläne
+             "tpm": int(_env("GROQ_TPM", "8000")), "models": ["openai/gpt-oss-120b"]},
 }
 # Höchstens so viel USD pro 24 Stunden für KI-Aufrufe
 DAILY_BUDGET_USD = float(_env("DAILY_BUDGET_USD", "3"))

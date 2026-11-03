@@ -137,6 +137,47 @@ class FreeLLMTest(unittest.TestCase):
         row = store.recent_costs(1)[0]
         self.assertEqual((row["model"], row["usd"]), ("groq:openai/gpt-oss-120b", 0.0))
 
+    def test_minute_limit_waits_and_retries_same_provider(self):
+        body = ('[{"error":{"code":429,"message":"You exceeded your current quota.","status":"RESOURCE_EXHAUSTED",'
+                '"details":[{"violations":[{"quotaId":"GenerateRequestsPerMinutePerProjectPerModel-FreeTier"}]},'
+                '{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"2s"}]}}]')
+        SCRIPT["gemini"] = [(429, body), ok('{"title":"G","items":[]}')]
+        with mock.patch("time.sleep") as sl:
+            self.assertEqual(self.ask("reiseplan").title, "G")
+        self.assertEqual([s[0] for s in SEEN], ["gemini", "gemini"])  # nicht als Tageslimit missverstanden
+        sl.assert_called_once_with(3.0)
+
+    def test_daily_limit_gives_hint(self):
+        body = '{"error":{"message":"quota","details":[{"violations":[{"quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier"}]}]}}'
+        SCRIPT["gemini"] = [(429, body)]
+        SCRIPT["groq"] = [(429, '{"error":{"message":"Rate limit reached ... tokens per day (TPD)"}}')]
+        with self.assertRaises(llm.LLMError) as cm:
+            self.ask("zielvorschlaege")
+        self.assertIn("Gemini: Tageslimit erreicht", str(cm.exception))
+        self.assertIn("eigenen Schlüssel", str(cm.exception))
+
+    def test_model_without_free_quota(self):
+        SCRIPT["gemini"] = [(429, '{"error":{"message":"Quota exceeded for metric: free_tier_requests, limit: 0"}}')]
+        SCRIPT["groq"] = [ok('{"title":"H","items":[]}')]
+        self.assertEqual(self.ask("zielvorschlaege").title, "H")
+        self.assertEqual([s[0] for s in SEEN], ["gemini", "groq"])
+
+    def test_groq_skipped_for_too_large_task(self):
+        SCRIPT["gemini"] = [ok('{"title":"Gross","items":[]}')]
+        out = llm.ask("reiseplan", system="Test", content="Plan", schema=Answer, fake=lambda: None, max_tokens=32000)
+        self.assertEqual(out.title, "Gross")
+        SCRIPT["gemini"] = [(503, "{}"), (503, "{}")]
+        with mock.patch("time.sleep"):
+            with self.assertRaises(llm.LLMError) as cm:
+                llm.ask("reiseplan", system="Test", content="Plan", schema=Answer, fake=lambda: None, max_tokens=32000)
+        self.assertIn("Groq: Aufgabe zu gross", str(cm.exception))
+        self.assertNotIn("groq", [s[0] for s in SEEN])  # gar nicht erst angefragt
+
+    def test_groq_answer_budget_is_reduced(self):
+        SCRIPT["groq"] = [ok('{"title":"I","items":[]}')]
+        self.ask()  # klein: max_tokens 16000 → auf das Minutenkontingent gekürzt
+        self.assertLess(SEEN[0][1]["max_tokens"], 8000)
+
     def test_key_info_never_returns_key(self):
         info = store.key_info()
         self.assertEqual(info["groq"]["hint"], "5678")
