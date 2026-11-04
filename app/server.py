@@ -391,6 +391,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r"[A-Z]{3}", code):
                     raise BadRequest("Flughafen als 3-Buchstaben-Code (z. B. ZRH).")
                 allowed["home_airport"] = code
+            if "home_place" in body:
+                place = re.sub(r"\s+", " ", str(body["home_place"] or "")).strip()[:80]
+                if re.search(r"[<>{}\[\]]", place):
+                    raise BadRequest("Wohnort: bitte nur den Ortsnamen (z. B. Winterthur).")
+                allowed["home_place"] = place
             store.save_settings(allowed)
             return self._send(200, info())
         if p == "/api/keys":
