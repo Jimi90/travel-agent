@@ -58,6 +58,18 @@ class PhotoTest(unittest.TestCase):
 class DestinationPhotoTest(unittest.TestCase):
     """destination_photo: erst Wahrzeichen, dann Suche danach, erst zuletzt der Ortsname."""
 
+    def setUp(self):
+        # Commons nie wirklich fragen (und nie die Ablage anfassen) – ausser ein Test setzt es selbst
+        pc = mock.patch.object(photos, "commons_photo", return_value=None)
+        self.commons = pc.start()
+        self.addCleanup(pc.stop)
+
+    def test_commons_before_wikipedia_place_name(self):
+        self.commons.side_effect = [None, "pc"]
+        with mock.patch.object(photos, "wiki_photo", return_value="w") as w:
+            self.assertEqual(photos.destination_photo("", "Sal", "Kap Verde", []), "pc")
+        w.assert_not_called()
+
     def run_chain(self, title_hit, search_hits):
         calls = []
 
