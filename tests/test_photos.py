@@ -84,8 +84,18 @@ class DestinationPhotoTest(unittest.TestCase):
 
     def test_without_landmark_uses_place_name(self):
         with mock.patch.object(photos, "wiki_photo", return_value="p9") as w:
-            self.assertEqual(photos.destination_photo("", "Rom", ""), "p9")
-        w.assert_called_once_with("Rom", must_match="Rom")
+            self.assertEqual(photos.destination_photo("", "Venedig", ""), "p9")
+        w.assert_called_once_with("Venedig", must_match="Venedig")
+
+    def test_highlight_before_place_name(self):
+        with mock.patch.object(photos, "wiki_photo", side_effect=[None, "ph"]) as w:
+            self.assertEqual(photos.destination_photo("", "Sal", "Kap Verde", ["Strand", "Pedra de Lume"]), "ph")
+        self.assertEqual(w.call_args_list[1].kwargs["must_match"], "Pedra de Lume")
+
+    def test_short_place_name_gets_no_guess(self):
+        with mock.patch.object(photos, "wiki_photo", return_value="baum") as w:
+            self.assertIsNone(photos.destination_photo("", "Sal", "Kap Verde", []))
+        w.assert_not_called()
 
 
 if __name__ == "__main__":

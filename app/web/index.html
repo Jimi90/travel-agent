@@ -636,7 +636,7 @@ function renderIdeas(res) {
   $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Hin- und Rückreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
     res.ideas.map((i, n) => {
-      const cn = cname(i.country), reg = (i.region || "").trim();
+      const cn = i.country ? cname(i.country) : (i.country_name || "").trim(), reg = (i.region || "").trim();
       const where = [`${cflag(i.country)} ${esc(cn)}`.trim(), reg && ![i.name, cn].some(x => actKey(x) === actKey(reg)) ? esc(reg) : ""].filter(Boolean).join(" · ");
       const mode = i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug";
       const stops = (i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : "";
