@@ -196,6 +196,7 @@ details.vcost .costs{padding:0 16px 8px;margin-top:0}
 .strip figure{margin:0;flex:none;width:150px;scroll-snap-align:start}
 .strip img{width:150px;height:105px;border-radius:10px;object-fit:cover;display:block;background:var(--card2);cursor:zoom-in}
 .strip figcaption{font-size:12px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nophoto{margin-top:6px}.nophoto a{color:var(--accent);text-decoration:none}
 .hstrip{display:flex;gap:6px;overflow-x:auto;margin:8px 0 4px;scrollbar-width:none}
 .hstrip::-webkit-scrollbar{display:none}
 .hstrip img{width:96px;height:72px;border-radius:8px;object-fit:cover;flex:none;background:var(--card2);cursor:zoom-in}
@@ -811,7 +812,8 @@ function renderTrip(outcome) {
       return `<div class="opt ${o.chosen ? "on" : ""}" data-hotel="${esc(s.id)}:${i}">
       <span class="dotsel"></span><div class="grow"><div class="t" style="font-size:16px">${esc(o.name)}${o.tier ? `<span class="badge">${esc(TIER[o.tier] || o.tier)}</span>` : ""}</div>
       <div class="${o.live ? "live" : "s"}">${o.live ? "" : "ca. "}CHF ${Math.round(night)}/Nacht · CHF ${Math.round(total).toLocaleString("de-CH")}${rate}${o.area ? ` · ${esc(o.area)}` : ""}</div>
-      ${o.photos && o.photos.length ? `<div class="hstrip">${o.photos.slice(0, 3).map(id => photo(id, "", o.name)).join("")}</div>` : ""}
+      ${o.photos && o.photos.length ? `<div class="hstrip">${o.photos.slice(0, 3).map(id => photo(id, "", o.name)).join("")}</div>`
+        : `<div class="s nophoto">${o.searched ? "Keine Fotos gefunden · " : "Fotos werden gesucht … "}<a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(o.name + " " + s.place.name)}" target="_blank" rel="noopener noreferrer">Bilder ansehen ↗</a></div>`}
       ${o.chosen && o.why ? `<div class="s">${esc(o.why)}</div>` : ""}</div></div>`;
     }).join("");
   };
@@ -934,7 +936,8 @@ function renderTrip(outcome) {
     try { reTrip(await api(`/api/trips/${tid}/hotel-prices`, {stay_id: b.dataset.hprices})); toast("Preise aktualisiert"); }
     catch (err) { toast(err.message); b.disabled = false; b.textContent = "Preise aktualisieren"; }
   });
-  q("[data-hotel]").forEach(o => o.onclick = async () => {
+  q("[data-hotel]").forEach(o => o.onclick = async ev => {
+    if (ev.target.closest("a")) return; // Link «Bilder ansehen» wählt kein Hotel
     const [stay_id, i] = o.dataset.hotel.split(":");
     const r = await api(`/api/trips/${tid}/choose-hotel`, {stay_id, index: +i});
     reTrip(r); toast(r.outcome.status === "angewendet" ? "Hotel gewählt" : (r.outcome.problems[0] || "Nicht möglich"));

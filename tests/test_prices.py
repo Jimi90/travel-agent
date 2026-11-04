@@ -83,3 +83,13 @@ class FlightsLiveTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HotelPhotoRetryTest(unittest.TestCase):
+    def test_retry_only_for_old_results_without_photo(self):
+        from app import hotels
+        self.assertTrue(hotels.needs_photo_retry({"found": False, "photos": []}))
+        self.assertFalse(hotels.needs_photo_retry({"found": False, "photos": [], "v": hotels.PHOTO_FALLBACK_V}))
+        self.assertFalse(hotels.needs_photo_retry({"photos": ["a"]}))
+        self.assertFalse(hotels.needs_photo_retry({"error": "x", "photos": []}))
+        self.assertFalse(hotels.needs_photo_retry(None))

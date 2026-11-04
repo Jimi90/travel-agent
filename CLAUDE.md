@@ -114,13 +114,18 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (69 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (70 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.9.0)
+## Stand (04.11.2026, Version 1.9.1)
+- 1.9.1: James: nicht bei allen Hotels Bilder. Ursache: Fotos kamen nur, wenn Google Hotels (SerpApi) das Hotel mit
+  passendem Namen fand; sonst nur Wikipedia (selten). Jetzt Wikipedia dann Commons (`hotels._free_photos`); ältere
+  Ergebnisse ohne Foto werden einmal nur über die freien Quellen neu versucht (`retry_photos`, `PHOTO_FALLBACK_V` 2, kein
+  SerpApi-Verbrauch). Ohne Bild zeigt die Zeile «Keine Fotos gefunden · Bilder ansehen ↗» (Google-Bildersuche, öffnet extern,
+  wählt kein Hotel). Kleine Hotels haben oft weder Wikipedia- noch Commons-Bilder – dann bleibt der Link. 70 Tests.
 - 1.9.0: Wunsch James: für 2 Tage etwas in der Region (Shopping-Trip o. ä.), dafür muss die App den Standort kennen. Neu
   Einstellung «Wohnort» (Profil → Einstellungen, `settings.home_place`, freier Text, ≤ 80 Zeichen). `matching._home_place()`
   liest sie; bei Reisen ≤ 3 Tage bekommt die KI «Wohnort: …», soll Ziele in Region/Schweiz/Nachbarländern per Zug/Auto
