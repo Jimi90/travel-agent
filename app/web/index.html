@@ -87,6 +87,14 @@ details{position:relative}
 .star{border:0;background:none;font-size:22px;color:var(--warn);cursor:pointer;padding:4px}
 .idea .s b{color:var(--text);font-weight:600}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:6px;vertical-align:1px}
+.fx input{font-size:28px;font-weight:600;font-variant-numeric:tabular-nums;padding:12px}
+.fxsel{display:grid;grid-template-columns:1fr auto;gap:0 8px;align-items:center}
+.fxsel label.f{padding:6px 0;grid-column:1}
+.fxswap{grid-column:2;grid-row:1 / span 2;font-size:20px;padding:10px 12px;align-self:center;margin-top:18px}
+.fxout{font-size:32px;font-weight:700;letter-spacing:-.5px;margin:10px 0 2px;font-variant-numeric:tabular-nums;word-break:break-word}
+#fxCard label.f.fx{padding:0 0 4px}
+#fxMsg:empty{display:none}
+.hint a{color:var(--accent)}
 img.prev{max-width:100%;max-height:260px;border-radius:10px;display:block;margin:10px auto 0}
 /* untere Leiste */
 #tabbar{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line);padding:6px 4px calc(env(safe-area-inset-bottom) + 6px);display:flex;z-index:20}
@@ -191,18 +199,20 @@ textarea.bare:focus{border:0}
 <!-- ============ HELFER ============ -->
 <main id="v-help" class="view" hidden>
   <h1>Helfer</h1>
-  <p class="sub">Für unterwegs: Fotos übersetzen und Nachrichten entwerfen.</p>
-  <h2>Speisekarte &amp; Schilder</h2>
-  <div class="card pad">
-    <div class="t">Foto aufnehmen oder wählen</div>
-    <div class="s">Kompass liest den Text, übersetzt ihn und erklärt Gerichte – bei Schwangerschaft mit Hinweisen.</div>
-    <input type="file" id="photo" accept="image/*" capture="environment" style="margin-top:12px">
-    <img id="photoPrev" class="prev" alt="" hidden>
-    <input type="text" id="photoQ" placeholder="Frage dazu (optional), z. B. «Was ist vegetarisch?»" style="margin-top:10px" maxlength="300">
-    <button class="btn" id="photoGo" disabled>Übersetzen</button>
-    <div class="msg" id="photoMsg"></div>
+  <p class="sub">Für unterwegs: Währungen umrechnen und Nachrichten entwerfen.</p>
+  <h2>Währungsrechner</h2>
+  <div class="card pad" id="fxCard">
+    <label class="f fx"><span>Betrag</span><input type="text" id="fxAmt" inputmode="decimal" autocomplete="off" placeholder="0" maxlength="18"></label>
+    <div class="fxsel">
+      <label class="f"><span>Von</span><select id="fxFrom" aria-label="Von Währung"></select></label>
+      <button class="small fxswap" id="fxSwap" aria-label="Währungen tauschen">⇅</button>
+      <label class="f"><span>Nach</span><select id="fxTo" aria-label="Nach Währung"></select></label>
+    </div>
+    <div class="fxout" id="fxOut" aria-live="polite"></div>
+    <div class="s" id="fxRate"></div>
+    <div class="msg" id="fxMsg"></div>
   </div>
-  <div id="visionOut"></div>
+  <p class="hint" id="fxSrc"></p>
 
   <h2>Nachricht entwerfen</h2>
   <div class="card">
@@ -284,7 +294,7 @@ textarea.bare:focus{border:0}
 <nav id="tabbar">
   <button data-view="v-trips" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Reisen</button>
   <button data-view="v-today"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>Unterwegs<span class="cnt" id="unread" hidden></span></button>
-  <button data-view="v-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h3l2-3h6l2 3h3v12H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Helfer</button>
+  <button data-view="v-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.8 9.2c-.5-.9-1.5-1.4-2.8-1.4-1.6 0-2.7.8-2.7 2 0 2.9 5.6 1.4 5.6 4.2 0 1.2-1.2 2-2.9 2-1.4 0-2.5-.6-3-1.6M12 6.2v1.6M12 16.2v1.6"/></svg>Helfer</button>
   <button data-view="v-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.6"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M14.5 14.3c.6-.2 1.3-.3 2-.3 2.4 0 4 1.5 4.5 4"/></svg>Profil</button>
 </nav>
 
@@ -363,6 +373,7 @@ function show(view) {
   if (view === "v-trips") loadTrips();
   if (view === "v-today") loadToday();
   if (view === "v-profile") loadProfile();
+  if (view === "v-help") fxLoad();
 }
 document.querySelectorAll("#tabbar button").forEach(b => b.onclick = () => show(b.dataset.view));
 
@@ -901,30 +912,69 @@ async function loadToday() {
 }
 $("markRead").onclick = async () => { await api("/api/notices/read", {}); await loadInfo(); loadToday(); };
 
-// ---------- Helfer: Foto ----------
-let PHOTO = null;
-$("photo").onchange = async () => {
-  const f = $("photo").files[0]; if (!f) return;
-  msg($("photoMsg"), "");
+// ---------- Helfer: Währungsrechner ----------
+const FX_TOP = ["CHF", "EUR", "USD", "GBP", "THB", "VND", "AED", "QAR", "JPY", "TRY", "IDR", "MYR", "SGD", "CZK", "PLN", "HUF", "SEK", "NOK", "DKK", "AUD", "CAD", "MXN", "ZAR", "MAD", "EGP", "INR", "CNY", "KRW", "ISK", "HRK"];
+let FX = null, FX_AT = 0, FX_NAMES = null;
+function fxName(c) {
+  try { FX_NAMES = FX_NAMES || new Intl.DisplayNames(["de-CH", "de"], {type: "currency"}); return FX_NAMES.of(c) || c; } catch { return c; }
+}
+function fxPrefs() { try { return JSON.parse(localStorage.getItem("fx") || "null") || {}; } catch { return {}; } }
+function fxSave() { try { localStorage.setItem("fx", JSON.stringify({from: $("fxFrom").value, to: $("fxTo").value})); } catch {} }
+function fxParse(t) {   // «1'250.50», «1 250,50», «12,5» → Zahl
+  let x = String(t).replace(/[\s'’]/g, "");
+  if (!x) return null;
+  const c = x.lastIndexOf(","), d = x.lastIndexOf(".");
+  if (c >= 0 && d >= 0) x = c > d ? x.replace(/\./g, "").replace(",", ".") : x.replace(/,/g, "");
+  else if (c >= 0) x = x.replace(",", ".");
+  if (!/^\d*\.?\d*$/.test(x) || x === "" || x === ".") return null;
+  const n = parseFloat(x);
+  return Number.isFinite(n) ? n : null;
+}
+function fxMoney(n, cur) {
+  try { return new Intl.NumberFormat("de-CH", {style: "currency", currency: cur}).format(n); }
+  catch { return n.toLocaleString("de-CH", {maximumFractionDigits: 2}) + " " + cur; }
+}
+function fxRateTxt(a, b) {   // «1 EUR = 0.93 CHF»
+  const r = FX.rates[b] / FX.rates[a];
+  return `1 ${a} = ${r.toLocaleString("de-CH", {maximumSignificantDigits: 4})} ${b}`;
+}
+function fxFill() {
+  const codes = Object.keys(FX.rates), pref = fxPrefs();
+  const top = FX_TOP.filter(c => FX.rates[c]);
+  const rest = codes.filter(c => !top.includes(c)).sort((x, y) => fxName(x).localeCompare(fxName(y), "de"));
+  const opts = c => `<option value="${esc(c)}">${esc(c)} – ${esc(fxName(c))}</option>`;
+  const html = `<optgroup label="Häufig">${top.map(opts).join("")}</optgroup><optgroup label="Alle">${rest.map(opts).join("")}</optgroup>`;
+  const f = $("fxFrom").value, t = $("fxTo").value;
+  $("fxFrom").innerHTML = html; $("fxTo").innerHTML = html;
+  const pick = (v, d) => FX.rates[v] ? v : d;
+  $("fxFrom").value = pick(f || pref.from, "EUR");
+  $("fxTo").value = pick(t || pref.to, "CHF");
+}
+function fxCalc() {
+  if (!FX) return;
+  const a = $("fxFrom").value, b = $("fxTo").value, n = fxParse($("fxAmt").value);
+  if (!$("fxAmt").value.trim()) { $("fxOut").textContent = ""; $("fxRate").textContent = ""; msg($("fxMsg"), ""); return; }
+  if (n === null) { $("fxOut").textContent = ""; $("fxRate").textContent = ""; msg($("fxMsg"), "Bitte eine Zahl eingeben.", "err"); return; }
+  msg($("fxMsg"), "");
+  $("fxOut").textContent = fxMoney(n / FX.rates[a] * FX.rates[b], b);
+  $("fxRate").textContent = `${fxRateTxt(a, b)} · ${fxRateTxt(b, a)}`;
+}
+async function fxLoad() {
+  if (FX && Date.now() - FX_AT < 3600e3) return;
   try {
-    const url = await shrink(f, 1600);
-    PHOTO = url.split(",")[1];
-    $("photoPrev").src = url; $("photoPrev").hidden = false; $("photoGo").disabled = false;
-  } catch { msg($("photoMsg"), "Das Bild konnte nicht gelesen werden.", "err"); }
-};
-$("photoGo").onclick = async () => {
-  const b = $("photoGo"); b.disabled = true; msg($("photoMsg"), `<span class="spin"></span>Lese und übersetze …`);
-  try {
-    const r = (await api("/api/vision", {image: PHOTO, media_type: "image/jpeg", question: $("photoQ").value})).result;
-    msg($("photoMsg"), "");
-    $("visionOut").innerHTML = `<h2>${esc(r.title || "Übersetzung")} <span class="r chip">${esc(r.language)}</span></h2><div class="card">` +
-      r.items.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.translation)}${i.price ? ` <span class="chip">${esc(i.price)}</span>` : ""}</div>
-        <div class="s"><i>${esc(i.original)}</i></div>${i.explanation ? `<div class="s">${esc(i.explanation)}</div>` : ""}
-        ${i.warnings.map(w => `<div class="s warnt">⚠︎ ${esc(w)}</div>`).join("")}</div></div>`).join("") +
-      `</div>${r.summary ? `<p class="hint">${esc(r.summary)}</p>` : ""}`;
-  } catch (e) { msg($("photoMsg"), esc(e.message), "err"); }
-  b.disabled = false;
-};
+    const r = await api("/api/fx");
+    const first = !FX; FX = r; FX_AT = Date.now();
+    if (first || !$("fxFrom").options.length) fxFill();
+    const d = new Date(r.updated);
+    const when = isNaN(d) ? "" : d.toLocaleDateString("de-CH", {day: "numeric", month: "long", year: "numeric"});
+    $("fxSrc").innerHTML = `Richtwert, nicht der Kurs deiner Bank oder Karte. Kurse vom ${esc(when)} · <a href="${esc(r.attribution_url)}" target="_blank" rel="noopener noreferrer">Rates By Exchange Rate API</a>` +
+      (r.stale ? `<br><span class="warnt">Kursdienst gerade nicht erreichbar – es gelten die zuletzt gespeicherten Kurse.</span>` : "");
+    fxCalc();
+  } catch (e) { if (!FX) msg($("fxMsg"), esc(e.message), "err"); }
+}
+$("fxAmt").oninput = fxCalc;
+$("fxFrom").onchange = $("fxTo").onchange = () => { fxSave(); fxCalc(); };
+$("fxSwap").onclick = () => { const f = $("fxFrom").value; $("fxFrom").value = $("fxTo").value; $("fxTo").value = f; fxSave(); fxCalc(); };
 
 // ---------- Helfer: Entwurf ----------
 $("dGo").onclick = async () => {
@@ -1129,7 +1179,7 @@ const PAGES = {
     title: "Schwangerschaft",
     html: () => { const pr = HH.constraints.pregnancy; return `<div class="card">${rSw("Schwanger", "cPreg", !!pr)}
       ${pr ? `<label class="row"><div class="grow t">Geburtstermin</div><input class="inl" type="date" id="cDue" value="${esc(pr.due_date)}" style="max-width:160px"></label>` : ""}</div>
-      <p class="hint">Kompass plant dann automatisch: keine Sauna oder Hitzebäder, kein Tauchen, keine grossen Höhen, höchstens mittel anstrengend, Pausen und kurze Wege. Bei Speisekarten gibt es Hinweise. Das sind Vorgaben, keine medizinische Beratung – bitte mit Ärztin oder Hebamme abstimmen.</p>`; },
+      <p class="hint">Kompass plant dann automatisch: keine Sauna oder Hitzebäder, kein Tauchen, keine grossen Höhen, höchstens mittel anstrengend, Pausen und kurze Wege. Das sind Vorgaben, keine medizinische Beratung – bitte mit Ärztin oder Hebamme abstimmen.</p>`; },
     bind: () => {
       $("cPreg").onchange = e => {
         if (e.target.checked) { const d = new Date(); d.setDate(d.getDate() + 180); HH.constraints.pregnancy = {due_date: d.toISOString().slice(0, 10)}; }

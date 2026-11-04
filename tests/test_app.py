@@ -275,6 +275,13 @@ class AppTest(unittest.TestCase):
         self.assertTrue(d["ok"])
         self.assertEqual(service.sm().get(tid).end_date, before.end_date)
 
+        # --- Währungsrechner (Testkurse)
+        code, r = self.call("GET", "/api/fx")
+        self.assertEqual(code, 200, r)
+        self.assertEqual((r["base"], r["rates"]["CHF"], r["stale"]), ("CHF", 1.0, False))
+        self.assertIn("VND", r["rates"])
+        self.assertEqual(self.call("GET", "/api/fx", auth=False)[0], 401)
+
         # --- Bild übersetzen (mit Schwangerschafts-Hinweisen)
         code, v = self.call("POST", "/api/vision", {"image": PNG, "media_type": "image/png"})
         self.assertEqual(code, 200, v)

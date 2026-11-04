@@ -98,7 +98,8 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Seit 1.6.0: KI nennt pro Programmpunkt `wikipedia` (→ `Activity.wiki`, Foto per Titel mit Weiterleitungen), Suche prüft
   ALLE Treffer (vorher nur den ersten – meist der Stadtartikel → kein Bild), dann «Titel» ohne Ort. Tagesplan: Bildleiste
   je Tag (`.strip`), Foto antippen = Grossansicht (`#lightbox`, Klick-Abfang in der Capture-Phase, damit kein Hotel gewählt wird).
-- `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
+- `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise; seit 1.7.3 nicht mehr in der Oberfläche), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
+- `app/fx.py` (1.7.3) Währungskurse für den Helfer-Rechner, siehe «Stand».
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
   Tag Wettercheck, Event-ID `wetter:<reise>:<datum>`; setzt Status unterwegs/abgeschlossen).
@@ -112,13 +113,21 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (41 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (46 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.2)
+## Stand (04.11.2026, Version 1.7.3)
+- 1.7.3: Wunsch James: im Helfer ersetzt ein **Währungsrechner** den Block «Speisekarte & Schilder» (Betrag, Von/Nach,
+  Tauschen, merkt die letzte Wahl im Browser). Kurse: `app/fx.py` holt `open.er-api.com/v6/latest/CHF` (gratis, ohne
+  Schlüssel, 1× täglich neu, ~160 Währungen inkl. VND/THB/AED/QAR), 6 Std. im Speicher, dauerhaft in kv «fx» → ohne Netz
+  gelten die zuletzt gespeicherten Kurse mit Hinweis; `GET /api/fx`. Quellenhinweis «Rates By Exchange Rate API» (Pflicht
+  der Nutzungsbedingungen) steht unter dem Rechner – nicht entfernen. Tab-Symbol Helfer: Münze statt Kamera.
+  `/api/vision` + `app/vision.py` + Tests bleiben im Code (nur aus der Oberfläche entfernt), `shrink()` wird vom
+  Buchungsimport weiter gebraucht. Im Testmodus bei 390 px hell/dunkel geprüft (46 Tests); echte Kurse vom Dienst nur auf
+  dem NAS prüfbar (open.er-api.com aus der Cloud gesperrt).
 - 1.7.2: Texte «Anreise» → «Hin- und Rückreise» (Formular, Vorschläge, Varianten, Begründungen, Budget-Seite).
 - 1.7.1: Budget = vor Ort pro Tag × Tage + Anreisebudget pro Reise, gewählt im Formular «Neue Reise» mit Vorschlag je
   Dauer (James: «nicht 600.– Anreise für ein Weekend», «gehört zur Suche, nicht in die Einstellungen»).

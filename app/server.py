@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, bookings, config, drafting, hotels, llm, photos, prices, service, store, tiles, vision
+from . import auth, bookings, config, drafting, fx, hotels, llm, photos, prices, service, store, tiles, vision
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -273,6 +273,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, j) if j else self._send(404, {"error": "Auftrag unbekannt (Neustart?)"})
         if p == "/api/notices":
             return self._send(200, {"notices": store.notices()})
+        if p == "/api/fx":
+            try:
+                return self._send(200, fx.get())
+            except fx.FxError as e:
+                return self._send(502, {"error": f"{e}. Es sind noch keine Kurse gespeichert."})
         if p == "/api/costs":
             return self._send(200, {"recent": store.recent_costs(), "spent_24h": store.spent_since(24),
                                     "spent_30d": store.spent_since(24 * 30)})
