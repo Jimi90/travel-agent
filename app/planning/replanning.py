@@ -252,7 +252,7 @@ class AutonomousRePlanningModule:
             yield day.date, *slot
 
     def _budget_left(self, work: Itinerary) -> Decimal | None:
-        cap = self.household.constraints.budget_total_max
+        cap = self.household.constraints.budget_for((work.end_date - work.start_date).days + 1)
         return None if cap is None else cap - work.total_cost()
 
     @staticmethod

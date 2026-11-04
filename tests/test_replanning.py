@@ -117,6 +117,19 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(household().harmonized(C.WANDERN), 1.5)
         self.assertEqual(PregnancyStatus(due_date=date(2026, 9, 20)).week_on(D5), 20)
 
+    def test_budget_and_reach_depend_on_days(self):
+        from app.planning.matching import match, reach_for
+        k = TravelConstraints(budget_total_max=Decimal("6000"), budget_per_day_max=Decimal("300"), max_flight_hours=12)
+        self.assertEqual(k.budget_for(3), Decimal("900"))
+        self.assertEqual(k.budget_for(30), Decimal("6000"))           # Budget pro Reise bleibt Obergrenze
+        self.assertEqual(TravelConstraints(budget_total_max=Decimal("2000")).budget_for(3), Decimal("2000"))
+        self.assertIsNone(TravelConstraints().budget_for(5))
+        short, long = reach_for(3, k), reach_for(21, k)
+        self.assertEqual((short.flight_hours, short.stops, short.ground_hours, short.max_bases), (2.0, 0, 5.0, 1))
+        self.assertEqual(long.flight_hours, 12)                        # Profil-Grenze gilt bei langen Reisen
+        self.assertEqual(reach_for(5, TravelConstraints(max_flight_hours=3)).flight_hours, 3)  # strengere gewinnt
+        self.assertIn("Kurztrip", match(household(), D5, 3).prompt_text())
+
     def test_hourly_window(self):
         fc = WeatherForecast(date=D5, place=LIS, precip_mm=8, hourly=[
             HourlyWeather(time=time(h), precip_mm=0 if h < 14 else 3) for h in range(6, 23)])
