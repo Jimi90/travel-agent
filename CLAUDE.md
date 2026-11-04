@@ -120,7 +120,9 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.8.2)
+## Stand (04.11.2026, Version 1.8.3)
+- 1.8.3: James: Bildschirm zoomt beim schnellen Tippen auf «+» (Tage). Ursache: iOS-Doppeltipp-Zoom. `touch-action:
+  manipulation` auf html und allen Bedienelementen (Pinch-Zoom bleibt möglich). Zoom-Verhalten nur auf dem iPhone prüfbar.
 - 1.8.2: James: im Tagesplan fehlten Fotos oft (Sharm el Sheikh Tag 3–7). `activity_photo` versucht zuletzt Commons
   (`commons_photo(Titel Ort)`), die Tageszeile zeigt sonst das Ortsfoto (`photos.places`), `PHOTO_VERSION` 3 → leere
   Zuordnungen älterer Reisen werden neu geholt (Hotelfotos bleiben). 66 Tests; echte Treffer nur auf dem NAS prüfbar.
