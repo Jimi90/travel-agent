@@ -113,13 +113,20 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (54 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (60 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.5)
+## Stand (04.11.2026, Version 1.7.6)
+- 1.7.6: James: «Das stimmt ja jetzt gar nicht mehr» – Karten zeigten falsche Länder/Flaggen (Cancún «Montenegro», Dakar
+  «Schweden»), ein besuchtes Land wurde trotzdem vorgeschlagen, Sal zeigte einen Baum. Ursache: `country[:2]` kürzte den
+  von der KI gelieferten Landesnamen («MEXICO» → «ME»). Jetzt `destinations.resolve_country`: KI liefert `country` (ISO)
+  + `country_name` (Deutsch); Code gleicht mit der Open-Meteo-Ortssuche ab (Ort, Landesname), bei Widerspruch gewinnt der
+  Landesname, sonst leer (dann keine Flagge). Der Besucht-Filter nutzt den geprüften Code. Anzeige: Landesname aus dem
+  Code (`Intl.DisplayNames`). Fotos: Wahrzeichen → Suche → Highlights → Ortsname nur bei ≥ 5 Buchstaben (kein «Sal»-Baum).
+  60 Tests; echte KI-/Ortssuche-Antworten nur auf dem NAS prüfbar.
 - 1.7.5: Wunsch James: Routen-Varianten waren «zu klein, zu viel, nicht strukturiert». Jetzt je Route eine Karte: grosse
   Karte oben (250 px, Nummern = Liste), Name + Preis («für 2 Personen»), ein Satz, **nummerierte Orte** mit Nächten und
   kurzer Notiz (`Stop.note`), Kacheln Wetter/Meer/Strecke aus `Variant`-`facts` (statt Text in `bullets`), höchstens 3

@@ -196,7 +196,7 @@ def wiki_title_photo(title: str) -> str | None:
     return pid
 
 
-def destination_photo(landmark: str, name: str, region: str = "") -> str | None:
+def destination_photo(landmark: str, name: str, region: str = "", highlights=()) -> str | None:
     """Ikonisches Bild eines Reiseziels: Wahrzeichen/Landschaft (Wikipedia-Titel der KI) → Suche danach →
     erst zuletzt der Ortsname (dessen Artikel zeigt oft nur ein Siegel oder eine Karte)."""
     landmark, name = (landmark or "").strip(), (name or "").split("(")[0].strip()
@@ -204,6 +204,14 @@ def destination_photo(landmark: str, name: str, region: str = "") -> str | None:
         pid = wiki_title_photo(landmark) or wiki_photo(landmark, must_match=landmark)
         if pid:
             return pid
+    for h in list(highlights or [])[:3]:  # Highlights («Vulkan Poás») sind meist echte Wahrzeichen
+        h = (h or "").strip()
+        if len(h) >= 5:
+            pid = wiki_photo(f"{h} {name}".strip(), must_match=h)
+            if pid:
+                return pid
+    if len(name) < 5:  # «Sal», «Rom»: der Ortsname trifft zu oft andere Artikel (Baum, Siegel)
+        return None
     return wiki_photo(f"{name} {region}".strip(), must_match=name)
 
 

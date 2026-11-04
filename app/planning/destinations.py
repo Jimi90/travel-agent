@@ -11,15 +11,19 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .. import llm, photos, weather
+from .. import config, llm, photos, weather
 from ..models import Household
 from ..models.common import new_id
 from .matching import climate_score, match
 
 
+ISO_CODES = frozenset("AD AE AF AG AI AL AM AO AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK HN HR HT HU ID IE IL IM IN IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW".split())
+
+
 class DestinationIdea(BaseModel):
     name: str
-    country: str  # ISO-3166 Alpha-2
+    country: str  # ISO-3166 Alpha-2, z. B. «PT» (nicht der Landesname)
+    country_name: str = ""  # Landesname auf Deutsch, z. B. «Portugal»
     region: str  # Region/Provinz/Insel, z. B. «Algarve», «Toskana», «Gran Canaria»
     landmark_wiki: str = ""  # Wikipedia-Titel eines ikonischen Wahrzeichens/einer Landschaft – das Bild der Karte
     lat: float
@@ -44,10 +48,38 @@ zu BEIDEN passt. Wähle die sinnvollste Anreise (Flug, Zug oder Auto) und schät
 die übliche Zahl Umstiege, und die Gesamtkosten für zwei Personen für genau diese Reisedauer (Anreise, Unterkunft,
 Aktivitäten) in CHF ehrlich. Bei kurzen Reisen nahe Ziele – auch in der Schweiz und den Nachbarländern.
 Halte dich strikt an alle Randbedingungen, besonders an die Reichweite.
-Pro Ziel: «region» = Region, Provinz oder Insel (z. B. «Algarve», «Toskana»), «highlights» = 3 bis 4 kurze, konkrete
+Pro Ziel: «country» = genau der zweibuchstabige ISO-Code des Landes (Mexiko = «MX», Senegal = «SN», Kap Verde = «CV»),
+«country_name» = Landesname auf Deutsch, «region» = Region, Provinz oder Insel (z. B. «Algarve», «Toskana»), «highlights» = 3 bis 4 kurze, konkrete
 Stichworte (je höchstens 3 Wörter, z. B. «Vulkan Poás», «Altstadt Alfama»), «landmark_wiki» = Titel des Wikipedia-Artikels
 eines weltbekannten Wahrzeichens oder einer ikonischen Landschaft dieses Ziels, die man auf einem Foto sofort dem Ziel
 zuordnet (z. B. «Torre de Belém», «Vulkan Arenal»). NICHT der Artikel über die Stadt oder das Land, kein Wappen, keine Flagge."""
+
+
+def resolve_country(idea: DestinationIdea) -> str:
+    """ISO-Code des Landes. Die KI liefert oft den Landesnamen statt des Codes («Mexiko» → «ME» = Montenegro);
+    deshalb gegen die Ortssuche (Ort und Landesname) abgleichen. Leer, wenn nichts sicher ist."""
+    raw = idea.country.strip().upper()
+    iso = raw if raw in ISO_CODES else ""
+
+    def code_of(q: str) -> str:
+        q = (q or "").split("(")[0].strip()
+        if not q:
+            return ""
+        try:
+            return weather.geocode(q).country.upper()
+        except Exception:  # Netz, nicht gefunden
+            return ""
+
+    if config.FAKE_MODE:
+        return iso
+    by_place = code_of(idea.name)
+    by_name = code_of(idea.country_name or (idea.country if not iso else ""))
+    if iso and iso in (by_place, by_name):
+        return iso
+    if by_name and by_name == by_place:
+        return by_name
+    # KI-Code und Ortssuche widersprechen sich: der Landesname ist verlässlicher als ein abgeschnittener Code
+    return by_name or iso or by_place
 
 
 def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, travel_budget=None) -> dict:
@@ -61,8 +93,8 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
                   fake=lambda: _fake(h), max_tokens=8000)
     out, dropped = [], []
     for idea in res.ideas:
-        cc = idea.country.strip().upper()[:2]
-        if cc in m.excluded_countries:
+        cc = resolve_country(idea)
+        if cc and cc in m.excluded_countries:
             dropped.append(f"{idea.name}: Land schon besucht")
             continue
         r = m.reach
@@ -81,14 +113,14 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
             dropped.append(f"{idea.name}: Hin- und Rückreise ca. CHF {idea.travel_cost_chf} – über dem Budget dafür "
                            f"(CHF {m.travel_budget:.0f})")
             continue
-        item = {**idea.model_dump(), "country": cc, "id": new_id(),
+        item = {**idea.model_dump(), "country": cc, "country_name": idea.country_name.strip(), "id": new_id(),
                 "typical_flight_hours": idea.travel_hours}  # (alter Feldname für ältere Anzeige)
         try:
             clim = weather.climate(idea.lat, idea.lon, start, days)
             item["climate_score"], item["climate_text"] = climate_score(m, clim)
         except weather.WeatherError as e:
             item["climate_score"], item["climate_text"] = None, f"Klimadaten nicht verfügbar ({e})"
-        item["photo"] = photos.destination_photo(idea.landmark_wiki, idea.name, idea.region)
+        item["photo"] = photos.destination_photo(idea.landmark_wiki, idea.name, idea.region, idea.highlights)
         if m.budget_total and idea.est_total_chf > float(m.budget_total):
             item["warning"] = f"Geschätzt {idea.est_total_chf} CHF – über dem Budget"
         out.append(item)
@@ -110,7 +142,7 @@ def _fake(h: Household) -> DestinationList:
             ("Doha", "QA", "Doha", "Museum of Islamic Art, Doha", 25.29, 51.53, "flug", 6.5, 0, 900),
             ("Colmar", "FR", "Elsass", "Petite Venise (Colmar)", 48.08, 7.36, "auto", 1.8, 0, 90)]
     return DestinationList(ideas=[DestinationIdea(
-        name=n, country=c, region=rg, landmark_wiki=lm, lat=la, lon=lo,
+        name=n, country=c, country_name=c, region=rg, landmark_wiki=lm, lat=la, lon=lo,
         why=f"Testvorschlag {n}: mildes Klima, gute Mischung.",
         highlights=["Altstadt", "Küste", "Essen"], travel_mode=mode, travel_hours=hrs, typical_stops=st,
         travel_cost_chf=tc, cost_level="mittel", est_total_chf=1500 + i * 300)
