@@ -136,6 +136,12 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
         if m.budget_total and idea.est_total_chf > float(m.budget_total):
             item["warning"] = f"Geschätzt {idea.est_total_chf} CHF – über dem Budget"
         out.append(item)
+    if m.budget_total:  # Budget hart: deutlich teurere Ziele fliegen raus (10 % Spielraum), ausser nichts bleibt übrig
+        limit = float(m.budget_total) * 1.10
+        fits = [i for i in out if i["est_total_chf"] <= limit]
+        if fits:
+            dropped += [f"{i['name']}: ca. CHF {i['est_total_chf']} – über dem Budget" for i in out if i not in fits]
+            out = fits
     # zuerst, was ins Budget passt, dann nach Klima
     out.sort(key=lambda x: (bool(x.get("warning")), -(x["climate_score"] if x["climate_score"] is not None else 5)))
     return {"start": start.isoformat(), "days": days, "wish": wish, "ideas": out[:6], "dropped": dropped,
