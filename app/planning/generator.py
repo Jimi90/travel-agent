@@ -325,7 +325,8 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
     budget = k.budget_for(days, travel_budget)
     travel_cost = sum((t.cost for t in itin.transports), Decimal("0"))
     if travel_budget and travel_cost > travel_budget:
-        notes.append(f"Anreise und Verbindungen ca. {travel_cost:.0f} CHF – über dem Anreisebudget ({travel_budget:.0f} CHF)")
+        notes.append(f"Hin- und Rückreise und Verbindungen ca. {travel_cost:.0f} CHF – über dem Budget dafür "
+                     f"({travel_budget:.0f} CHF)")
     if budget and itin.total_cost() > budget:
         notes.append(f"Geschätzte Kosten {itin.total_cost():.0f} CHF liegen über dem Budget für {days} Tage "
                      f"({budget:.0f} CHF)")

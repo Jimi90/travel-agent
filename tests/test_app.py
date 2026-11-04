@@ -104,7 +104,7 @@ class AppTest(unittest.TestCase):
         self.assertNotIn("Rom", names)
         self.assertNotIn("Kreta (Chania)", names)
         self.assertEqual(len(j["result"]["dropped"]), 4)
-        self.assertIn("Madeira (Funchal): Anreise ca. CHF 520 – über dem Anreisebudget (CHF 400)", j["result"]["dropped"])
+        self.assertIn("Madeira (Funchal): Hin- und Rückreise ca. CHF 520 – über dem Budget dafür (CHF 400)", j["result"]["dropped"])
         self.assertNotIn("Doha", names)                           # 6.5 Std. Flug – zu weit für 6 Tage
         self.assertIn("Kurzurlaub (6 Tage)", j["result"]["reach"])
 
@@ -113,7 +113,7 @@ class AppTest(unittest.TestCase):
         j3 = self.wait_job(r["job"])
         near = sorted(i["name"] for i in j3["result"]["ideas"])
         self.assertEqual(near, ["Colmar", "Lyon"], j3["result"]["dropped"])
-        self.assertIn("Valencia: Anreise ca. CHF 260 – über dem Anreisebudget (CHF 200)", j3["result"]["dropped"])
+        self.assertIn("Valencia: Hin- und Rückreise ca. CHF 260 – über dem Budget dafür (CHF 200)", j3["result"]["dropped"])
         self.assertEqual(j3["result"]["travel_budget"], 200.0)
         # eigenes Anreisebudget im Formular: CHF 300 → Valencia (Anreise ca. 260) bleibt
         code, r = self.call("POST", "/api/destinations", {"start": start.isoformat(), "days": 3, "wish": "",

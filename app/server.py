@@ -60,7 +60,7 @@ def _travel(body: dict):
     v = body.get("travel_budget")
     if v in (None, ""):
         return None
-    return Decimal(_int(v, 0, 50_000, "Anreise"))
+    return Decimal(_int(v, 0, 50_000, "Hin- und Rückreise"))
 
 
 def _text(v, maxlen: int) -> str:
