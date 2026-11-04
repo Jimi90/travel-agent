@@ -103,7 +103,8 @@ class AppTest(unittest.TestCase):
         names = [i["name"] for i in j["result"]["ideas"]]
         self.assertNotIn("Rom", names)
         self.assertNotIn("Kreta (Chania)", names)
-        self.assertEqual(len(j["result"]["dropped"]), 3)
+        self.assertEqual(len(j["result"]["dropped"]), 4)
+        self.assertIn("Madeira (Funchal): Anreise ca. CHF 520 – über dem Anreisebudget (CHF 400)", j["result"]["dropped"])
         self.assertNotIn("Doha", names)                           # 6.5 Std. Flug – zu weit für 6 Tage
         self.assertIn("Kurzurlaub (6 Tage)", j["result"]["reach"])
 
@@ -111,7 +112,9 @@ class AppTest(unittest.TestCase):
         code, r = self.call("POST", "/api/destinations", {"start": start.isoformat(), "days": 3, "wish": ""})
         j3 = self.wait_job(r["job"])
         near = sorted(i["name"] for i in j3["result"]["ideas"])
-        self.assertEqual(near, ["Colmar", "Lyon", "Valencia"], j3["result"]["dropped"])
+        self.assertEqual(near, ["Colmar", "Lyon"], j3["result"]["dropped"])
+        self.assertIn("Valencia: Anreise ca. CHF 260 – über dem Anreisebudget (CHF 200)", j3["result"]["dropped"])
+        self.assertEqual(j3["result"]["travel_budget"], 200.0)
         self.assertTrue(any("Lissabon: 2.8 Std. Flug – zu weit für 3 Tage" == d for d in j3["result"]["dropped"]))
         self.assertIsNotNone(j["result"]["ideas"][0]["climate_score"])
         self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))

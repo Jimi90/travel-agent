@@ -33,8 +33,11 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Seit 1.7.0 Reichweite nach Reisedauer (`matching.reach_for`, `REACH_TABLE`; James: «2–3 Tage: max. 2 Std. Flug oder
   5 Std. Auto»): ≤3 Tage 2 Std. Flug direkt / 5 Std. Zug-Auto / 1 Ort, ≤6: 4 Std./1 Umstieg/7 Std./2 Orte, ≤13: 9 Std./3 Orte,
   länger: Profil-Grenze; strengere Profil-Grenzen gelten immer. Ideen haben `travel_mode` (flug|zug|auto) + `travel_hours`,
-  gefiltert im Code. Budget: `TravelConstraints.budget_per_day_max` × Tage, höchstens `budget_total_max` (`budget_for(days)`),
-  überall verwendet (Matching, Plausibilität, Umplanung, Ausfall, finaler Vorschlag). Ideen im Budget zuerst.
+  gefiltert im Code. Budget (seit 1.7.1, Wunsch James): `budget_per_day_max` = **vor Ort** pro Tag (Unterkunft, Essen,
+  Programm) × Tage + `travel_budget[Kategorie]` (Anreise hin und zurück für beide, je Reiselänge `TRIP_CATEGORIES`:
+  kurztrip/kurzurlaub/ferien/lang, Vorschläge 200/400/900/1800, in Profil → Budget anpassbar), höchstens `budget_total_max`
+  (optionaler Deckel) → `budget_for(days)`, überall verwendet (Matching, Plausibilität, Umplanung, Ausfall, finaler Vorschlag).
+  Ideen mit `travel_cost_chf` > Anreisebudget × 1.2 fallen weg (mit Grund); Ideen im Budget zuerst.
   Varianten: höchstens `reach.max_bases` Orte (Rest wird gekürzt), Warnung «Weit für X Tage» per Luftlinie ab Heimatflughafen.
 - `variants.py` (1.5.0) Routen-Varianten: Ziel → KI liefert 3 Routen (Orte + Nächte, Stichpunkte, Wassertemperatur,
   Kosten Flüge/Unterkünfte/Programm/Transfers) → Code gleicht Nächte ab, ergänzt echtes Wetter (Archiv, grösster Ort),
@@ -113,7 +116,9 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.0)
+## Stand (04.11.2026, Version 1.7.1)
+- 1.7.1: Budget = vor Ort pro Tag × Tage + Anreisebudget je Reiselänge (James: «nicht 600.– Anreise für ein Weekend»).
+  Im Testmodus bei 390 px hell/dunkel geprüft (Speichern, Neuladen, Weekend-Vorschläge).
 - 1.7.0: James bekam für 3 Tage Doha vorgeschlagen. Jetzt Reichweite und Budget abhängig von der Reisedauer, Anreise
   auch per Zug/Auto, Hinweis im Formular. Im Testmodus bei 390 px hell/dunkel geprüft; echte Vorschläge nur auf dem NAS.
 - 1.6.0: Wunsch James: Hotelvorschläge mit 3–4 Fotos und echten Preisen für die Nächte; Bilder im Tagesplan (in seinem

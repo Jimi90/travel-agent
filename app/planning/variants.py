@@ -30,7 +30,7 @@ class Variant(BaseModel):
     route: list[Stop]
     bullets: list[str]  # 3–5 kurze Stichpunkte (Wasser, Tempo, Highlights, Anreise …)
     water_temp_c: float  # Meerwassertemperatur zur Reisezeit, 0 wenn kein Meer
-    flights_chf: int  # Schätzungen für beide zusammen
+    flights_chf: int  # Anreise hin und zurück (Flug/Zug/Auto) – Schätzungen für beide zusammen
     hotels_chf: int
     activities_chf: int
     transfers_chf: int
@@ -96,10 +96,12 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
             est_h = far / 750 + 0.5
             if m.reach.flight_hours and est_h > m.reach.flight_hours * 1.25:
                 warn = f"Weit für {days} Tage: ca. {est_h:.0f} Std. Flug pro Strecke"
+        if not warn and m.travel_budget and v.flights_chf > float(m.travel_budget) * 1.2:
+            warn = f"Anreise ca. CHF {v.flights_chf} – über dem Anreisebudget (CHF {m.travel_budget:.0f})"
         total = v.flights_chf + v.hotels_chf + v.activities_chf + v.transfers_chf
         item = {"id": new_id(), "name": v.name, "summary": v.summary, "bullets": bullets,
                 "route": [s.model_dump() for s in route], "climate_score": score,
-                "costs": {"Flüge": v.flights_chf, "Unterkünfte": v.hotels_chf, "Programm": v.activities_chf,
+                "costs": {"Anreise": v.flights_chf, "Unterkünfte": v.hotels_chf, "Programm": v.activities_chf,
                           "Transfers": v.transfers_chf, "Total": total},
                 "over_budget": bool(m.budget_total and total > float(m.budget_total)),
                 "budget": float(m.budget_total) if m.budget_total else None, "warning": warn,

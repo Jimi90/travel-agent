@@ -120,8 +120,16 @@ class ModelTests(unittest.TestCase):
     def test_budget_and_reach_depend_on_days(self):
         from app.planning.matching import match, reach_for
         k = TravelConstraints(budget_total_max=Decimal("6000"), budget_per_day_max=Decimal("300"), max_flight_hours=12)
-        self.assertEqual(k.budget_for(3), Decimal("900"))
+        self.assertEqual(k.budget_for(3), Decimal("1100"))            # 3 × 300 vor Ort + 200 Anreise (Kurztrip)
+        self.assertEqual(k.budget_for(10), Decimal("3900"))           # 10 × 300 + 900 Anreise (Ferien)
         self.assertEqual(k.budget_for(30), Decimal("6000"))           # Budget pro Reise bleibt Obergrenze
+        self.assertEqual((k.travel_budget_for(2), k.travel_budget_for(5), k.travel_budget_for(21)),
+                         (Decimal("200"), Decimal("400"), Decimal("1800")))
+        own = TravelConstraints(budget_per_day_max=Decimal("250"), travel_budget={"kurztrip": 120})
+        self.assertEqual(own.budget_for(2), Decimal("620"))            # eigener Wert für Weekends
+        self.assertEqual(own.travel_budget_for(8), Decimal("900"))     # nicht gesetzte Länge: Vorschlagswert
+        with self.assertRaises(ValueError):
+            TravelConstraints(travel_budget={"weekend": 100})
         self.assertEqual(TravelConstraints(budget_total_max=Decimal("2000")).budget_for(3), Decimal("2000"))
         self.assertIsNone(TravelConstraints().budget_for(5))
         short, long = reach_for(3, k), reach_for(21, k)

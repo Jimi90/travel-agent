@@ -90,6 +90,7 @@ class MatchingResult(Model):
     reach: Reach | None = None  # nur wenn die Reisedauer bekannt ist
     home: str = "Zürich"
     budget_per_day: Decimal | None = None
+    travel_budget: Decimal | None = None  # Anreise hin und zurück für beide, für diese Reiselänge
 
     @property
     def liked(self) -> list[CategoryMatch]:
@@ -112,9 +113,13 @@ class MatchingResult(Model):
         lines.append(f"Wunschklima tagsüber {self.temp_min_c:.0f}–{self.temp_max_c:.0f} °C, Regentoleranz {self.rain_tolerance}.")
         if self.budget_per_night:
             lines.append(f"Unterkunft höchstens {self.budget_per_night} {self.currency} pro Nacht.")
+        if self.budget_per_day:
+            lines.append(f"Vor Ort höchstens {self.budget_per_day} {self.currency} pro Tag für beide "
+                         f"(Unterkunft, Essen, Programm).")
+        if self.travel_budget:
+            lines.append(f"Anreise hin und zurück für beide höchstens {self.travel_budget:.0f} {self.currency}.")
         if self.budget_total:
-            lines.append(f"Gesamtbudget für diese Reise höchstens {self.budget_total} {self.currency} "
-                         f"(Anreise, Unterkünfte, Aktivitäten).")
+            lines.append(f"Gesamtbudget für diese Reise höchstens {self.budget_total:.0f} {self.currency}.")
         lines.append(f"Körperliche Anstrengung höchstens: {INTENSITY_TEXT[self.max_intensity]}.")
         if self.pregnancy_week is not None:
             lines.append(f"Eine Reisende ist schwanger (ca. Woche {self.pregnancy_week}): keine Sauna/Hitzebäder, "
@@ -160,6 +165,7 @@ def match(h: Household, on: date | None = None, days: int | None = None, home_ai
         names=[p.name for p in h.profiles], categories=cats, temp_min_c=lo, temp_max_c=hi, climate_note=note,
         rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_for(days),
         budget_per_day=k.budget_per_day_max, reach=reach_for(days, k) if days else None,
+        travel_budget=k.travel_budget_for(days),
         home=HOME_CITY.get(home_airport.upper(), home_airport),
         currency=k.currency, max_intensity=k.effective_max_intensity(), avoid_tags=sorted(k.effective_avoid_tags()),
         excluded_countries=sorted(h.history.visited_countries),

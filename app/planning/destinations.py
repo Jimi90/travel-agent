@@ -28,6 +28,7 @@ class DestinationIdea(BaseModel):
     travel_mode: Literal["flug", "zug", "auto"]  # beste Anreise ab dem Heimatort
     travel_hours: float  # Reisezeit pro Strecke (Flug: reine Flugzeit)
     typical_stops: int  # Umstiege beim Flug, sonst 0
+    travel_cost_chf: int  # Anreise hin und zurück für beide (Schätzung)
     cost_level: Literal["guenstig", "mittel", "teuer"]
     est_total_chf: int
 
@@ -71,6 +72,10 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str) 
             dropped.append(f"{idea.name}: {idea.travel_hours:g} Std. mit {'Zug' if idea.travel_mode == 'zug' else 'Auto'}"
                            f" – zu weit für {days} Tage")
             continue
+        if m.travel_budget and idea.travel_cost_chf > float(m.travel_budget) * 1.2:
+            dropped.append(f"{idea.name}: Anreise ca. CHF {idea.travel_cost_chf} – über dem Anreisebudget "
+                           f"(CHF {m.travel_budget:.0f})")
+            continue
         item = {**idea.model_dump(), "country": cc, "id": new_id(),
                 "typical_flight_hours": idea.travel_hours}  # (alter Feldname für ältere Anzeige)
         try:
@@ -86,16 +91,18 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str) 
     # zuerst, was ins Budget passt, dann nach Klima
     out.sort(key=lambda x: (bool(x.get("warning")), -(x["climate_score"] if x["climate_score"] is not None else 5)))
     return {"start": start.isoformat(), "days": days, "wish": wish, "ideas": out[:6], "dropped": dropped,
-            "reach": m.reach.text(m.home), "budget": float(m.budget_total) if m.budget_total else None}
+            "reach": m.reach.text(m.home), "budget": float(m.budget_total) if m.budget_total else None,
+            "travel_budget": float(m.travel_budget) if m.travel_budget else None}
 
 
 def _fake(h: Household) -> DestinationList:
-    base = [("Lissabon", "PT", 38.72, -9.14, "flug", 2.8, 0), ("Madeira (Funchal)", "PT", 32.65, -16.91, "flug", 3.8, 0),
-            ("Kreta (Chania)", "GR", 35.51, 24.02, "flug", 2.9, 0), ("Rom", "IT", 41.9, 12.5, "flug", 1.5, 0),
-            ("Valencia", "ES", 39.47, -0.38, "flug", 1.9, 0), ("Malta (Valletta)", "MT", 35.9, 14.51, "flug", 2.4, 0),
-            ("Lyon", "FR", 45.76, 4.84, "zug", 4.5, 0), ("Doha", "QA", 25.29, 51.53, "flug", 6.5, 0),
-            ("Colmar", "FR", 48.08, 7.36, "auto", 1.8, 0)]
+    base = [("Lissabon", "PT", 38.72, -9.14, "flug", 2.8, 0, 380), ("Madeira (Funchal)", "PT", 32.65, -16.91, "flug", 3.8, 0, 520),
+            ("Kreta (Chania)", "GR", 35.51, 24.02, "flug", 2.9, 0, 420), ("Rom", "IT", 41.9, 12.5, "flug", 1.5, 0, 220),
+            ("Valencia", "ES", 39.47, -0.38, "flug", 1.9, 0, 260), ("Malta (Valletta)", "MT", 35.9, 14.51, "flug", 2.4, 0, 340),
+            ("Lyon", "FR", 45.76, 4.84, "zug", 4.5, 0, 180), ("Doha", "QA", 25.29, 51.53, "flug", 6.5, 0, 900),
+            ("Colmar", "FR", 48.08, 7.36, "auto", 1.8, 0, 90)]
     return DestinationList(ideas=[DestinationIdea(
         name=n, country=c, region="", lat=la, lon=lo, why=f"Testvorschlag {n}: mildes Klima, gute Mischung.",
         highlights=["Altstadt", "Küste", "Essen"], travel_mode=mode, travel_hours=hrs, typical_stops=st,
-        cost_level="mittel", est_total_chf=1500 + i * 300) for i, (n, c, la, lo, mode, hrs, st) in enumerate(base)])
+        travel_cost_chf=tc, cost_level="mittel", est_total_chf=1500 + i * 300)
+        for i, (n, c, la, lo, mode, hrs, st, tc) in enumerate(base)])

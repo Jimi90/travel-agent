@@ -11,7 +11,7 @@ def _env(name, default=None):
 DATA_DIR = Path(_env("DATA_DIR", "/data"))
 DB_PATH = DATA_DIR / "kompass.db"
 PORT = int(_env("PORT", "8000"))
-APP_VERSION = "1.7.0"  # von Hand erhöhen
+APP_VERSION = "1.7.1"  # von Hand erhöhen
 APP_BUILD = _env("APP_BUILD", "entwicklung")[:7]  # von GitHub gesetzt
 APP_PASSWORD = _env("APP_PASSWORD", "")  # Pflicht, mindestens 16 Zeichen
 

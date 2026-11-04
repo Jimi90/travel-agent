@@ -555,14 +555,15 @@ async function suggest() {
 
 function renderIdeas(res) {
   const saved = new Set();
-  $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.budget ? ` Budget: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
+  $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Anreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
     `<div class="card">` + res.ideas.map((i, n) => `<div class="row idea">
       <div class="grow">${photo(i.photo, "idea-img", i.name)}<div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
       <div class="s">${esc(i.why)}</div>
       <div class="s">${esc((i.highlights || []).join(" · "))}</div>
       <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
-      <div class="s">${i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug"} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${(i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : ""} · ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
+      <div class="s">${i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug"} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${(i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : ""}${i.travel_cost_chf ? ` · Anreise ca. ${esc(chf(i.travel_cost_chf))}` : ""}</div>
+      <div class="s">Ganze Reise ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
       ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
       <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
       </div></div>`).join("") + `</div>` +
@@ -996,7 +997,7 @@ function renderProfileMain() {
   const fly = (k.max_flight_hours ? `max. ${k.max_flight_hours} Std.` : "beliebig lang") + ` · ${k.max_stops} Umstieg${k.max_stops === 1 ? "" : "e"}`;
   const avoidN = k.avoid_tags.length;
   $("pRules").innerHTML =
-    rNav("Budget", k.budget_per_day_max ? `${chf(k.budget_per_day_max)}/Tag` : k.budget_total_max ? `${chf(k.budget_total_max)}/Reise` : "Kein Limit", 'data-sub="budget"') +
+    rNav("Budget", k.budget_per_day_max ? `${chf(k.budget_per_day_max)}/Tag + Anreise` : k.budget_total_max ? `${chf(k.budget_total_max)}/Reise` : "Nur Anreise", 'data-sub="budget"') +
     rNav("Reisedauer", `${k.duration_days_min}–${k.duration_days_max} Tage`, 'data-sub="dauer"') +
     rNav("Flüge", fly, 'data-sub="fluege"') +
     rNav("Anstrengung", INT_TXT[k.max_intensity], 'data-sub="anstrengung"') +
@@ -1078,13 +1079,27 @@ function personPage(i) {
 const PAGES = {
   budget: () => ({
     title: "Budget",
-    html: () => `<div class="card">${rIn("Pro Tag (CHF)", "cBudgetDay", HH.constraints.budget_per_day_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}
-      ${rIn("Pro Reise höchstens (CHF)", "cBudget", HH.constraints.budget_total_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
-      <p class="hint">Für beide zusammen: Anreise, Unterkünfte und Programm. Das Tagesbudget wird auf die Reisedauer hochgerechnet
-        (z. B. 3 Tage × CHF 300 = CHF 900); «pro Reise» ist die Obergrenze, auch für lange Reisen. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`,
+    html: () => { const k = HH.constraints, tb = k.travel_budget || {};
+      const TL = [["kurztrip", "Kurztrip (bis 3 Tage)", 200], ["kurzurlaub", "Kurzurlaub (4–6 Tage)", 400],
+                  ["ferien", "Ferien (7–13 Tage)", 900], ["lang", "Lange Reise (ab 14 Tagen)", 1800]];
+      return `<h2 style="margin-top:14px">Vor Ort</h2>
+      <div class="card">${rIn("Pro Tag (CHF)", "cBudgetDay", k.budget_per_day_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
+      <p class="hint">Für beide zusammen: Unterkunft, Essen und Programm. Wird mit der Reisedauer multipliziert.</p>
+      <h2>Anreise hin und zurück <span class="r">CHF</span></h2>
+      <div class="card">${TL.map(([key, label, def]) => rIn(label.replace(" (", " · ").replace(")", ""), "tb_" + key, tb[key] ?? def, `type="number" inputmode="numeric" data-tb="${key}" style="max-width:90px"`)).join("")}</div>
+      <p class="hint">Für beide zusammen. Je kürzer die Reise, desto weniger darf die Anreise kosten – Ziele mit teurerer Anreise schlägt Kompass nicht vor.</p>
+      <h2>Ganze Reise</h2>
+      <div class="card">${rIn("Höchstens (CHF)", "cBudget", k.budget_total_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
+      <p class="hint">Optional, als Deckel für lange Reisen. Beispiel: 3 Tage × CHF 250 + CHF 200 Anreise = CHF 950 für ein Weekend. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`; },
     bind: () => {
-      $("cBudgetDay").oninput = e => { HH.constraints.budget_per_day_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
-      $("cBudget").oninput = e => { HH.constraints.budget_total_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
+      const k = HH.constraints;
+      $("cBudgetDay").oninput = e => { k.budget_per_day_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
+      $("cBudget").oninput = e => { k.budget_total_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
+      $("subIn").querySelectorAll("[data-tb]").forEach(inp => inp.oninput = () => {
+        k.travel_budget = {...(k.travel_budget || {})};
+        if (inp.value === "") delete k.travel_budget[inp.dataset.tb]; else k.travel_budget[inp.dataset.tb] = inp.value;
+        saveSoon();
+      });
     },
   }),
   dauer: () => ({
