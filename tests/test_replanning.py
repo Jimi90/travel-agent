@@ -309,3 +309,13 @@ class MoveTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PlanOverBudgetTest(unittest.TestCase):
+    def test_plan_over_budget_is_built_with_note(self):
+        from app.planning import generator
+        h = household(budget="500")
+        draft = generator.fake_draft("Lissabon", 6, "ZRH")
+        itin, notes = generator.build(draft, h, date(2026, 5, 4), 6, "ZRH")
+        self.assertTrue(itin.days)
+        self.assertTrue(any("über dem Budget" in n for n in notes), notes)
