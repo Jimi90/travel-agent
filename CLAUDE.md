@@ -120,7 +120,11 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.9.3)
+## Stand (04.11.2026, Version 1.9.4)
+- 1.9.4: Wunsch James: im Formular «Neue Reise» Abreise- und Rückreisedatum statt Dauer −/+. Zeile «Rückreise» (`#nEnd`, Datumsfeld)
+  mit «N Tage · N−1 Nächte» darunter; Dauer = Tage von Abreise bis Rückreise (beide zählen), 2–30. Abreise ändern: Dauer bleibt,
+  Rückreise wandert mit; Rückreise ausserhalb 2–30 springt zurück + Hinweis. Server unverändert (`days` wie bisher). Im Testmodus
+  bei 390 px hell/dunkel geprüft; Datumsauswahl auf dem iPhone nur dort prüfbar.
 - 1.9.3: James: «Wenn ich ein maximal Budget hinterlege, aber Routen vorgeschlagen werden, die viel mehr kosten, macht das keinen
   Sinn.» Budget ist jetzt hart: `variants.suggest` wirft Routen über Budget × `BUDGET_SLACK` (1.10) raus («Nicht gezeigt, weil
   über dem Budget: …»); passt keine, nur die günstigste mit Warnung «Keine Route im Budget». `destinations.suggest` ebenso für
