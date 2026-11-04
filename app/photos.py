@@ -215,9 +215,75 @@ def destination_photo(landmark: str, name: str, region: str = "", highlights=())
             pid = wiki_photo(f"{h} {name}".strip(), must_match=h)
             if pid:
                 return pid
-    if len(name) < 5:  # «Sal», «Rom»: der Ortsname trifft zu oft andere Artikel (Baum, Siegel)
+    # Commons: freie Ortsfotos; Ortsname + Region/Wahrzeichen, auch bei kurzen Namen («Sal», «Rom»)
+    for q, need in ((f"{landmark} {name}", landmark or name), (f"{name} {region}", name), (name, name)):
+        if q.strip():
+            pid = commons_photo(q.strip(), must_match=need)
+            if pid:
+                return pid
+    if len(name) < 5:  # kurzer Ortsname trifft in Wikipedia zu oft andere Artikel (Baum, Siegel)
         return None
     return wiki_photo(f"{name} {region}".strip(), must_match=name)
+
+
+COMMONS = "https://commons.wikimedia.org/w/api.php"
+
+
+def parse_commons(data: dict) -> list[dict]:
+    """Commons-Suche (Dateien, formatversion=2) → Querformat-Fotos (JPEG), beste Treffer zuerst."""
+    pages = sorted((data.get("query") or {}).get("pages") or [], key=lambda p: p.get("index", 99))
+    out = []
+    for p in pages:
+        ii = (p.get("imageinfo") or [{}])[0]
+        url = ii.get("thumburl") or ""
+        if not url or ii.get("mime") != "image/jpeg":
+            continue
+        w, h = ii.get("thumbwidth") or 0, ii.get("thumbheight") or 0
+        if w and h and w < h:  # Hochformat passt schlecht in die Karte
+            continue
+        out.append({"url": url, "title": re.sub(r"^(File|Datei):", "", p.get("title", "")),
+                    "page": ii.get("descriptionurl", "")})
+    return out
+
+
+def commons_photo(query: str, must_match: str = "") -> str | None:
+    """Foto aus Wikimedia Commons (Millionen freier Ortsfotos). Dateititel muss ein Wort von must_match enthalten."""
+    key = "commons1:" + _fold(query).strip() + "|" + _fold(must_match).strip()
+    cached = store.get("photo_q", key)
+    if cached is not None:
+        return cached.get("id")
+    need = _words(must_match)
+    if config.FAKE_MODE:
+        hits = [{"url": f"https://upload.wikimedia.org/fake/c-{urllib.parse.quote(query)}.jpg", "title": query,
+                 "page": ""}]
+    else:
+        try:
+            data = _get_json(COMMONS, {"action": "query", "format": "json", "formatversion": 2,
+                                       "generator": "search", "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 10,
+                                       "prop": "imageinfo", "iiprop": "url|mime|size", "iiurlwidth": 800})
+        except (urllib.error.URLError, TimeoutError, ValueError):
+            return None
+        hits = parse_commons(data)
+    pid = None
+    for h in hits:
+        if (need and not need & _words(h["title"])) or bad_image(h["url"], h["title"]):
+            continue
+        pid = download(h["url"], "Wikimedia Commons", h["title"], h["page"])
+        if pid:
+            break
+    store.put("photo_q", key, {"id": pid})
+    return pid
+
+
+def place_photo(name: str, region: str = "") -> str | None:
+    """Foto eines Ortes: Commons-Suche zuerst (zeigt Landschaft/Stadt), dann der Wikipedia-Artikel."""
+    name = (name or "").split("(")[0].strip()
+    if not name:
+        return None
+    pid = commons_photo(f"{name} {region}".strip(), must_match=name)
+    if not pid and region:
+        pid = commons_photo(name, must_match=name)
+    return pid or wiki_photo(name, must_match=name)
 
 
 def has_photo_subject(a) -> bool:
@@ -266,7 +332,7 @@ def fill_trip(itin) -> None:
             for d in itin.days:
                 b = d.base
                 if b.name not in m["places"]:
-                    m["places"][b.name] = wiki_photo(b.name, must_match=b.name)
+                    m["places"][b.name] = place_photo(b.name)
                     store.put("trip_photos", itin.id, m)
                 for a in d.activities:
                     k = activity_key(a.title)

@@ -216,6 +216,8 @@ details.vcost .costs{padding:0 16px 8px;margin-top:0}
 .tphero .cap{position:absolute;left:16px;right:16px;bottom:14px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.45);pointer-events:none}
 .tphero h1{font-size:28px;line-height:1.15;margin:0;color:#fff}
 .tphero .when{font-size:15px;margin-top:4px;opacity:.92}
+.tiles.four{grid-template-columns:repeat(3,minmax(0,1fr));padding:0;margin-top:12px}
+.tiles.four .tile{background:var(--card2)}
 .tiles.three{grid-auto-flow:row;grid-template-columns:.9fr .8fr 1.5fr;padding:0;margin-top:12px}
 .tiles.three .tile{background:var(--card)}
 button.lrow{position:relative;display:flex;width:100%;align-items:center;justify-content:space-between;border:0;background:none;color:var(--accent);font:inherit;font-size:17px;padding:14px 16px;text-align:left;cursor:pointer}
@@ -683,11 +685,13 @@ function cname(cc) {
 }
 function renderIdeas(res) {
   const saved = new Set();
+  const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
   $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Hin- und Rückreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
     res.ideas.map((i, n) => {
       const cn = i.country ? cname(i.country) : (i.country_name || "").trim(), reg = (i.region || "").trim();
       const where = [`${cflag(i.country)} ${esc(cn)}`.trim(), reg && ![i.name, cn].some(x => actKey(x) === actKey(reg)) ? esc(reg) : ""].filter(Boolean).join(" · ");
+      const c = i.climate || null;
       const mode = i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug";
       const stops = (i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : "";
       return `<div class="card dcard"><div class="ph">${photo(i.photo, "dimg", `${i.name}, ${cn}`)}<div class="shade"></div>
@@ -695,8 +699,11 @@ function renderIdeas(res) {
         <div class="cap"><div class="nm">${esc(i.name)}</div><div class="where">${where}</div></div></div>
         <div class="dbody">
           <div class="hl">${(i.highlights || []).slice(0, 4).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
-          <div class="facts">${mode} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${stops}${i.travel_cost_chf ? ` · hin und zurück ca. ${esc(chf(i.travel_cost_chf))}` : ""}<br>
-            <b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> · ${esc(i.climate_text)}</div>
+          <div class="tiles four">${[
+            c ? tile("Wetter", `${Math.round(c.temp_max)}° / ${Math.round(c.temp_min)}°`, `${wxIcon(c.rain_days > .45 ? "regen" : c.rain_days > .2 ? "teils bewölkt" : "klar")} ${Math.round(c.rain_days * 100)} % Regen`) : "",
+            i.sea_temp ? tile("Wasser", `${i.sea_temp} °C`, i.sea_source || "") : "",
+            tile("Anreise", `${i.travel_hours ?? i.typical_flight_hours} Std.`, `${mode}${stops}${i.travel_cost_chf ? ` · ${chf(i.travel_cost_chf)} hin/zurück` : ""}`)].join("")}</div>
+          ${i.climate_score != null ? `<div class="s">Klima ${i.climate_score}/10 · ${esc(i.climate_text)}</div>` : ""}
           <div class="s why">${esc(i.why)}</div>
           ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
           <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>

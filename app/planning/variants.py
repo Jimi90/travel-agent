@@ -129,7 +129,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
                           "Transfers": v.transfers_chf, "Total": total},
                 "over_budget": bool(m.budget_total and total > float(m.budget_total)),
                 "budget": float(m.budget_total) if m.budget_total else None, "warning": warn,
-                "photo": photos.wiki_photo(route[0].name, must_match=route[0].name) if route else None}
+                "photo": photos.place_photo(route[0].name, destination) if route else None}
         out.append(item)
     return {"id": new_id(), "destination": destination, "start": start.isoformat(), "days": days, "wishes": wishes,
             "travel_budget": float(m.travel_budget) if m.travel_budget is not None else None, "variants": out}

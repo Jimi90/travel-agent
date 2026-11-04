@@ -33,6 +33,7 @@ class DestinationIdea(BaseModel):
     travel_mode: Literal["flug", "zug", "auto"]  # beste Anreise ab dem Heimatort
     travel_hours: float  # Reisezeit pro Strecke (Flug: reine Flugzeit)
     typical_stops: int  # Umstiege beim Flug, sonst 0
+    water_temp_c: float = 0  # Meerwassertemperatur zur Reisezeit in °C, 0 wenn kein Badestrand/Meer am Ziel
     travel_cost_chf: int  # Anreise hin und zurück für beide (Schätzung)
     cost_level: Literal["guenstig", "mittel", "teuer"]
     est_total_chf: int
@@ -52,7 +53,8 @@ Pro Ziel: «country» = genau der zweibuchstabige ISO-Code des Landes (Mexiko = 
 «country_name» = Landesname auf Deutsch, «region» = Region, Provinz oder Insel (z. B. «Algarve», «Toskana»), «highlights» = 3 bis 4 kurze, konkrete
 Stichworte (je höchstens 3 Wörter, z. B. «Vulkan Poás», «Altstadt Alfama»), «landmark_wiki» = Titel des Wikipedia-Artikels
 eines weltbekannten Wahrzeichens oder einer ikonischen Landschaft dieses Ziels, die man auf einem Foto sofort dem Ziel
-zuordnet (z. B. «Torre de Belém», «Vulkan Arenal»). NICHT der Artikel über die Stadt oder das Land, kein Wappen, keine Flagge."""
+zuordnet (z. B. «Torre de Belém», «Vulkan Arenal»). NICHT der Artikel über die Stadt oder das Land, kein Wappen, keine Flagge.
+«water_temp_c» = übliche Meerwassertemperatur am Ziel zur Reisezeit in °C (0, wenn kein Meer/Badestrand)."""
 
 
 def resolve_country(idea: DestinationIdea) -> str:
@@ -118,8 +120,18 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
         try:
             clim = weather.climate(idea.lat, idea.lon, start, days)
             item["climate_score"], item["climate_text"] = climate_score(m, clim)
+            item["climate"] = clim
         except weather.WeatherError as e:
             item["climate_score"], item["climate_text"] = None, f"Klimadaten nicht verfügbar ({e})"
+        sea = None
+        try:
+            sea = weather.sea_temperature(idea.lat, idea.lon, start, days)
+        except Exception:  # Zusatzinfo, darf den Vorschlag nie verhindern
+            pass
+        if sea is not None and sea > 5:
+            item["sea_temp"], item["sea_source"] = round(sea), "gemessen"
+        elif idea.water_temp_c and idea.water_temp_c > 5:
+            item["sea_temp"], item["sea_source"] = round(idea.water_temp_c), "geschätzt"
         item["photo"] = photos.destination_photo(idea.landmark_wiki, idea.name, idea.region, idea.highlights)
         if m.budget_total and idea.est_total_chf > float(m.budget_total):
             item["warning"] = f"Geschätzt {idea.est_total_chf} CHF – über dem Budget"
