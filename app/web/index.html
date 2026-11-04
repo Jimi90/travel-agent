@@ -155,6 +155,30 @@ textarea.bare:focus{border:0}
 .map img{position:absolute;width:256px;height:256px;max-width:none;user-select:none;pointer-events:none}
 .map svg{position:absolute;inset:0;width:100%;height:100%}
 .map .osm{position:absolute;right:4px;bottom:3px;font-size:10px;color:#333;background:rgba(255,255,255,.75);padding:1px 4px;border-radius:4px}
+.map.big{height:250px;border-radius:0}
+.vcard .vhead{display:flex;align-items:flex-start;gap:12px;padding:14px 16px 0}
+.vname{font-size:22px;font-weight:700;letter-spacing:-.3px;line-height:1.2}
+.vprice{flex:none;text-align:right;line-height:1.2}
+.vprice b{display:block;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.vprice small{font-size:12px;color:var(--muted)}
+.vprice.over b{color:var(--warn)}
+.vsum{padding:8px 16px 0;font-size:15px;line-height:1.45;color:var(--muted)}
+.vcard .badge{margin:0 0 0 0}
+.vwarn{padding:8px 16px 0;font-size:13px;color:var(--warn);line-height:1.4}
+ol.stops{list-style:none;margin:12px 0 0;padding:0}
+ol.stops li{display:flex;align-items:center;gap:12px;padding:10px 16px;position:relative}
+ol.stops li+li::before{content:"";position:absolute;top:0;left:38px;right:16px;border-top:1px solid var(--line)}
+.num{flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--onaccent);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.tiles{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px;padding:6px 16px 0}
+.tile{background:var(--card2);border-radius:12px;padding:10px;min-width:0}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-size:18px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile .u{font-size:12px;color:var(--muted);margin-top:1px;line-height:1.3}
+ul.vbul{margin:12px 0 0;padding:0 16px 0 34px;font-size:14px;line-height:1.5}
+details.vcost{margin-top:8px}
+details.vcost>summary{padding:10px 16px}
+details.vcost .costs{padding:0 16px 8px;margin-top:0}
+.vcard .go{margin:4px 16px 16px;width:calc(100% - 32px)}
 .var{padding:14px 16px}
 .var+.var{border-top:1px solid var(--line)}
 .var ul{margin:8px 0 0;padding-left:18px;font-size:14px;line-height:1.5}
@@ -420,10 +444,10 @@ function watchJob(id, label, onDone) {
 function clearJob() { try { localStorage.removeItem("job"); } catch {} }
 
 // ---------- Karte (OpenStreetMap-Kacheln über den eigenen Server) ----------
-function mapHtml(points) {
+function mapHtml(points, cls = "") {
   const pts = (points || []).filter(p => p.lat != null && p.lon != null)
     .filter((p, i, a) => i === 0 || p.name !== a[i - 1].name);
-  return pts.length ? `<div class="map" data-pts='${esc(JSON.stringify(pts))}'></div>` : "";
+  return pts.length ? `<div class="map ${cls}" data-pts='${esc(JSON.stringify(pts))}'></div>` : "";
 }
 function drawMaps(root) {
   (root || document).querySelectorAll(".map[data-pts]").forEach(el => {
@@ -544,16 +568,28 @@ async function startVariants(dest) {
 }
 
 function renderVariants(res) {
-  $("ideas").innerHTML = `<h2>Routen für ${esc(res.destination)}</h2><div class="card">` + res.variants.map((v, i) => `
-    <div class="var">${mapHtml(v.route)}
-      <div class="t" style="margin-top:10px"><b>${esc(v.name)}</b>${v.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div>
-      ${v.warning ? `<div class="s warnt">${esc(v.warning)}</div>` : ""}
-      <div class="s">${esc(v.route.map(st => `${st.name} (${st.nights} N.)`).join(" → "))}</div>
-      <div class="s" style="margin-top:4px">${esc(v.summary)}</div>
-      <ul>${v.bullets.map(x => `<li>${esc(x)}</li>`).join("")}</ul>
-      <div class="costs">${Object.entries(v.costs).map(([k, c]) => k === "Total" ? `<b>Total ca.</b><b>${esc(chf(c))}</b>` : `<span>${esc(k)}</span><span>${esc(chf(c))}</span>`).join("")}${v.budget ? `<span>Budget</span><span class="${v.over_budget ? "warnt" : ""}">${esc(chf(v.budget))}</span>` : ""}</div>
-      <button class="btn" data-var="${i}" style="margin-top:12px">Diese Route planen</button>
-    </div>`).join("") + `</div><p class="hint">Wetter = echte Messwerte derselben Tage im Vorjahr. Kosten sind Schätzungen für euch beide.</p>`;
+  const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
+  $("ideas").innerHTML = `<h2>Routen für ${esc(res.destination)}</h2>
+    <p class="hint" style="margin:0 16px 12px">${res.variants.length} Möglichkeiten für ${esc(res.days)} Tage. Die Nummern gelten für Karte und Liste.</p>` +
+    res.variants.map((v, i) => {
+      const f = v.facts || null, nights = v.route.reduce((n, st) => n + st.nights, 0), w = f && f.weather;
+      const tiles = f ? [w ? tile("Wetter", `${w.max}° / ${w.min}°`, `${w.score != null ? "Klima " + w.score + "/10 · " : ""}Regen ${w.rain_pct} %`) : "",
+        f.water_c ? tile("Meer", `${f.water_c} °C`, "geschätzt") : "",
+        f.km ? tile("Strecke", `${Number(f.km).toLocaleString("de-CH")} km`, `${f.stops} Orte`) : ""].join("") : "";
+      const bullets = (v.bullets || []).slice(0, f ? 3 : 5);
+      return `<div class="card vcard">${mapHtml(v.route, "big")}
+        <div class="vhead"><div class="grow"><div class="vname">${esc(v.name)}</div>
+            <div class="s">${nights} Nächte · ${v.route.length === 1 ? "1 Ort" : v.route.length + " Orte"}${v.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div></div>
+          <div class="vprice ${v.over_budget ? "over" : ""}"><b>ca. ${esc(chf(v.costs.Total))}</b><small>für 2 Personen</small></div></div>
+        ${v.warning ? `<div class="vwarn">${esc(v.warning)}</div>` : ""}
+        <div class="vsum">${esc(v.summary)}</div>
+        <ol class="stops">${v.route.map((st, n) => `<li><span class="num">${n + 1}</span><div class="grow"><div class="t">${esc(st.name)}</div>${st.note ? `<div class="s">${esc(st.note)}</div>` : ""}</div><span class="chip">${st.nights} ${st.nights === 1 ? "Nacht" : "Nächte"}</span></li>`).join("")}</ol>
+        ${tiles ? `<div class="tiles">${tiles}</div>` : ""}
+        ${bullets.length ? `<ul class="vbul">${bullets.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        <details class="vcost"><summary>Kosten im Detail</summary><div class="costs">${Object.entries(v.costs).filter(([k]) => k !== "Total").map(([k, c]) => `<span>${esc(k)}</span><span>${esc(chf(c))}</span>`).join("")}<b>Total ca.</b><b>${esc(chf(v.costs.Total))}</b>${v.budget ? `<span>Budget</span><span class="${v.over_budget ? "warnt" : ""}">${esc(chf(v.budget))}</span>` : ""}</div></details>
+        <button class="btn go" data-var="${i}">Diese Route planen</button>
+      </div>`;
+    }).join("") + `<p class="hint">Wetter = echte Messwerte derselben Tage im Vorjahr am Ort mit den meisten Nächten. Kosten sind Schätzungen für euch beide.</p>`;
   drawMaps($("ideas"));
   $("ideas").scrollIntoView({behavior: "smooth", block: "start"});
   $("ideas").querySelectorAll("[data-var]").forEach(btn => btn.onclick = async () => {

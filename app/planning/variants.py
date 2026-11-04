@@ -6,11 +6,12 @@ Wetter aus Messwerten derselben Tage im Vorjahr (Open-Meteo), Distanzen zwischen
 from __future__ import annotations
 
 import math
+import re
 from datetime import date, timedelta
 
 from pydantic import BaseModel
 
-from .. import llm, photos, weather
+from .. import config, llm, photos, weather
 from ..models import Household
 from ..models.common import new_id
 from .matching import HOME_COORDS, climate_score, match
@@ -22,13 +23,14 @@ class Stop(BaseModel):
     lat: float
     lon: float
     nights: int
+    note: str = ""  # 3–6 Wörter, was man hier macht/sieht (z. B. «Altstadt, Goldmuseum»)
 
 
 class Variant(BaseModel):
     name: str  # z. B. «Stadt & Strand»
     summary: str  # 1–2 Sätze
     route: list[Stop]
-    bullets: list[str]  # 3–5 kurze Stichpunkte (Wasser, Tempo, Highlights, Anreise …)
+    bullets: list[str]  # 2–4 sehr kurze Stichpunkte (Reisetempo, Besonderheiten) – keine Kosten/Wetter/Distanzen
     water_temp_c: float  # Meerwassertemperatur zur Reisezeit, 0 wenn kein Meer
     flights_chf: int  # Anreise hin und zurück (Flug/Zug/Auto) – Schätzungen für beide zusammen
     hotels_chf: int
@@ -43,7 +45,9 @@ class VariantList(BaseModel):
 SYSTEM = """Du bist Kompass, ein Reiseplaner für ein Paar aus der Schweiz. Deutsch, Schweizer Rechtschreibung (kein ß).
 Erstelle 3 deutlich verschiedene Routen-Varianten für das Ziel (z. B. ruhig an einem Ort, Rundreise, Stadt + Strand).
 Jede Route: Orte in Reisereihenfolge mit Nächten; Summe der Nächte = Reisetage − 1. Nur echte Orte mit Koordinaten.
-bullets: 3–5 kurze, konkrete Stichpunkte (z. B. Reisetempo, Highlights, Wege/Transfers, Besonderheiten zur Reisezeit).
+Pro Ort: «note» = 3 bis 6 Wörter, was man dort sieht oder macht (z. B. «Altstadt, Goldmuseum»).
+bullets: 2 bis 4 sehr kurze Stichpunkte (höchstens 8 Wörter), z. B. Reisetempo, Wege, Besonderheiten zur Reisezeit.
+KEINE Kosten, Wetter, Wassertemperatur oder Distanzen in bullets und notes – die zeigt die App getrennt.
 Kosten ehrlich schätzen, in CHF für beide zusammen. Alle Randbedingungen strikt einhalten."""
 
 
@@ -53,6 +57,23 @@ def km(a: Stop, b: Stop) -> float:
     dp, dl = p2 - p1, math.radians(b.lon - a.lon)
     h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(h))
+
+
+def _locate(stop: Stop) -> None:
+    """Koordinaten der KI sind oft falsch (Orte vertauscht, gleichnamiger Ort im falschen Land): per Ortssuche im
+    angegebenen Land überschreiben. Findet die Suche nichts, bleiben die Werte der KI."""
+    if config.FAKE_MODE:
+        return
+    base = re.sub(r"\s*\(.*?\)", "", stop.name).strip()
+    tries = [base] + ([base.rsplit(" de ", 1)[1].strip()] if " de " in base else [])
+    for name in dict.fromkeys(t for t in tries if t):
+        try:
+            place = weather.geocode(name, stop.country)
+        except (weather.WeatherError, ValueError, KeyError):
+            continue
+        if place.lat is not None and place.lon is not None:
+            stop.lat, stop.lon = place.lat, place.lon
+            return
 
 
 def suggest(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
@@ -68,6 +89,8 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
     home = HOME_COORDS.get(home_airport.upper())
     for v in res.variants[:3]:
         route = [s for s in v.route if s.nights > 0] or v.route[:1]
+        for s_ in route:
+            _locate(s_)
         if len(route) > m.reach.max_bases:  # Kurztrip: nicht durch mehrere Orte hetzen
             extra = sum(s.nights for s in route[m.reach.max_bases:])
             route = route[:m.reach.max_bases]
@@ -75,22 +98,22 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
         nights = sum(s.nights for s in route)
         if nights != days - 1 and route:  # Nächte auf die Reisedauer abgleichen (letzter Ort gleicht aus)
             route[-1].nights = max(1, route[-1].nights + (days - 1 - nights))
-        bullets = list(v.bullets[:5])
+        bullets = [b for b in v.bullets if b.strip()][:4]
         # Wetter: echte Messwerte am ersten (Haupt-)Ort, gleiche Tage im Vorjahr
-        score = None
+        score, facts = None, {"weather": None, "water_c": None, "km": None, "stops": len(route)}
         try:
             main = max(route, key=lambda s: s.nights)
             clim = weather.climate(main.lat, main.lon, start, days)
             score, txt = climate_score(m, clim)
-            bullets.insert(0, f"Wetter {main.name}: tagsüber Ø {clim['temp_max']:.0f} °C, nachts Ø "
-                              f"{clim['temp_min']:.0f} °C, Regentage {clim['rain_days'] * 100:.0f} % (Vorjahr)")
+            facts["weather"] = {"place": main.name, "max": round(clim["temp_max"]), "min": round(clim["temp_min"]),
+                                "rain_pct": round(clim["rain_days"] * 100), "score": score}
         except (weather.WeatherError, ValueError):
             pass
         if v.water_temp_c and v.water_temp_c > 5:
-            bullets.insert(1, f"Wasser ca. {v.water_temp_c:.0f} °C (Schätzung)")
+            facts["water_c"] = round(v.water_temp_c)
         dist = sum(km(a, b) for a, b in zip(route, route[1:]))
         if len(route) > 1:
-            bullets.append(f"Route ca. {dist:,.0f} km zwischen {len(route)} Orten".replace(",", "'"))
+            facts["km"] = round(dist)
         warn = ""
         if home and route:  # Luftlinie ab Heimatflughafen grob in Flugstunden (ca. 750 km/h + 30 Min.)
             far = max(km(Stop(name="", country="CH", lat=home[0], lon=home[1], nights=0), s_) for s_ in route)
@@ -100,7 +123,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
         if not warn and m.travel_budget and v.flights_chf > float(m.travel_budget) * 1.2:
             warn = f"Hin- und Rückreise ca. CHF {v.flights_chf} – über dem Budget dafür (CHF {m.travel_budget:.0f})"
         total = v.flights_chf + v.hotels_chf + v.activities_chf + v.transfers_chf
-        item = {"id": new_id(), "name": v.name, "summary": v.summary, "bullets": bullets,
+        item = {"id": new_id(), "name": v.name, "summary": v.summary, "bullets": bullets, "facts": facts,
                 "route": [s.model_dump() for s in route], "climate_score": score,
                 "costs": {"Hin- und Rückreise": v.flights_chf, "Unterkünfte": v.hotels_chf, "Programm": v.activities_chf,
                           "Transfers": v.transfers_chf, "Total": total},
@@ -119,7 +142,8 @@ def route_text(route: list[dict]) -> str:
 def _fake(destination: str, days: int) -> VariantList:
     a = destination.split(",")[0].strip() or "Ziel"
     n = days - 1
-    mk = lambda name, la, lo, k: Stop(name=name, country="PT", lat=la, lon=lo, nights=k)  # noqa: E731
+    mk = lambda name, la, lo, k: Stop(name=name, country="PT", lat=la, lon=lo, nights=k,  # noqa: E731
+                                      note="Altstadt, Aussichtspunkte, Essen")
     return VariantList(variants=[
         Variant(name="Gemütlich an einem Ort", summary=f"Alles von {a} aus, kurze Wege.",
                 route=[mk(a, 38.72, -9.14, n)], bullets=["Ruhiges Tempo", "Tagesausflüge möglich"],

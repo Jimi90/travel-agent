@@ -54,10 +54,14 @@ def _get(url: str, params: dict, ttl: float) -> dict:
 
 # --- Ortssuche ------------------------------------------------------------------------------
 
-def geocode(name: str) -> Place:
+def geocode(name: str, country: str | None = None) -> Place:
+    """Ort per Name suchen; mit Ländercode (ISO-2) nur im richtigen Land (sonst wird «San José de Cúcuta» zu Costa Rica)."""
     if config.FAKE_MODE:
         return _fake_place(name)
-    data = _get(GEO_URL, {"name": name, "count": 1, "language": "de", "format": "json"}, 7 * 86400)
+    params = {"name": name, "count": 1, "language": "de", "format": "json"}
+    if country and len(country) == 2 and country.isalpha():
+        params["countryCode"] = country.upper()
+    data = _get(GEO_URL, params, 7 * 86400)
     res = (data.get("results") or [])
     if not res:
         raise WeatherError(f"Ort «{name}» nicht gefunden")

@@ -113,13 +113,22 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (50 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (54 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.4)
+## Stand (04.11.2026, Version 1.7.5)
+- 1.7.5: Wunsch James: Routen-Varianten waren «zu klein, zu viel, nicht strukturiert». Jetzt je Route eine Karte: grosse
+  Karte oben (250 px, Nummern = Liste), Name + Preis («für 2 Personen»), ein Satz, **nummerierte Orte** mit Nächten und
+  kurzer Notiz (`Stop.note`), Kacheln Wetter/Meer/Strecke aus `Variant`-`facts` (statt Text in `bullets`), höchstens 3
+  Stichpunkte, Kosten eingeklappt («Kosten im Detail»). Die KI soll in `bullets`/`note` keine Kosten/Wetter/Distanzen
+  schreiben (Prompt). Alte gemerkte Varianten ohne `facts` zeigen weiter alle Stichpunkte. Dabei gefunden: Die KI-
+  Koordinaten waren falsch (Marker in Panama/Costa Rica statt Kolumbien, «San José de Cúcuta» → Costa Rica) → `variants._locate`
+  überschreibt sie per Open-Meteo-Ortssuche **im angegebenen Land** (`weather.geocode(name, country)` mit `countryCode`;
+  Klammern weg, bei «… de X» auch «X»); findet die Suche nichts, bleiben die KI-Werte. Im Testmodus bei 390 px
+  hell/dunkel geprüft; echte Ortssuche und Kartenkacheln nur auf dem NAS prüfbar.
 - 1.7.4: Wunsch James: Zielvorschläge «auf den ersten Blick» – grosses ikonisches Bild, darauf Ort, Flagge + Land + Region
   und der Preis (ganze Reise, 2 Personen), darunter Highlights als Chips, Anreise, Klima, Begründung. Das Bild kommt
   nicht mehr vom Stadtartikel (zeigte Siegel/Baum: «San Jose», «Sal»), sondern von `DestinationIdea.landmark_wiki`
