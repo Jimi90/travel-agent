@@ -626,6 +626,7 @@ function renderVariants(res) {
   const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
   $("ideas").innerHTML = `<h2>Routen für ${esc(res.destination)}</h2>
     <p class="hint" style="margin:0 16px 12px">${res.variants.length} Möglichkeiten für ${esc(res.days)} Tage. Die Nummern gelten für Karte und Liste.</p>` +
+    ((res.dropped || []).length ? `<p class="hint" style="margin:0 16px 12px">Nicht gezeigt, weil über dem Budget: ${esc(res.dropped.join(" · "))}</p>` : "") +
     res.variants.map((v, i) => {
       const f = v.facts || null, nights = v.route.reduce((n, st) => n + st.nights, 0), w = f && f.weather;
       const tiles = f ? [w ? tile("Wetter", `${w.max}° / ${w.min}°`, `${w.score != null ? "Klima " + w.score + "/10 · " : ""}Regen ${w.rain_pct} %`) : "",

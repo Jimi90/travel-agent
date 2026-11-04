@@ -48,7 +48,13 @@ Jede Route: Orte in Reisereihenfolge mit Nächten; Summe der Nächte = Reisetage
 Pro Ort: «note» = 3 bis 6 Wörter, was man dort sieht oder macht (z. B. «Altstadt, Goldmuseum»).
 bullets: 2 bis 4 sehr kurze Stichpunkte (höchstens 8 Wörter), z. B. Reisetempo, Wege, Besonderheiten zur Reisezeit.
 KEINE Kosten, Wetter, Wassertemperatur oder Distanzen in bullets und notes – die zeigt die App getrennt.
-Kosten ehrlich schätzen, in CHF für beide zusammen. Alle Randbedingungen strikt einhalten."""
+Kosten ehrlich schätzen, in CHF für beide zusammen. Alle Randbedingungen strikt einhalten.
+BUDGET ist eine harte Grenze: Die Summe aus flights_chf + hotels_chf + activities_chf + transfers_chf darf das genannte
+Gesamtbudget nicht überschreiten. Wähle dafür günstigere Orte, einfachere Unterkünfte, weniger Ortswechsel und
+kostenlose Programmpunkte. Mindestens eine Variante soll klar unter dem Budget liegen."""
+
+
+BUDGET_SLACK = 1.10
 
 
 def km(a: Stop, b: Stop) -> float:
@@ -131,7 +137,21 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
                 "budget": float(m.budget_total) if m.budget_total else None, "warning": warn,
                 "photo": photos.place_photo(route[0].name, destination) if route else None}
         out.append(item)
+    dropped = []
+    if m.budget_total:  # Budget hart: Routen deutlich darüber fliegen raus (10 % Spielraum für Schätzfehler)
+        limit = float(m.budget_total) * BUDGET_SLACK
+        fits = [o for o in out if o["costs"]["Total"] <= limit]
+        if fits:
+            dropped = [f"{o['name']}: ca. CHF {o['costs']['Total']:.0f} – über dem Budget" for o in out if o not in fits]
+            out = fits
+        elif out:  # nichts passt: nur die günstigste zeigen, deutlich gekennzeichnet
+            cheapest = min(out, key=lambda o: o["costs"]["Total"])
+            cheapest["warning"] = (f"Keine Route im Budget (CHF {float(m.budget_total):.0f}) – das ist die günstigste. "
+                                   "Mehr Budget, weniger Tage oder ein günstigeres Ziel wählen.")
+            dropped = [f"{o['name']}: ca. CHF {o['costs']['Total']:.0f}" for o in out if o is not cheapest]
+            out = [cheapest]
     return {"id": new_id(), "destination": destination, "start": start.isoformat(), "days": days, "wishes": wishes,
+            "dropped": dropped,
             "travel_budget": float(m.travel_budget) if m.travel_budget is not None else None, "variants": out}
 
 

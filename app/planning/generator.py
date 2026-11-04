@@ -126,6 +126,10 @@ Regeln:
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
+- BUDGET ist eine harte Grenze: Hotels (Preis × Nächte), Verbindungen und alle Programmpunkte zusammen dürfen das
+  genannte Gesamtbudget nicht überschreiten. Lieber günstigere Hotels, einfachere Restaurants und kostenlose oder
+  günstige Programmpunkte wählen, als das Budget zu sprengen. Das erste (am besten passende) Hotel je Ort muss im
+  Budget liegen.
 - hotels: pro Aufenthaltsort genau 3 echte Hotels in verschiedenen Preisklassen; tags enthält genau eines von
   «guenstig», «mittel», «gehoben». Das am besten passende (im Budget) zuerst.
 - transports: Anreise am Tag 1 ab dem Heimatort, Rückreise am letzten Tag, dazu alle Ortswechsel

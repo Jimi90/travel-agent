@@ -114,13 +114,19 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (73 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (75 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.9.2)
+## Stand (04.11.2026, Version 1.9.3)
+- 1.9.3: James: «Wenn ich ein maximal Budget hinterlege, aber Routen vorgeschlagen werden, die viel mehr kosten, macht das keinen
+  Sinn.» Budget ist jetzt hart: `variants.suggest` wirft Routen über Budget × `BUDGET_SLACK` (1.10) raus («Nicht gezeigt, weil
+  über dem Budget: …»); passt keine, nur die günstigste mit Warnung «Keine Route im Budget». `destinations.suggest` ebenso für
+  Ziele (`est_total_chf`), ausser nichts bleibt übrig. Prompts (Varianten, Plan) nennen das Budget als harte Grenze. Der fertige
+  Plan zeigt bei Überschreitung weiter nur den Hinweis (1.8.4), weil die KI-Preise Schätzungen sind. 75 Tests; echte KI nur auf
+  dem NAS prüfbar.
 - 1.9.2: Wunsch James: bessere Bilderquelle als Wikipedia → Google-Bildersuche über SerpApi (`photos.google_photo`,
   `engine=google_images`, nur Vorschaubilder von gstatic, Titel muss ein Wort des Suchbegriffs enthalten, Cache «gimg1:»
   auch für «nichts», Kosten-Zeile `preise_bild`, höchstens `IMAGE_MONTH_CAP` = 100 pro Monat von den 250 gratis). Letzte

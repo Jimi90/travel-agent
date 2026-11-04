@@ -52,3 +52,29 @@ class LocateTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BudgetFilterTest(unittest.TestCase):
+    """Routen deutlich über dem Budget werden nicht gezeigt (10 % Spielraum); passt keine, nur die günstigste."""
+
+    def run_suggest(self, budget):
+        from datetime import date
+        from tests.test_replanning import household
+        h = household(budget=budget)
+        with mock.patch.object(variants.llm, "ask", return_value=variants._fake("Lissabon", 7)), \
+                mock.patch.object(variants.photos, "place_photo", return_value=None), \
+                mock.patch.object(variants.weather, "climate", side_effect=weather.WeatherError("x")), \
+                mock.patch.object(config, "FAKE_MODE", True):
+            return variants.suggest(h, "Lissabon", date(2026, 5, 4), 7, "", "ZRH")
+
+    def test_too_expensive_route_is_dropped(self):
+        res = self.run_suggest("1800")  # Totals 1920 / 2050 / 1950, Grenze mit Spielraum 1980
+        names = [v["name"] for v in res["variants"]]
+        self.assertEqual(names, ["Gemütlich an einem Ort", "Rundreise"])
+        self.assertTrue(any("Stadt & Insel" in d for d in res["dropped"]))
+
+    def test_nothing_fits_keeps_only_cheapest_with_warning(self):
+        res = self.run_suggest("1000")
+        self.assertEqual(len(res["variants"]), 1)
+        self.assertEqual(res["variants"][0]["name"], "Gemütlich an einem Ort")
+        self.assertIn("Keine Route im Budget", res["variants"][0]["warning"])
