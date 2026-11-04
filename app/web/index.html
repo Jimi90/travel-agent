@@ -260,6 +260,8 @@ textarea.bare:focus{border:0}
     <div class="row"><div class="grow t">Dauer</div>
       <div class="stepper"><button type="button" id="nMinus" aria-label="Ein Tag weniger">−</button>
         <span id="nDaysTxt">7 Tage</span><button type="button" id="nPlus" aria-label="Ein Tag mehr">+</button></div></div>
+    <label class="row"><div class="grow"><div class="t">Anreise bis (CHF)</div><div class="s">hin und zurück, für beide</div></div>
+      <input class="inl" id="nTravel" type="number" inputmode="numeric" min="0" max="50000" style="max-width:90px"></label>
   </div>
   <h2>Wünsche <span class="r">optional</span></h2>
   <div class="card"><textarea id="nWish" class="bare" maxlength="800"></textarea></div>
@@ -459,13 +461,21 @@ function setNewMode(m) {
 const REACH = [[3, "Kurztrip", "höchstens 2 Std. Flug direkt oder 5 Std. Zug/Auto, 1 Ort"],
   [6, "Kurzurlaub", "höchstens 4 Std. Flug oder 7 Std. Zug/Auto, bis 2 Orte"],
   [13, "Ferien", "höchstens 9 Std. Flug, bis 3 Orte"], [999, "Lange Reise", "Flugzeit nach deinem Profil"]];
+let TRAVEL_TOUCHED = false;
+function travelDefault(days) {
+  const key = days <= 3 ? "kurztrip" : days <= 6 ? "kurzurlaub" : days <= 13 ? "ferien" : "lang";
+  return Math.round(((INFO && INFO.travel_defaults) || {})[key] ?? {kurztrip: 200, kurzurlaub: 400, ferien: 900, lang: 1800}[key]);
+}
 function setDays(n) { NEW_DAYS = Math.min(30, Math.max(2, n)); $("nDaysTxt").textContent = `${NEW_DAYS} Tage`;
+  if (!TRAVEL_TOUCHED) $("nTravel").value = travelDefault(NEW_DAYS);
   $("nMinus").disabled = NEW_DAYS <= 2; $("nPlus").disabled = NEW_DAYS >= 30;
   const r = REACH.find(x => NEW_DAYS <= x[0]);
   $("nModeHint").textContent = NEW_MODE === "vorschlag" ? `${r[1]}: ${r[2]}. ${NEW_TXT.vorschlag.hint}` : NEW_TXT.ziel.hint; }
 $("nMode").querySelectorAll("button").forEach(b => b.onclick = () => { setNewMode(b.dataset.mode); if (b.dataset.mode === "ziel") $("nDest").focus(); });
 $("nMinus").onclick = () => setDays(NEW_DAYS - 1);
 $("nDest").oninput = () => msg($("nMsg"), "");
+$("nTravel").oninput = () => { TRAVEL_TOUCHED = $("nTravel").value !== ""; };
+const travelValue = () => $("nTravel").value === "" ? null : Number($("nTravel").value);
 $("nPlus").onclick = () => setDays(NEW_DAYS + 1);
 
 function openNew(dest) {
@@ -473,6 +483,7 @@ function openNew(dest) {
   if (!$("nStart").value) $("nStart").value = d.toISOString().slice(0, 10);
   let m = "vorschlag"; try { m = localStorage.getItem("newMode") || m; } catch {}
   if (dest) { m = "ziel"; $("nDest").value = dest; }
+  TRAVEL_TOUCHED = false;
   setNewMode(m); setDays(NEW_DAYS);
   openSheet("newSheet");
 }
@@ -494,7 +505,7 @@ async function startVariants(dest) {
   msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen und prüft das Wetter …`);
   $("ideas").innerHTML = "";
   try {
-    const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value});
+    const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
       if (j.status === "laeuft") return setTimeout(poll, 2000);
@@ -530,7 +541,7 @@ function renderVariants(res) {
 }
 async function startPlan(dest) {
   try {
-    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value});
+    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
     closeSheet("newSheet"); show("v-trips");
     watchJob(r.job, `Kompass plant «${dest}» …`, res => { loadTrips(); openTrip(res.trip_id); });
   } catch (e) { msg($("nMsg"), esc(e.message), "err"); }
@@ -540,7 +551,7 @@ async function suggest() {
   const b = $("nGo"); b.disabled = true;
   msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima …`);
   try {
-    const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value});
+    const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
       if (j.status === "laeuft") return setTimeout(poll, 2000);
@@ -1079,27 +1090,18 @@ function personPage(i) {
 const PAGES = {
   budget: () => ({
     title: "Budget",
-    html: () => { const k = HH.constraints, tb = k.travel_budget || {};
-      const TL = [["kurztrip", "Kurztrip (bis 3 Tage)", 200], ["kurzurlaub", "Kurzurlaub (4–6 Tage)", 400],
-                  ["ferien", "Ferien (7–13 Tage)", 900], ["lang", "Lange Reise (ab 14 Tagen)", 1800]];
+    html: () => { const k = HH.constraints;
       return `<h2 style="margin-top:14px">Vor Ort</h2>
       <div class="card">${rIn("Pro Tag (CHF)", "cBudgetDay", k.budget_per_day_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
       <p class="hint">Für beide zusammen: Unterkunft, Essen und Programm. Wird mit der Reisedauer multipliziert.</p>
-      <h2>Anreise hin und zurück <span class="r">CHF</span></h2>
-      <div class="card">${TL.map(([key, label, def]) => rIn(label.replace(" (", " · ").replace(")", ""), "tb_" + key, tb[key] ?? def, `type="number" inputmode="numeric" data-tb="${key}" style="max-width:90px"`)).join("")}</div>
-      <p class="hint">Für beide zusammen. Je kürzer die Reise, desto weniger darf die Anreise kosten – Ziele mit teurerer Anreise schlägt Kompass nicht vor.</p>
       <h2>Ganze Reise</h2>
       <div class="card">${rIn("Höchstens (CHF)", "cBudget", k.budget_total_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
-      <p class="hint">Optional, als Deckel für lange Reisen. Beispiel: 3 Tage × CHF 250 + CHF 200 Anreise = CHF 950 für ein Weekend. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`; },
+      <p class="hint">Optional, als Deckel für lange Reisen. Das Anreisebudget wählst du bei jeder neuen Reise
+        (Vorschlag je Dauer). Beispiel: 3 Tage × CHF 250 + CHF 200 Anreise = CHF 950 für ein Weekend. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`; },
     bind: () => {
       const k = HH.constraints;
       $("cBudgetDay").oninput = e => { k.budget_per_day_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
       $("cBudget").oninput = e => { k.budget_total_max = e.target.value === "" ? null : e.target.value; saveSoon(); };
-      $("subIn").querySelectorAll("[data-tb]").forEach(inp => inp.oninput = () => {
-        k.travel_budget = {...(k.travel_budget || {})};
-        if (inp.value === "") delete k.travel_budget[inp.dataset.tb]; else k.travel_budget[inp.dataset.tb] = inp.value;
-        saveSoon();
-      });
     },
   }),
   dauer: () => ({

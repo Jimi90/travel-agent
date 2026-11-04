@@ -128,8 +128,8 @@ Regeln:
 
 def generate(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
              web_search: bool = False, trip_id: str | None = None,
-             route: list[dict] | None = None) -> tuple[Itinerary, list[str]]:
-    m = match(h, start, days, home_airport)
+             route: list[dict] | None = None, travel_budget=None) -> tuple[Itinerary, list[str]]:
+    m = match(h, start, days, home_airport, travel_budget)
     prompt = (f"Ziel: {destination}\nReise: {start:%d.%m.%Y} bis {start + timedelta(days=days - 1):%d.%m.%Y} "
               f"({days} Tage, {days - 1} Nächte). Heimatflughafen: {home_airport}.\n{m.prompt_text()}\n"
               f"Wünsche: {wishes.strip() or 'keine'}")
@@ -142,7 +142,7 @@ def generate(h: Household, destination: str, start: date, days: int, wishes: str
     draft = llm.ask("reiseplan", system=SYSTEM, content=prompt, schema=PlanDraft, trip_id=trip_id,
                     fake=lambda: fake_draft(destination, days, home_airport, route), max_tokens=32000,
                     web_search=web_search)
-    itin, notes = build(draft, h, start, days, home_airport)
+    itin, notes = build(draft, h, start, days, home_airport, m.travel_budget)
     if route:
         want = [s["name"].casefold() for s in route]
         got = [b.name.casefold() for b in draft.bases]
@@ -185,7 +185,8 @@ def flights_url(frm: str, to: str, d: date) -> str:
     return f"https://www.google.com/travel/flights?q={q}"
 
 
-def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: str) -> tuple[Itinerary, list[str]]:
+def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: str,
+          travel_budget: Decimal | None = None) -> tuple[Itinerary, list[str]]:
     notes: list[str] = []
     k = h.constraints
     avoid, max_int = k.effective_avoid_tags(), k.effective_max_intensity()
@@ -313,6 +314,7 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
         id=new_id(), title=draft.title[:160] or f"Reise {draft.bases[0].name}", start_date=start, end_date=end,
         days=plan_days, stays=stays, transports=transports, alternatives=alts, hotel_suggestions=suggestions,
         summary=draft.summary, home_airport=home_airport, cost_note=draft.cost_note, status="entwurf",
+        travel_budget=travel_budget,
     )
     empty = itin.model_copy(update={"days": [DayPlan(date=d.date, base=d.base) for d in itin.days]})
     problems = PlausibilityChecker().check(empty, itin, k, datetime.combine(start, time(0)))
@@ -320,7 +322,10 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
     notes += [p.message for p in problems if p.level == "warnung" or p.code == "transport_reihenfolge"]
     if errors:
         raise llm.LLMError("Der Plan ist nicht stimmig: " + "; ".join(p.message for p in errors[:3]))
-    budget = k.budget_for(days)
+    budget = k.budget_for(days, travel_budget)
+    travel_cost = sum((t.cost for t in itin.transports), Decimal("0"))
+    if travel_budget and travel_cost > travel_budget:
+        notes.append(f"Anreise und Verbindungen ca. {travel_cost:.0f} CHF – über dem Anreisebudget ({travel_budget:.0f} CHF)")
     if budget and itin.total_cost() > budget:
         notes.append(f"Geschätzte Kosten {itin.total_cost():.0f} CHF liegen über dem Budget für {days} Tage "
                      f"({budget:.0f} CHF)")

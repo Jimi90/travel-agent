@@ -106,12 +106,20 @@ class TravelConstraints(Model):
         v = self.travel_budget.get(key)
         return Decimal(v) if v is not None else Decimal(DEFAULT_TRAVEL_BUDGET[key])
 
-    def budget_for(self, days: int | None) -> Decimal | None:
-        """Budget für eine Reise dieser Länge: vor Ort pro Tag × Tage + Anreise, höchstens das Budget pro Reise."""
-        own = (self.budget_per_day_max * days + self.travel_budget_for(days)) \
-            if self.budget_per_day_max and days else None
+    def budget_for(self, days: int | None, travel: Decimal | None = None) -> Decimal | None:
+        """Budget für eine Reise dieser Länge: vor Ort pro Tag × Tage + Anreise, höchstens das Budget pro Reise.
+
+        travel: Anreisebudget dieser Reise (im Formular «Neue Reise» gewählt); sonst der Vorschlag je Reiselänge.
+        """
+        if travel is None:
+            travel = self.travel_budget_for(days)
+        own = (self.budget_per_day_max * days + (travel or 0)) if self.budget_per_day_max and days else None
         caps = [c for c in (self.budget_total_max, own) if c]
         return min(caps) if caps else None
+
+    def budget_for_trip(self, it) -> Decimal | None:
+        """Budget eines bestehenden Reiseplans (Dauer + dort gemerktes Anreisebudget)."""
+        return self.budget_for((it.end_date - it.start_date).days + 1, getattr(it, "travel_budget", None))
 
     def effective_avoid_tags(self) -> set[str]:
         tags = set(self.avoid_tags)

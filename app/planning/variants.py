@@ -55,8 +55,9 @@ def km(a: Stop, b: Stop) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
-def suggest(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str) -> dict:
-    m = match(h, start, days, home_airport)
+def suggest(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
+            travel_budget=None) -> dict:
+    m = match(h, start, days, home_airport, travel_budget)
     prompt = (f"Ziel: {destination}\nReise: ab {start:%d.%m.%Y}, {days} Tage ({days - 1} Nächte). "
               f"Heimatort: {m.home} (Flughafen {home_airport}).\n{m.prompt_text()}\n"
               f"Höchstens {m.reach.max_bases} Aufenthaltsort(e) pro Route. Anreise so wählen, wie es für diese Dauer "
@@ -108,7 +109,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
                 "photo": photos.wiki_photo(route[0].name, must_match=route[0].name) if route else None}
         out.append(item)
     return {"id": new_id(), "destination": destination, "start": start.isoformat(), "days": days, "wishes": wishes,
-            "variants": out}
+            "travel_budget": float(m.travel_budget) if m.travel_budget is not None else None, "variants": out}
 
 
 def route_text(route: list[dict]) -> str:

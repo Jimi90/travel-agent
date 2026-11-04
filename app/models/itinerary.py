@@ -182,6 +182,7 @@ class Itinerary(Model):
     hotel_suggestions: list[HotelSuggestion] = []
     summary: str = ""
     home_airport: str = "ZRH"
+    travel_budget: Money | None = None  # Anreise hin und zurück für beide, beim Planen gewählt
     cost_note: str = ""
     status: Literal["entwurf", "gebucht", "unterwegs", "abgeschlossen"] = "entwurf"
     version: int = Field(default=1, ge=1)  # wird nur vom StatusManager erhöht

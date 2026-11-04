@@ -115,6 +115,14 @@ class AppTest(unittest.TestCase):
         self.assertEqual(near, ["Colmar", "Lyon"], j3["result"]["dropped"])
         self.assertIn("Valencia: Anreise ca. CHF 260 – über dem Anreisebudget (CHF 200)", j3["result"]["dropped"])
         self.assertEqual(j3["result"]["travel_budget"], 200.0)
+        # eigenes Anreisebudget im Formular: CHF 300 → Valencia (Anreise ca. 260) bleibt
+        code, r = self.call("POST", "/api/destinations", {"start": start.isoformat(), "days": 3, "wish": "",
+                                                          "travel_budget": 300})
+        j3b = self.wait_job(r["job"])
+        self.assertIn("Valencia", [i["name"] for i in j3b["result"]["ideas"]])
+        self.assertEqual(j3b["result"]["travel_budget"], 300.0)
+        self.assertEqual(self.call("POST", "/api/destinations", {"start": start.isoformat(), "days": 3,
+                                                                 "travel_budget": "viel"})[0], 400)
         self.assertTrue(any("Lissabon: 2.8 Std. Flug – zu weit für 3 Tage" == d for d in j3["result"]["dropped"]))
         self.assertIsNotNone(j["result"]["ideas"][0]["climate_score"])
         self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))
@@ -122,7 +130,7 @@ class AppTest(unittest.TestCase):
 
         # --- Routen-Varianten → Plan aus Variante → Hotel wählen → Kostenaufstellung
         code, r = self.call("POST", "/api/variants", {"destination": "Lissabon", "start": start.isoformat(),
-                                                      "days": 6, "wishes": ""})
+                                                      "days": 6, "wishes": "", "travel_budget": 650})
         j = self.wait_job(r["job"])
         self.assertEqual(j["status"], "fertig", j)
         vs = j["result"]
@@ -145,6 +153,7 @@ class AppTest(unittest.TestCase):
         bases = list(dict.fromkeys(day["base"]["name"] for day in d["trip"]["days"]))
         self.assertEqual(bases, [st["name"] for st in v1["route"]])
         self.assertTrue(d["trip"]["summary"].startswith("Stadt & Insel"))
+        self.assertEqual(float(d["trip"]["travel_budget"]), 650.0)      # Anreisebudget aus dem Formular bleibt beim Plan
         s0 = d["trip"]["stays"][0]
         opts = d["hotel_options"][s0["id"]]
         self.assertEqual([o["tier"] for o in opts], ["mittel", "guenstig", "gehoben"])

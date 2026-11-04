@@ -135,7 +135,8 @@ class MatchingResult(Model):
         return "\n".join(lines)
 
 
-def match(h: Household, on: date | None = None, days: int | None = None, home_airport: str = "ZRH") -> MatchingResult:
+def match(h: Household, on: date | None = None, days: int | None = None, home_airport: str = "ZRH",
+          travel_budget: Decimal | None = None) -> MatchingResult:
     cats = []
     for cat in ActivityCategory:
         prefs = [p.preference(cat) for p in h.profiles]
@@ -163,9 +164,9 @@ def match(h: Household, on: date | None = None, days: int | None = None, home_ai
     k = h.constraints
     return MatchingResult(
         names=[p.name for p in h.profiles], categories=cats, temp_min_c=lo, temp_max_c=hi, climate_note=note,
-        rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_for(days),
+        rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_for(days, travel_budget),
         budget_per_day=k.budget_per_day_max, reach=reach_for(days, k) if days else None,
-        travel_budget=k.travel_budget_for(days),
+        travel_budget=travel_budget if travel_budget is not None else k.travel_budget_for(days),
         home=HOME_CITY.get(home_airport.upper(), home_airport),
         currency=k.currency, max_intensity=k.effective_max_intensity(), avoid_tags=sorted(k.effective_avoid_tags()),
         excluded_countries=sorted(h.history.visited_countries),

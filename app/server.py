@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import date, datetime
+from decimal import Decimal
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -52,6 +53,14 @@ def _int(v, lo: int, hi: int, name: str) -> int:
     if not lo <= n <= hi:
         raise BadRequest(f"{name}: {lo}–{hi} erlaubt.")
     return n
+
+
+def _travel(body: dict):
+    """Anreisebudget aus dem Formular (CHF, hin und zurück für beide); leer = Vorschlag je Reiselänge."""
+    v = body.get("travel_budget")
+    if v in (None, ""):
+        return None
+    return Decimal(_int(v, 0, 50_000, "Anreise"))
 
 
 def _text(v, maxlen: int) -> str:
@@ -108,7 +117,7 @@ def trip_detail(trip_id: str) -> dict:
     costs = {"Flüge & Verbindungen": float(sum(t.cost for t in it.transports)),
              "Unterkünfte": float(sum(s.cost for s in it.stays)),
              "Programm": float(sum(a.cost for d in it.days for a in d.activities))}
-    budget = store.household().constraints.budget_for((it.end_date - it.start_date).days + 1)
+    budget = store.household().constraints.budget_for_trip(it)
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
             "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
             "photos": tp, "photos_pending": pending,
@@ -126,6 +135,7 @@ def info() -> dict:
             "settings": s, "models": config.MODELS, "keys": store.key_info(), "ai": llm.available(),
             "free_models": {k: v["model"] for k, v in config.FREE_PROVIDERS.items()},
             "gemini_models": config.FREE_PROVIDERS["gemini"]["models"],
+            "travel_defaults": {k: float(v) for k, v in store.household().constraints.travel_budget.items()},
             "prices": {"available": prices.available(), "month": prices.month_usage(), "free_quota": 250},
             "spent_24h": round(store.spent_since(24), 4), "spent_30d": round(store.spent_since(24 * 30), 4),
             "budget_usd": config.DAILY_BUDGET_USD, "unread": store.unread(),
@@ -368,7 +378,8 @@ class Handler(BaseHTTPRequestHandler):
             days = _int(body.get("days"), 2, 30, "Tage")
             if start < date.today():
                 raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
-            return self._send(200, {"job": service.start_destinations(start, days, _text(body.get("wish"), 400))})
+            return self._send(200, {"job": service.start_destinations(start, days, _text(body.get("wish"), 400),
+                                                                     _travel(body))})
         if p == "/api/variants":
             start = _date(body.get("start"))
             days = _int(body.get("days"), 2, 30, "Tage")
@@ -377,7 +388,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise BadRequest("Bitte das Ziel eingeben.")
             if start < date.today():
                 raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
-            return self._send(200, {"job": service.start_variants(dest, start, days, _text(body.get("wishes"), 800))})
+            return self._send(200, {"job": service.start_variants(dest, start, days, _text(body.get("wishes"), 800),
+                                                                 _travel(body))})
         if p == "/api/trips":
             if body.get("variant_set"):  # gewählte Routen-Variante: Daten nur aus der gemerkten Liste
                 vs = store.get("variants", str(body["variant_set"]))
@@ -387,13 +399,15 @@ class Handler(BaseHTTPRequestHandler):
                 v = vs["variants"][idx]
                 return self._send(200, {"job": service.start_plan(
                     vs["destination"], date.fromisoformat(vs["start"]), vs["days"], vs["wishes"],
-                    route=v["route"], summary=f"{v['name']}: {v['summary']}")})
+                    route=v["route"], summary=f"{v['name']}: {v['summary']}",
+                    travel_budget=_travel({"travel_budget": vs.get("travel_budget")}))})
             start = _date(body.get("start"))
             days = _int(body.get("days"), 2, 30, "Tage")
             dest = _text(body.get("destination"), 200)
             if not dest:
                 raise BadRequest("Bitte ein Ziel angeben oder vorschlagen lassen.")
-            return self._send(200, {"job": service.start_plan(dest, start, days, _text(body.get("wishes"), 800))})
+            return self._send(200, {"job": service.start_plan(dest, start, days, _text(body.get("wishes"), 800),
+                                                             travel_budget=_travel(body))})
         if p == "/api/fav-destination":
             item = body.get("idea") or {}
             if not isinstance(item, dict) or not item.get("id"):

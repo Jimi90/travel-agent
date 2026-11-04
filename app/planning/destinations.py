@@ -45,8 +45,8 @@ Aktivitäten) in CHF ehrlich. Bei kurzen Reisen nahe Ziele – auch in der Schwe
 Halte dich strikt an alle Randbedingungen, besonders an die Reichweite."""
 
 
-def suggest(h: Household, start: date, days: int, wish: str, home_airport: str) -> dict:
-    m = match(h, start, days, home_airport)
+def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, travel_budget=None) -> dict:
+    m = match(h, start, days, home_airport, travel_budget)
     prompt = (f"Reisezeit: ab {start:%d.%m.%Y}, {days} Tage. Heimatort: {m.home} (Flughafen {home_airport}).\n"
               f"{m.prompt_text()}\n"
               f"Wunsch/Hinweis: {wish.strip() or 'keiner – überrasche uns, gerne abwechslungsreich'}\n"
