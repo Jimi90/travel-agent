@@ -92,17 +92,18 @@ def fetch(name: str, stay, trip_id: str) -> dict:
                           link=prop.get("link") or prop.get("serpapi_property_details_link"),
                           photos=ids[:MAX_PHOTOS], source="Google Hotels")
     if not result["photos"]:  # ohne SerpApi oder ohne Bilder: vielleicht hat Wikipedia/Commons eins
-        result["photos"] = _free_photos(name, stay.place.name)
+        result["photos"] = _free_photos(name, stay.place.name, trip_id)
     result["v"] = PHOTO_FALLBACK_V
     store.put("hotel_live", k, result)
     return result
 
 
-PHOTO_FALLBACK_V = 2  # 2: Commons als zweite freie Quelle → ältere Ergebnisse ohne Foto neu versuchen (ohne SerpApi)
+PHOTO_FALLBACK_V = 3  # 3: Google-Bildersuche als letzte Reserve; 2: Commons als zweite freie Quelle → ältere Ergebnisse ohne Foto neu versuchen (ohne SerpApi)
 
 
-def _free_photos(name: str, place: str) -> list:
-    pid = photos.wiki_photo(f"{name} {place}", must_match=name) or photos.commons_photo(f"{name} {place}", must_match=name)
+def _free_photos(name: str, place: str, trip_id: str | None = None) -> list:
+    pid = (photos.wiki_photo(f"{name} {place}", must_match=name) or photos.commons_photo(f"{name} {place}", must_match=name)
+           or photos.google_photo(f"{name} {place} Hotel", must_match=name, trip_id=trip_id))
     return [pid] if pid else []
 
 
@@ -110,13 +111,13 @@ def needs_photo_retry(c: dict | None) -> bool:
     return bool(c) and not c.get("photos") and c.get("v") != PHOTO_FALLBACK_V and "error" not in c
 
 
-def retry_photos(name: str, stay) -> None:
+def retry_photos(name: str, stay, trip_id: str | None = None) -> None:
     """Nur die kostenlosen Fotoquellen nochmals fragen; Preise/Suche (SerpApi) bleiben, wie sie sind."""
     k = key(name, stay.place.name, stay.check_in, stay.check_out)
     c = store.get("hotel_live", k)
     if not needs_photo_retry(c):
         return
-    c["photos"] = _free_photos(name, stay.place.name)
+    c["photos"] = _free_photos(name, stay.place.name, trip_id)
     c["v"] = PHOTO_FALLBACK_V
     store.put("hotel_live", k, c)
 
@@ -146,7 +147,7 @@ def enrich(it, force_stay: str | None = None) -> None:
                         fetch(h.name, st, it.id)
                         n += 1
                     else:
-                        retry_photos(h.name, st)
+                        retry_photos(h.name, st, it.id)
         except Exception as e:  # nie die App stören
             print(f"[Hotels] {it.id}: {type(e).__name__}: {e}", flush=True)
         finally:

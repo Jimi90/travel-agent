@@ -114,13 +114,20 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (70 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (73 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.9.1)
+## Stand (04.11.2026, Version 1.9.2)
+- 1.9.2: Wunsch James: bessere Bilderquelle als Wikipedia → Google-Bildersuche über SerpApi (`photos.google_photo`,
+  `engine=google_images`, nur Vorschaubilder von gstatic, Titel muss ein Wort des Suchbegriffs enthalten, Cache «gimg1:»
+  auch für «nichts», Kosten-Zeile `preise_bild`, höchstens `IMAGE_MONTH_CAP` = 100 pro Monat von den 250 gratis). Letzte
+  Reserve nach Wikipedia/Commons für: Hotels (`hotels._free_photos`, `PHOTO_FALLBACK_V` 3 → alte «ohne Foto» einmal neu),
+  Orte (`place_photo`), Zielvorschläge (`destination_photo`). Nicht für Programmpunkte (zu viele Suchen; Tageszeile zeigt
+  das Ortsfoto). Quellenhinweis im Foto: «Google Bilder». Fotos urheberrechtlich geschützt → nur privat nutzen.
+  73 Tests (auch mit nicht schreibbarem DATA_DIR wie auf GitHub); echte SerpApi-Antworten nur auf dem NAS prüfbar.
 - 1.9.1: James: nicht bei allen Hotels Bilder. Ursache: Fotos kamen nur, wenn Google Hotels (SerpApi) das Hotel mit
   passendem Namen fand; sonst nur Wikipedia (selten). Jetzt Wikipedia dann Commons (`hotels._free_photos`); ältere
   Ergebnisse ohne Foto werden einmal nur über die freien Quellen neu versucht (`retry_photos`, `PHOTO_FALLBACK_V` 2, kein

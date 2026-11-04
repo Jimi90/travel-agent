@@ -19,6 +19,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import date
 
 from . import config, store
 
@@ -221,9 +222,11 @@ def destination_photo(landmark: str, name: str, region: str = "", highlights=())
             pid = commons_photo(q.strip(), must_match=need)
             if pid:
                 return pid
-    if len(name) < 5:  # kurzer Ortsname trifft in Wikipedia zu oft andere Artikel (Baum, Siegel)
-        return None
-    return wiki_photo(f"{name} {region}".strip(), must_match=name)
+    pid = None
+    if len(name) >= 5:  # kurzer Ortsname trifft in Wikipedia zu oft andere Artikel (Baum, Siegel)
+        pid = wiki_photo(f"{name} {region}".strip(), must_match=name)
+    # letzte Reserve: Google-Bildersuche (gemerkt, begrenzt pro Monat)
+    return pid or google_photo(f"{landmark or name} {name} {region}".strip(), must_match=name)
 
 
 COMMONS = "https://commons.wikimedia.org/w/api.php"
@@ -275,6 +278,48 @@ def commons_photo(query: str, must_match: str = "") -> str | None:
     return pid
 
 
+IMAGE_MONTH_CAP = 100  # Google-Bildersuchen pro Monat (Gratis-Kontingent SerpApi: 250, der Rest bleibt für Preise)
+
+
+def image_usage() -> int:
+    since = date.today().replace(day=1).isoformat()
+    (n,) = store.db().execute("SELECT COUNT(*) FROM costs WHERE purpose = 'preise_bild' AND model = 'serpapi' "
+                              "AND substr(ts, 1, 10) >= ?", (since,)).fetchone()
+    return int(n)
+
+
+def google_photo(query: str, must_match: str = "", trip_id: str | None = None) -> str | None:
+    """Letzte Reserve: erstes passendes Bild der Google-Bildersuche (SerpApi). Das Ergebnis wird dauerhaft gemerkt
+    (auch «nichts»), jede echte Suche zählt als Kosten-Zeile. Nur Vorschaubilder von Google (gstatic)."""
+    from . import prices  # spät: prices braucht diese Datei nicht
+    key = "gimg1:" + _fold(query).strip() + "|" + _fold(must_match).strip()
+    cached = store.get("photo_q", key)
+    if cached is not None:
+        return cached.get("id")
+    if not prices.available() or image_usage() >= IMAGE_MONTH_CAP:
+        return None
+    try:
+        if config.FAKE_MODE:
+            data = {"images_results": [{"title": query, "thumbnail": f"https://encrypted-tbn0.gstatic.com/fake-{_fold(query)}"}]}
+            store.add_cost("preise_bild", "serpapi", 0.0, 0, 0, trip_id)
+        else:
+            data = prices._search({"engine": "google_images", "q": query, "hl": "de", "gl": "ch", "safe": "active"},
+                                  "preise_bild", trip_id)
+    except prices.PriceError:
+        return None  # nichts merken, später nochmals
+    need = _words(must_match)
+    pid = None
+    for r in (data.get("images_results") or [])[:8]:
+        url, title = r.get("thumbnail") or "", str(r.get("title") or "")
+        if (need and not need & _words(title)) or bad_image(url, title):
+            continue
+        pid = download(url, "Google Bilder", title, r.get("link") or "")
+        if pid:
+            break
+    store.put("photo_q", key, {"id": pid})
+    return pid
+
+
 def place_photo(name: str, region: str = "") -> str | None:
     """Foto eines Ortes: Commons-Suche zuerst (zeigt Landschaft/Stadt), dann der Wikipedia-Artikel."""
     name = (name or "").split("(")[0].strip()
@@ -283,7 +328,8 @@ def place_photo(name: str, region: str = "") -> str | None:
     pid = commons_photo(f"{name} {region}".strip(), must_match=name)
     if not pid and region:
         pid = commons_photo(name, must_match=name)
-    return pid or wiki_photo(name, must_match=name)
+    return pid or wiki_photo(name, must_match=name) or google_photo(f"{name} {region} Sehenswürdigkeiten".strip(),
+                                                                  must_match=name)
 
 
 def has_photo_subject(a) -> bool:
