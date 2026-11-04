@@ -140,7 +140,7 @@ def trip_detail(trip_id: str) -> dict:
             opts.append({"name": h.name, "area": h.area, "night": float(h.price_per_night),
                          "total": float(h.price_per_night) * nights, "why": h.why,
                          "tier": next((t for t in ("guenstig", "mittel", "gehoben") if t in h.tags), ""),
-                         "url": h.search_url, "chosen": h.name == st.name, "photos": live.get("photos", []),
+                         "url": h.search_url, "chosen": h.name == st.name, "photos": live.get("photos", []), "searched": bool(live),
                          "live": {**{k: live.get(k) for k in ("night", "total", "rating", "reviews", "link", "ts")},
                                   "total": prices.stay_total(live.get("total"), live.get("night"), nights)}
                          if live.get("found") and live.get("night") else None})
