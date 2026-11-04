@@ -12,6 +12,17 @@ from .common import ActivityCategory, Intensity, Model, Money, new_id
 # +2 = sehr gern, 0 = egal, -2 = auf keinen Fall (Veto für den ganzen Haushalt)
 Preference = Annotated[int, Field(ge=-2, le=2)]
 
+# Reiselänge → Kategorie (gleiche Grenzen wie die Reichweite in planning/matching.py)
+TRIP_CATEGORIES = [(3, "kurztrip", "Kurztrip (bis 3 Tage)"), (6, "kurzurlaub", "Kurzurlaub (4–6 Tage)"),
+                   (13, "ferien", "Ferien (7–13 Tage)"), (10_000, "lang", "Lange Reise (ab 14 Tagen)")]
+# Anreise hin und zurück für beide – Vorschlagswerte, in Profil → Budget anpassbar
+DEFAULT_TRAVEL_BUDGET = {"kurztrip": 200, "kurzurlaub": 400, "ferien": 900, "lang": 1800}
+
+
+def trip_category(days: int) -> str:
+    return next(key for upto, key, _ in TRIP_CATEGORIES if days <= upto)
+
+
 # Vorgabe, was in der Schwangerschaft automatisch vermieden wird. Keine medizinische Aussage:
 # mit Ärztin/Hebamme abstimmen und über ``PregnancyStatus.extra_avoid_tags`` ergänzen.
 PREGNANCY_AVOID_TAGS = frozenset({"hitze", "tauchen", "hoehe", "achterbahn"})
@@ -61,8 +72,9 @@ class PregnancyStatus(Model):
 class TravelConstraints(Model):
     """Feste Randbedingungen – gelten für jede Planung und jede Planänderung."""
 
-    budget_total_max: Money | None = None  # höchstens pro Reise (Obergrenze)
-    budget_per_day_max: Money | None = None  # pro Tag für beide – wird auf die Reisedauer hochgerechnet
+    budget_total_max: Money | None = None  # höchstens pro Reise (Obergrenze, optional)
+    budget_per_day_max: Money | None = None  # vor Ort pro Tag für beide (Unterkunft, Essen, Programm)
+    travel_budget: dict[str, Money] = Field(default_factory=lambda: {k: Decimal(v) for k, v in DEFAULT_TRAVEL_BUDGET.items()})
     currency: str = "CHF"
     duration_days_min: int = Field(default=1, ge=1)
     duration_days_max: int = Field(default=21, ge=1)
@@ -78,11 +90,36 @@ class TravelConstraints(Model):
             raise ValueError("duration_days_min ist grösser als duration_days_max")
         return self
 
-    def budget_for(self, days: int | None) -> Decimal | None:
-        """Budget für eine Reise dieser Länge: Tagesbudget × Tage, höchstens das Budget pro Reise."""
-        caps = [c for c in (self.budget_total_max,
-                            self.budget_per_day_max * days if self.budget_per_day_max and days else None) if c]
+    @field_validator("travel_budget")
+    @classmethod
+    def _travel(cls, v: dict) -> dict:
+        unknown = set(v) - set(DEFAULT_TRAVEL_BUDGET)
+        if unknown:
+            raise ValueError(f"unbekannte Reiselänge: {', '.join(sorted(unknown))}")
+        return v
+
+    def travel_budget_for(self, days: int | None) -> Decimal | None:
+        """Anreise hin und zurück für beide, je nach Reiselänge (Weekend ≠ drei Wochen)."""
+        if not days:
+            return None
+        key = trip_category(days)
+        v = self.travel_budget.get(key)
+        return Decimal(v) if v is not None else Decimal(DEFAULT_TRAVEL_BUDGET[key])
+
+    def budget_for(self, days: int | None, travel: Decimal | None = None) -> Decimal | None:
+        """Budget für eine Reise dieser Länge: vor Ort pro Tag × Tage + Anreise, höchstens das Budget pro Reise.
+
+        travel: Anreisebudget dieser Reise (im Formular «Neue Reise» gewählt); sonst der Vorschlag je Reiselänge.
+        """
+        if travel is None:
+            travel = self.travel_budget_for(days)
+        own = (self.budget_per_day_max * days + (travel or 0)) if self.budget_per_day_max and days else None
+        caps = [c for c in (self.budget_total_max, own) if c]
         return min(caps) if caps else None
+
+    def budget_for_trip(self, it) -> Decimal | None:
+        """Budget eines bestehenden Reiseplans (Dauer + dort gemerktes Anreisebudget)."""
+        return self.budget_for((it.end_date - it.start_date).days + 1, getattr(it, "travel_budget", None))
 
     def effective_avoid_tags(self) -> set[str]:
         tags = set(self.avoid_tags)

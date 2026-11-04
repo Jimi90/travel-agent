@@ -164,7 +164,7 @@ class ExtendedDisruptionHandler:
                 continue
             if res.status is ChangeStatus.APPLIED:
                 after = self.status.get(itin.id)
-                cap = k.budget_for((after.end_date - after.start_date).days + 1)
+                cap = k.budget_for_trip(after)
                 if cap and after.total_cost() > cap:
                     warnings.append(f"Geschätzte Kosten jetzt {after.total_cost():.0f} CHF – über dem Budget "
                                     f"({cap:.0f} CHF).")

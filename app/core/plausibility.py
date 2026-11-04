@@ -113,7 +113,7 @@ class PlausibilityChecker:
         return out
 
     def _budget(self, before: Itinerary, after: Itinerary, k: TravelConstraints) -> list[Problem]:
-        cap = k.budget_for((after.end_date - after.start_date).days + 1)
+        cap = k.budget_for_trip(after)
         if cap is None:
             return []
         total = after.total_cost()

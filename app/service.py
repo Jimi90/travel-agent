@@ -191,11 +191,11 @@ def _start_job(kind: str, fn, *args) -> str:
     return jid
 
 
-def start_destinations(start: date, days: int, wish: str) -> str:
+def start_destinations(start: date, days: int, wish: str, travel_budget=None) -> str:
     s = store.settings()
 
     def run():
-        res = destinations.suggest(store.household(), start, days, wish, s["home_airport"])
+        res = destinations.suggest(store.household(), start, days, wish, s["home_airport"], travel_budget)
         res["id"] = new_id()
         store.put("ideas", res["id"], res)
         return res
@@ -203,11 +203,11 @@ def start_destinations(start: date, days: int, wish: str) -> str:
     return _start_job("ziele", run)
 
 
-def start_variants(destination: str, start: date, days: int, wishes: str) -> str:
+def start_variants(destination: str, start: date, days: int, wishes: str, travel_budget=None) -> str:
     s = store.settings()
 
     def run():
-        res = variants.suggest(store.household(), destination, start, days, wishes, s["home_airport"])
+        res = variants.suggest(store.household(), destination, start, days, wishes, s["home_airport"], travel_budget)
         store.put("variants", res["id"], res)
         return res
 
@@ -215,12 +215,13 @@ def start_variants(destination: str, start: date, days: int, wishes: str) -> str
 
 
 def start_plan(destination: str, start: date, days: int, wishes: str, route: list[dict] | None = None,
-               summary: str = "") -> str:
+               summary: str = "", travel_budget=None) -> str:
     s = store.settings()
 
     def run():
         itin, notes = generator.generate(store.household(), destination, start, days, wishes, s["home_airport"],
-                                         web_search=bool(s.get("web_search")), route=route)
+                                         web_search=bool(s.get("web_search")), route=route,
+                                         travel_budget=travel_budget)
         if summary:  # gewählte Variante zuerst, dann der Überblick des Planers
             itin = itin.model_copy(update={"summary": f"{summary} {itin.summary}".strip()})
         sm().create(itin)
