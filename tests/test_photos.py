@@ -63,6 +63,9 @@ class DestinationPhotoTest(unittest.TestCase):
         pc = mock.patch.object(photos, "commons_photo", return_value=None)
         self.commons = pc.start()
         self.addCleanup(pc.stop)
+        pg = mock.patch.object(photos, "google_photo", return_value=None)  # nie SerpApi/Ablage anfassen
+        self.google = pg.start()
+        self.addCleanup(pg.stop)
 
     def test_commons_before_wikipedia_place_name(self):
         self.commons.side_effect = [None, "pc"]
@@ -109,6 +112,45 @@ class DestinationPhotoTest(unittest.TestCase):
             self.assertIsNone(photos.destination_photo("", "Sal", "Kap Verde", []))
         w.assert_not_called()
 
+    def test_google_is_last_resort(self):
+        self.google.return_value = "g1"
+        with mock.patch.object(photos, "wiki_photo", return_value=None):
+            self.assertEqual(photos.destination_photo("", "Sal", "Kap Verde", []), "g1")
+        self.assertEqual(self.commons.call_count, 3)  # erst alle freien Quellen, dann Google
+
+
+
+class GooglePhotoTest(unittest.TestCase):
+    def setUp(self):
+        self.mem = {}
+        for name, fn in (("get", lambda kind, key: self.mem.get((kind, key))),
+                         ("put", lambda kind, key, data: self.mem.__setitem__((kind, key), data)),
+                         ("add_cost", lambda *a, **k: None)):
+            p = mock.patch.object(photos.store, name, fn)
+            p.start()
+            self.addCleanup(p.stop)
+
+    def run_search(self, results, usage=0):
+        from app import prices
+        with mock.patch.object(prices, "available", return_value=True), \
+                mock.patch.object(photos, "image_usage", return_value=usage), \
+                mock.patch.object(prices, "_search", return_value={"images_results": results}) as s, \
+                mock.patch.object(photos, "download", side_effect=lambda u, *a: "pid-" + u[-1]):
+            return photos.google_photo("Landhaus Gassner Triesenberg Hotel", must_match="Landhaus Gassner"), s
+
+    def test_picks_matching_title_and_remembers(self):
+        res = [{"title": "Irgendein Strand", "thumbnail": "https://encrypted-tbn0.gstatic.com/a"},
+               {"title": "Landhaus Gassner – Zimmer", "thumbnail": "https://encrypted-tbn0.gstatic.com/b"}]
+        pid, s = self.run_search(res)
+        self.assertEqual(pid, "pid-b")
+        self.assertEqual(photos.google_photo("Landhaus Gassner Triesenberg Hotel", must_match="Landhaus Gassner"), "pid-b")
+        self.assertEqual(s.call_count, 1)  # zweite Frage kommt aus der Ablage
+
+    def test_monthly_cap_stops_searches(self):
+        pid, s = self.run_search([{"title": "Landhaus Gassner", "thumbnail": "https://x.gstatic.com/c"}],
+                                 usage=photos.IMAGE_MONTH_CAP)
+        self.assertIsNone(pid)
+        s.assert_not_called()
 
 
 class TripPhotoVersionTest(unittest.TestCase):
