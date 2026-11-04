@@ -361,9 +361,8 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
     <label class="row" id="nDestRow" hidden><div class="grow t">Ziel</div>
       <input class="inl" id="nDest" maxlength="200" placeholder="z. B. Madeira" autocomplete="off"></label>
     <label class="row"><div class="grow t">Abreise</div><input class="inl" type="date" id="nStart" style="max-width:170px"></label>
-    <div class="row"><div class="grow t">Dauer</div>
-      <div class="stepper"><button type="button" id="nMinus" aria-label="Ein Tag weniger">−</button>
-        <span id="nDaysTxt">7 Tage</span><button type="button" id="nPlus" aria-label="Ein Tag mehr">+</button></div></div>
+    <label class="row"><div class="grow"><div class="t">Rückreise</div><div class="s" id="nDaysTxt">7 Tage</div></div>
+      <input class="inl" type="date" id="nEnd" style="max-width:170px"></label>
     <label class="row"><div class="grow"><div class="t">Hin- und Rückreise bis (CHF)</div><div class="s">Flug, Zug oder Auto, für beide</div></div>
       <input class="inl" id="nTravel" type="number" inputmode="numeric" min="0" max="50000" style="max-width:90px"></label>
   </div>
@@ -571,17 +570,28 @@ function travelDefault(days) {
   const key = days <= 3 ? "kurztrip" : days <= 6 ? "kurzurlaub" : days <= 13 ? "ferien" : "lang";
   return Math.round(((INFO && INFO.travel_defaults) || {})[key] ?? {kurztrip: 200, kurzurlaub: 400, ferien: 900, lang: 1800}[key]);
 }
-function setDays(n) { NEW_DAYS = Math.min(30, Math.max(2, n)); $("nDaysTxt").textContent = `${NEW_DAYS} Tage`;
+const isoDay = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const addDays = (iso, n) => { const d = new Date(iso + "T12:00:00"); d.setDate(d.getDate() + n); return isoDay(d); };
+// Dauer = Tage von Abreise bis Rückreise (beide Tage zählen); 2–30 Tage
+function setDays(n) { NEW_DAYS = Math.min(30, Math.max(2, n));
+  const st = $("nStart").value;
+  if (st) { $("nEnd").value = addDays(st, NEW_DAYS - 1); $("nEnd").min = addDays(st, 1); $("nEnd").max = addDays(st, 29); }
+  $("nDaysTxt").textContent = `${NEW_DAYS} Tage · ${NEW_DAYS - 1} ${NEW_DAYS - 1 === 1 ? "Nacht" : "Nächte"}`;
   if (!TRAVEL_TOUCHED) $("nTravel").value = travelDefault(NEW_DAYS);
-  $("nMinus").disabled = NEW_DAYS <= 2; $("nPlus").disabled = NEW_DAYS >= 30;
   const r = REACH.find(x => NEW_DAYS <= x[0]);
   $("nModeHint").textContent = NEW_MODE === "vorschlag" ? `${r[1]}: ${r[2]}. ${NEW_TXT.vorschlag.hint}` : NEW_TXT.ziel.hint; }
+$("nStart").onchange = () => setDays(NEW_DAYS);  // Abreise ändern: Dauer bleibt, Rückreise wandert mit
+$("nEnd").onchange = () => {
+  const st = $("nStart").value, en = $("nEnd").value;
+  if (!st || !en) return setDays(NEW_DAYS);
+  const n = Math.round((new Date(en + "T12:00:00") - new Date(st + "T12:00:00")) / 86400000) + 1;
+  setDays(n);  // ausserhalb 2–30 Tage wird korrigiert, das Datum springt zurück
+  if (n < 2 || n > 30) toast(n < 2 ? "Die Rückreise muss nach der Abreise liegen." : "Höchstens 30 Tage.");
+};
 $("nMode").querySelectorAll("button").forEach(b => b.onclick = () => { setNewMode(b.dataset.mode); if (b.dataset.mode === "ziel") $("nDest").focus(); });
-$("nMinus").onclick = () => setDays(NEW_DAYS - 1);
 $("nDest").oninput = () => msg($("nMsg"), "");
 $("nTravel").oninput = () => { TRAVEL_TOUCHED = $("nTravel").value !== ""; };
 const travelValue = () => $("nTravel").value === "" ? null : Number($("nTravel").value);
-$("nPlus").onclick = () => setDays(NEW_DAYS + 1);
 
 function openNew(dest) {
   const d = new Date(); d.setDate(d.getDate() + 30);
