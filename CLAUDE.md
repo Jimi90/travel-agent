@@ -120,7 +120,10 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.8.1)
+## Stand (04.11.2026, Version 1.8.2)
+- 1.8.2: James: im Tagesplan fehlten Fotos oft (Sharm el Sheikh Tag 3–7). `activity_photo` versucht zuletzt Commons
+  (`commons_photo(Titel Ort)`), die Tageszeile zeigt sonst das Ortsfoto (`photos.places`), `PHOTO_VERSION` 3 → leere
+  Zuordnungen älterer Reisen werden neu geholt (Hotelfotos bleiben). 66 Tests; echte Treffer nur auf dem NAS prüfbar.
 - 1.8.1: Wunsch James: Zielkarten ohne Bilder, Infos schwer lesbar; auf einen Blick Wetter + Wassertemperatur (Vorbild tui.ch).
   Fotos: `photos.commons_photo` (Wikimedia Commons, Dateisuche, nur JPEG-Querformat, Titel muss Ortswort enthalten, Cache
   «commons1:») ist jetzt Teil von `destination_photo` (Wahrzeichen → Highlights → Commons → Wikipedia) und von

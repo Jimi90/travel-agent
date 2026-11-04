@@ -775,7 +775,7 @@ function renderTrip(outcome) {
     const strip = pics.length ? `<div class="strip">${pics.map(([id, title]) => `<figure>${photo(id, "", title)}<figcaption>${esc(title)}</figcaption></figure>`).join("")}</div>` : "";
     const n = day.activities.length;
     return `<details class="day" data-d="${esc(day.date)}" ${OPEN_DAYS.set.has(day.date) ? "open" : ""}>
-      <summary>${pics.length ? photo(pics[0][0], "dthumb", pics[0][1]) : `<span class="dthumb"></span>`}
+      <summary>${pics.length ? photo(pics[0][0], "dthumb", pics[0][1]) : P.places[day.base.name] ? photo(P.places[day.base.name], "dthumb", day.base.name) : `<span class="dthumb"></span>`}
         <div class="grow"><div class="t">${esc(fmtD(day.date, {weekday: "short", day: "numeric", month: "long"}))}${isToday ? ` <span class="badge acc">heute</span>` : ""}</div>
         <div class="s">Tag ${di + 1} · ${esc(day.base.name)} · ${n ? n + (n === 1 ? " Punkt" : " Punkte") : "frei"}</div></div></summary>` +
       (day.theme ? `<div class="theme">${esc(day.theme)}</div>` : "") + strip +
