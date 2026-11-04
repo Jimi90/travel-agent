@@ -328,7 +328,9 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
     )
     empty = itin.model_copy(update={"days": [DayPlan(date=d.date, base=d.base) for d in itin.days]})
     problems = PlausibilityChecker().check(empty, itin, k, datetime.combine(start, time(0)))
-    errors = [p for p in problems if p.level == "fehler" and p.code != "transport_reihenfolge"]
+    # Budget nie als Fehler: ein Plan über dem Budget wird trotzdem gezeigt, mit Hinweis (unten) – nicht abgelehnt
+    soft = ("transport_reihenfolge", "budget")
+    errors = [p for p in problems if p.level == "fehler" and p.code not in soft]
     notes += [p.message for p in problems if p.level == "warnung" or p.code == "transport_reihenfolge"]
     if errors:
         raise llm.LLMError("Der Plan ist nicht stimmig: " + "; ".join(p.message for p in errors[:3]))
