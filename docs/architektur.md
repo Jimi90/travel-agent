@@ -19,7 +19,7 @@ app/
   core/         StatusManager (einzige Schreibstelle), Operationen, Plausibilitätsprüfung
   planning/     matching, destinations, generator, replanning, alternatives, providers, disruption_ext
   weather.py    Open-Meteo        llm.py      Claude (Kosten, Bremse, Testmodus)
-  vision.py     Foto-Übersetzung  drafting.py Nachrichten-Entwürfe
+  vision.py     Foto-Übersetzung (nicht in der Oberfläche)  drafting.py Nachrichten-Entwürfe  fx.py Währungskurse
   service.py    Steuerzentrale + Morgen-Zeitplan
   store.py      Ablage (Haushalt, Einstellungen, Meldungen, Kosten, Favoriten, Entwürfe)
   server.py     Routen        auth.py  Anmeldung        web/  Oberfläche

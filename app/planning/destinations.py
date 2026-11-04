@@ -20,7 +20,8 @@ from .matching import climate_score, match
 class DestinationIdea(BaseModel):
     name: str
     country: str  # ISO-3166 Alpha-2
-    region: str
+    region: str  # Region/Provinz/Insel, z. B. «Algarve», «Toskana», «Gran Canaria»
+    landmark_wiki: str = ""  # Wikipedia-Titel eines ikonischen Wahrzeichens/einer Landschaft – das Bild der Karte
     lat: float
     lon: float
     why: str
@@ -42,7 +43,11 @@ Rechtschreibung (kein ß). Schlage nur echte, erreichbare Ziele vor. Begründe k
 zu BEIDEN passt. Wähle die sinnvollste Anreise (Flug, Zug oder Auto) und schätze die Reisezeit pro Strecke, beim Flug
 die übliche Zahl Umstiege, und die Gesamtkosten für zwei Personen für genau diese Reisedauer (Anreise, Unterkunft,
 Aktivitäten) in CHF ehrlich. Bei kurzen Reisen nahe Ziele – auch in der Schweiz und den Nachbarländern.
-Halte dich strikt an alle Randbedingungen, besonders an die Reichweite."""
+Halte dich strikt an alle Randbedingungen, besonders an die Reichweite.
+Pro Ziel: «region» = Region, Provinz oder Insel (z. B. «Algarve», «Toskana»), «highlights» = 3 bis 4 kurze, konkrete
+Stichworte (je höchstens 3 Wörter, z. B. «Vulkan Poás», «Altstadt Alfama»), «landmark_wiki» = Titel des Wikipedia-Artikels
+eines weltbekannten Wahrzeichens oder einer ikonischen Landschaft dieses Ziels, die man auf einem Foto sofort dem Ziel
+zuordnet (z. B. «Torre de Belém», «Vulkan Arenal»). NICHT der Artikel über die Stadt oder das Land, kein Wappen, keine Flagge."""
 
 
 def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, travel_budget=None) -> dict:
@@ -83,8 +88,7 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
             item["climate_score"], item["climate_text"] = climate_score(m, clim)
         except weather.WeatherError as e:
             item["climate_score"], item["climate_text"] = None, f"Klimadaten nicht verfügbar ({e})"
-        short = idea.name.split("(")[0].strip()
-        item["photo"] = photos.wiki_photo(short, must_match=short)
+        item["photo"] = photos.destination_photo(idea.landmark_wiki, idea.name, idea.region)
         if m.budget_total and idea.est_total_chf > float(m.budget_total):
             item["warning"] = f"Geschätzt {idea.est_total_chf} CHF – über dem Budget"
         out.append(item)
@@ -96,13 +100,18 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
 
 
 def _fake(h: Household) -> DestinationList:
-    base = [("Lissabon", "PT", 38.72, -9.14, "flug", 2.8, 0, 380), ("Madeira (Funchal)", "PT", 32.65, -16.91, "flug", 3.8, 0, 520),
-            ("Kreta (Chania)", "GR", 35.51, 24.02, "flug", 2.9, 0, 420), ("Rom", "IT", 41.9, 12.5, "flug", 1.5, 0, 220),
-            ("Valencia", "ES", 39.47, -0.38, "flug", 1.9, 0, 260), ("Malta (Valletta)", "MT", 35.9, 14.51, "flug", 2.4, 0, 340),
-            ("Lyon", "FR", 45.76, 4.84, "zug", 4.5, 0, 180), ("Doha", "QA", 25.29, 51.53, "flug", 6.5, 0, 900),
-            ("Colmar", "FR", 48.08, 7.36, "auto", 1.8, 0, 90)]
+    base = [("Lissabon", "PT", "Region Lissabon", "Torre de Belém", 38.72, -9.14, "flug", 2.8, 0, 380),
+            ("Madeira (Funchal)", "PT", "Madeira", "Pico do Arieiro", 32.65, -16.91, "flug", 3.8, 0, 520),
+            ("Kreta (Chania)", "GR", "Kreta", "Balos Lagoon", 35.51, 24.02, "flug", 2.9, 0, 420),
+            ("Rom", "IT", "Latium", "Kolosseum", 41.9, 12.5, "flug", 1.5, 0, 220),
+            ("Valencia", "ES", "Valencia", "Ciudad de las Artes y las Ciencias", 39.47, -0.38, "flug", 1.9, 0, 260),
+            ("Malta (Valletta)", "MT", "Malta", "Valletta", 35.9, 14.51, "flug", 2.4, 0, 340),
+            ("Lyon", "FR", "Auvergne-Rhône-Alpes", "Basilique Notre-Dame de Fourvière", 45.76, 4.84, "zug", 4.5, 0, 180),
+            ("Doha", "QA", "Doha", "Museum of Islamic Art, Doha", 25.29, 51.53, "flug", 6.5, 0, 900),
+            ("Colmar", "FR", "Elsass", "Petite Venise (Colmar)", 48.08, 7.36, "auto", 1.8, 0, 90)]
     return DestinationList(ideas=[DestinationIdea(
-        name=n, country=c, region="", lat=la, lon=lo, why=f"Testvorschlag {n}: mildes Klima, gute Mischung.",
+        name=n, country=c, region=rg, landmark_wiki=lm, lat=la, lon=lo,
+        why=f"Testvorschlag {n}: mildes Klima, gute Mischung.",
         highlights=["Altstadt", "Küste", "Essen"], travel_mode=mode, travel_hours=hrs, typical_stops=st,
         travel_cost_chf=tc, cost_level="mittel", est_total_chf=1500 + i * 300)
-        for i, (n, c, la, lo, mode, hrs, st, tc) in enumerate(base)])
+        for i, (n, c, rg, lm, la, lo, mode, hrs, st, tc) in enumerate(base)])

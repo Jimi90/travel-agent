@@ -33,6 +33,10 @@ GENERIC = re.compile(r"^(abendessen|mittagessen|frühstück|fruhstuck|ankunft|ab
 STOP = {"und", "der", "die", "das", "mit", "von", "im", "in", "am", "an", "zum", "zur", "the", "of", "and", "de", "do",
         "da", "la", "le", "el", "tour", "besuch", "ausflug", "wanderung", "spaziergang", "fahrt", "abend", "morgen"}
 
+# Bilder, die nie «das Ziel» zeigen: Wappen, Siegel, Flaggen, Logos, Karten (kamen bei Stadtartikeln oft als Seitenbild)
+BAD_IMAGE = re.compile(r"coat[_ -]?of[_ -]?arms|wappen|blason|escudo|stemma|(^|[^a-z])seal([^a-z]|$)|flag|flagge|bandera|"
+                       r"logo|locator|location[_ -]?map|(^|[^a-z])map([^a-z]|$)|karte|emblem|\.svg", re.I)
+
 _lock = threading.Lock()
 _running: set[str] = set()
 
@@ -123,6 +127,12 @@ def parse_wiki_all(data: dict) -> list[dict]:
             for p in pages if (p.get("thumbnail") or {}).get("source")]
 
 
+def bad_image(url: str, title: str = "") -> bool:
+    """Wappen, Siegel, Flaggen, Logos und Karten sind kein Foto des Ziels."""
+    name = urllib.parse.unquote(url.rsplit("/", 1)[-1])
+    return bool(BAD_IMAGE.search(name) or BAD_IMAGE.search(title or ""))
+
+
 def parse_wiki(data: dict) -> dict | None:
     hits = parse_wiki_all(data)
     return hits[0] if hits else None
@@ -149,7 +159,8 @@ def wiki_photo(query: str, must_match: str = "") -> str | None:
                 return None  # später nochmals versuchen (nichts merken)
             hits = parse_wiki_all(data)
         # alle Treffer prüfen, nicht nur den ersten (oft ist das der Artikel über die Stadt)
-        hit = next((h for h in hits if not need or need & _words(h["title"])), None)
+        hit = next((h for h in hits if (not need or need & _words(h["title"])) and not bad_image(h["url"], h["title"])),
+                   None)
         if hit:
             pid = download(hit["url"], "Wikipedia", hit["title"], hit["page"])
             if pid:
@@ -177,12 +188,23 @@ def wiki_title_photo(title: str) -> str | None:
             except (urllib.error.URLError, TimeoutError, ValueError):
                 return None
             hits = parse_wiki_all(data)
-        if hits:
+        if hits and not bad_image(hits[0]["url"], hits[0]["title"]):
             pid = download(hits[0]["url"], "Wikipedia", hits[0]["title"], hits[0]["page"])
             if pid:
                 break
     store.put("photo_q", key, {"id": pid})
     return pid
+
+
+def destination_photo(landmark: str, name: str, region: str = "") -> str | None:
+    """Ikonisches Bild eines Reiseziels: Wahrzeichen/Landschaft (Wikipedia-Titel der KI) → Suche danach →
+    erst zuletzt der Ortsname (dessen Artikel zeigt oft nur ein Siegel oder eine Karte)."""
+    landmark, name = (landmark or "").strip(), (name or "").split("(")[0].strip()
+    if landmark:
+        pid = wiki_title_photo(landmark) or wiki_photo(landmark, must_match=landmark)
+        if pid:
+            return pid
+    return wiki_photo(f"{name} {region}".strip(), must_match=name)
 
 
 def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
