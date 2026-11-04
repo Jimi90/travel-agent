@@ -140,7 +140,7 @@ def parse_wiki(data: dict) -> dict | None:
 
 def wiki_photo(query: str, must_match: str = "") -> str | None:
     """Foto zum Suchbegriff; must_match: Wörter, von denen der Seitentitel mindestens eins enthalten muss."""
-    key = "wiki:" + _fold(query).strip()
+    key = "wiki2:" + _fold(query).strip()
     cached = store.get("photo_q", key)
     if cached is not None:
         return cached.get("id")
@@ -171,7 +171,7 @@ def wiki_photo(query: str, must_match: str = "") -> str | None:
 
 def wiki_title_photo(title: str) -> str | None:
     """Foto eines bestimmten Wikipedia-Artikels (Titel von der KI), deutsch zuerst, Weiterleitungen folgen."""
-    key = "title:" + _fold(title).strip()
+    key = "title2:" + _fold(title).strip()
     cached = store.get("photo_q", key)
     if cached is not None:
         return cached.get("id")
@@ -228,8 +228,14 @@ def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
 
 # --- Fotos einer Reise -------------------------------------------------------------------------
 
+PHOTO_VERSION = 2  # 2: Wappen/Logos aussortiert → ältere Zuordnungen (Orte, Programmpunkte) werden neu geholt
+
+
 def trip_photos(trip_id: str) -> dict:
-    return store.get("trip_photos", trip_id) or {"places": {}, "activities": {}, "stays": {}}
+    m = store.get("trip_photos", trip_id) or {"places": {}, "activities": {}, "stays": {}}
+    if m.get("v") != PHOTO_VERSION:
+        m = {"v": PHOTO_VERSION, "places": {}, "activities": {}, "stays": m.get("stays") or {}}
+    return m
 
 
 def activity_key(title: str) -> str:

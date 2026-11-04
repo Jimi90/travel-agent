@@ -124,20 +124,58 @@ def flights(seg: TransportSegment, max_stops: int, trip_id: str) -> dict:
 
 # --- Hotels ---------------------------------------------------------------------------------
 
+def money(text) -> float | None:
+    """«CHF 1’600», «1'600.50», «1.600,50», «1,600» → Zahl. SerpApi liest den Schweizer Tausenderstrich
+    manchmal falsch («1’600» → 1), deshalb wird der Text selbst gelesen."""
+    if not isinstance(text, str):
+        return None
+    s = re.sub(r"[^\d.,’'\u2019\u202f\u00a0 ]", "", text).strip()
+    s = re.sub(r"[’'\u2019\u202f\u00a0 ]", "", s)
+    if not s or not any(c.isdigit() for c in s):
+        return None
+    if "," in s and "." in s:
+        dec = "," if s.rfind(",") > s.rfind(".") else "."
+        s = s.replace("." if dec == "," else ",", "").replace(dec, ".")
+    elif "," in s:
+        s = s.replace(",", "") if re.fullmatch(r"\d{1,3}(,\d{3})+", s) else s.replace(",", ".")
+    elif "." in s and re.fullmatch(r"\d{1,3}(\.\d{3})+", s):
+        s = s.replace(".", "")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def _num(v) -> float | None:
     if isinstance(v, dict):
-        v = v.get("extracted_lowest") or v.get("extracted_before_taxes_fees")
+        extracted = v.get("extracted_lowest") or v.get("extracted_before_taxes_fees")
+        text = money(v.get("lowest") or v.get("before_taxes_fees"))
+        try:
+            ex = float(extracted) if extracted not in (None, "") else None
+        except (TypeError, ValueError):
+            ex = None
+        if ex is None or (text is not None and text > ex):  # Textwert gewinnt, wenn der Zahlenwert abgeschnitten ist
+            return text if text is not None else ex
+        return ex
     try:
         return float(v) if v not in (None, "") else None
     except (TypeError, ValueError):
-        return None
+        return money(v) if isinstance(v, str) else None
+
+
+def stay_total(total, night, nights) -> float | None:
+    """Gesamtpreis der Nächte; unplausible Werte (z. B. 1 statt 1'600) werden durch Nacht × Nächte ersetzt."""
+    est = night * nights if night and nights else None
+    if total and est and not (0.5 * est <= total <= 2.0 * est):
+        return est
+    return total or est
 
 
 def parse_hotels(data: dict, nights: int, max_night: float | None, limit: int = 8) -> list[dict]:
     out = []
     for p in data.get("properties") or []:
         night = _num(p.get("rate_per_night"))
-        total = _num(p.get("total_rate")) or (night * nights if night else None)
+        total = stay_total(_num(p.get("total_rate")), night, nights)
         if not p.get("name") or night is None:
             continue
         out.append({"name": str(p["name"])[:160], "night": night, "total": total,

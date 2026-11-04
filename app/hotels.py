@@ -83,7 +83,7 @@ def fetch(name: str, stay, trip_id: str) -> dict:
         prop = next((p for p in _props(data) if same_hotel(name, str(p.get("name", "")), stay.place.name)), None)
         if prop:
             night = prices._num(prop.get("rate_per_night"))
-            total = prices._num(prop.get("total_rate")) or (night * nights if night else None)
+            total = prices.stay_total(prices._num(prop.get("total_rate")), night, nights)
             imgs = [i.get("thumbnail") or i.get("original_image") for i in prop.get("images") or []
                     if isinstance(i, dict)]
             ids = [pid for pid in (photos.download(u, "Google Hotels", name) for u in imgs[:MAX_PHOTOS + 2] if u) if pid]

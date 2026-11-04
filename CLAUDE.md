@@ -113,13 +113,23 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (60 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (64 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.6)
+## Stand (04.11.2026, Version 1.7.7)
+- 1.7.7: Wunsch James: Reiseblatt «schöner und übersichtlicher, wie von Apple». Neu: Titelbild mit Titel/Datum darauf,
+  drei Kennzahlen (Dauer/Orte/Kosten), Status + Wetter/Import als Listenzeilen, Tage einzeln aufklappbar (heute bzw.
+  erster Tag offen, `OPEN_DAYS`), Unterkünfte als Karte (Preis + Status rechts, Hotelwahl kompakt, Fusszeile Booking.com ·
+  Andere Hotels · Gebucht), Verbindungen als antippbare Zeilen (Optionen im Aktionsblatt: Flüge suchen, Echte Preise,
+  gebucht, «Fällt aus …»), Finaler Vorschlag nur Route + Kosten, «So geht's weiter» nur im Entwurf, Verlauf eingeklappt.
+  Behoben: Titelbild war das Cancún-Wappen (Altbestand vor dem Bildfilter) → `photos.PHOTO_VERSION` 2 verwirft ältere
+  Ort-/Programmfotos (Hotelfotos bleiben), Cache-Schlüssel `wiki2:`/`title2:`, Titelbild zuerst aus Programmpunkt-Fotos.
+  Preis «CHF 1 für eure Nächte»: SerpApi liest «1’600» (Schweizer Strich) als 1 → `prices.money` liest den Text,
+  `prices.stay_total` ersetzt unplausible Summen durch Nacht × Nächte (auch für schon gemerkte Preise). 64 Tests;
+  Testmodus 390 px hell/dunkel geprüft, echte Fotos/Preise nur auf dem NAS prüfbar.
 - 1.7.6: James: «Das stimmt ja jetzt gar nicht mehr» – Karten zeigten falsche Länder/Flaggen (Cancún «Montenegro», Dakar
   «Schweden»), ein besuchtes Land wurde trotzdem vorgeschlagen, Sal zeigte einen Baum. Ursache: `country[:2]` kürzte den
   von der KI gelieferten Landesnamen («MEXICO» → «ME»). Jetzt `destinations.resolve_country`: KI liefert `country` (ISO)

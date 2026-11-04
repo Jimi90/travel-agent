@@ -98,5 +98,14 @@ class DestinationPhotoTest(unittest.TestCase):
         w.assert_not_called()
 
 
+
+class TripPhotoVersionTest(unittest.TestCase):
+    def test_old_assignments_are_dropped_but_stays_kept(self):
+        with mock.patch.object(photos.store, "get", return_value={"places": {"Cancún": "logo"}, "activities": {"a": "x"},
+                                                                  "stays": {"s1": "h"}}):
+            m = photos.trip_photos("t1")
+        self.assertEqual((m["places"], m["activities"], m["stays"], m["v"]), ({}, {}, {"s1": "h"}, photos.PHOTO_VERSION))
+
+
 if __name__ == "__main__":
     unittest.main()
