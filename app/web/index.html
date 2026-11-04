@@ -239,6 +239,26 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
 .foot>*{flex:1;min-width:0;border:0;background:none;color:var(--accent);font:inherit;font-size:14px;line-height:1.25;padding:13px 6px;text-align:center;text-decoration:none;cursor:pointer}
 .foot>*+*{border-left:1px solid var(--line)}
 .foot>*:active{background:var(--card2)}
+/* Heute-Karte + Tagesplan (1.8.0) */
+.lc{background:linear-gradient(160deg,var(--accent),#0f4f55);color:#fff;border-radius:16px;padding:14px 16px;margin:12px 0 0}
+.lc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.lc-k{font-size:13px;opacity:.85}
+.lc-place{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.15;margin-top:2px}
+.lc-now{font-size:34px;display:flex;align-items:center;gap:6px;line-height:1}
+.lc-now b{font-size:34px;font-weight:600;font-variant-numeric:tabular-nums}
+.lc-sum{font-size:14px;margin-top:8px;opacity:.95;line-height:1.4}
+.lc-alert{font-size:13px;margin-top:6px;background:rgba(0,0,0,.25);border-radius:8px;padding:6px 8px}
+.lc-hours{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
+.lc-hours div{text-align:center;display:flex;flex-direction:column;gap:2px;align-items:center}
+.lc-hours span{font-size:11px;opacity:.8}
+.lc-hours i{font-style:normal;font-size:18px;line-height:1.2}
+.lc-hours b{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.lc-hours em{font-style:normal;font-size:11px;opacity:.8}
+.lc-theme{font-size:14px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.25)}
+.theme{font-size:15px;font-weight:600;padding:2px 16px 10px;color:var(--accent)}
+.desc{font-size:14px;line-height:1.45;margin-top:4px;color:var(--text);opacity:.82}
+.fl-plan{font-size:12px}
+.fl-wait{display:flex;align-items:center}
 </style>
 </head>
 <body>
@@ -420,7 +440,7 @@ async function copy(text) {
 }
 
 function actionSheet(title, items) {
-  $("aGrp").innerHTML = `<div class="ttl">${esc(title)}</div>` + items.map((it, i) => `<button data-i="${i}" class="${it.red ? "red" : ""}">${esc(it.label)}</button>`).join("");
+  $("aGrp").innerHTML = `<div class="ttl">${esc(title)}</div>` + items.map((it, i) => `<button data-i="${i}" class="${it.red ? "red" : ""} ${it.bold ? "bold" : ""}">${esc(it.label)}</button>`).join("");
   $("aGrp").querySelectorAll("button").forEach(b => b.onclick = () => { closeAS(); items[+b.dataset.i].fn(); });
   $("asheet").classList.add("open");
 }
@@ -698,6 +718,32 @@ async function openTrip(id) {
 }
 function reTrip(d) { TRIP = d; renderTrip(); }
 
+// Wetter: Symbol zum Wettertext von Open-Meteo («klar», «Regen», «Gewitter» …)
+function wxIcon(sum, storm, p) {
+  const x = (sum || "").toLowerCase();
+  if (storm || x.includes("gewitter")) return "⛈️";
+  if (/regen|schauer|niesel/.test(x)) return "🌧️";
+  if (x.includes("schnee")) return "🌨️";
+  if (x.includes("nebel")) return "🌫️";
+  if (/bedeckt/.test(x)) return "☁️";
+  if (/teils|bewölkt/.test(x)) return "⛅";
+  if (/klar|sonn/.test(x)) return "☀️";
+  return p >= 50 ? "🌧️" : "🌤️";
+}
+// «Heute»-Karte: Tag der Planung, Ort und aktuelle Vorhersage genau für diesen Ort
+function liveCard(L) {
+  if (!L) return "";
+  const f = L.forecast, T = v => v == null ? "–" : Math.round(v) + "°";
+  const head = `<div class="lc-top"><div><div class="lc-k">Heute · Tag ${L.index} von ${L.total}</div><div class="lc-place">${esc(L.place)}</div></div>
+    ${f ? `<div class="lc-now">${wxIcon(f.summary, f.storm, f.p)}<b>${T(f.tmax)}</b></div>` : ""}</div>`;
+  if (!f) return `<div class="lc">${head}<div class="lc-sum">${esc(L.error || "Keine Vorhersage verfügbar.")}</div></div>`;
+  const facts = [f.summary, `${T(f.tmin)} bis ${T(f.tmax)}`, `Regen ${f.p}%${f.mm ? ` (${f.mm.toFixed(f.mm < 10 ? 1 : 0)} mm)` : ""}`, f.wind ? `Wind bis ${Math.round(f.wind)} km/h` : ""].filter(Boolean);
+  return `<div class="lc">${head}<div class="lc-sum">${facts.map(esc).join(" · ")}</div>
+    ${(f.alerts || []).length ? `<div class="lc-alert">⚠️ ${f.alerts.map(esc).join(" · ")}</div>` : ""}
+    ${f.hours.length ? `<div class="lc-hours">${f.hours.map(h => `<div><span>${esc(h.h.slice(0, 2))} Uhr</span><i>${wxIcon("", h.storm, h.p)}</i><b>${T(h.temp)}</b><em>${h.p}%</em></div>`).join("")}</div>` : ""}
+    ${L.theme ? `<div class="lc-theme">${esc(L.theme)}${L.activities ? ` · ${L.activities} ${L.activities === 1 ? "Programmpunkt" : "Programmpunkte"}` : ""}</div>` : ""}</div>`;
+}
+
 function renderTrip(outcome) {
   const d = TRIP, t = d.trip;
   const actions = d.actions.map(a => {
@@ -714,23 +760,25 @@ function renderTrip(outcome) {
   const P = d.photos || {places: {}, activities: {}, stays: {}};
   if (!OPEN_DAYS || OPEN_DAYS.tid !== t.id) OPEN_DAYS = {tid: t.id, set: new Set([d.today || (t.days[0] && t.days[0].date)])};
   const nightsOf = (a, b) => Math.max(1, Math.round((new Date(b.slice(0, 10)) - new Date(a.slice(0, 10))) / 86400000));
-  const days = t.days.map(day => {
+  const days = t.days.map((day, di) => {
     const isToday = day.date === d.today;
-    const seen = new Set(), pics = day.activities.map(a => [P.activities[actKey(a.title)], a.title])
+    // Fotos nur zu Programmpunkten, die man sieht – nie zu Essen (ein Teller sagt nichts über den Tag)
+    const seen = new Set(), pics = day.activities.filter(a => a.category !== "kulinarik").map(a => [P.activities[actKey(a.title)], a.title])
       .filter(([id]) => id && !seen.has(id) && seen.add(id));
     const strip = pics.length ? `<div class="strip">${pics.map(([id, title]) => `<figure>${photo(id, "", title)}<figcaption>${esc(title)}</figcaption></figure>`).join("")}</div>` : "";
     const n = day.activities.length;
     return `<details class="day" data-d="${esc(day.date)}" ${OPEN_DAYS.set.has(day.date) ? "open" : ""}>
       <summary>${pics.length ? photo(pics[0][0], "dthumb", pics[0][1]) : `<span class="dthumb"></span>`}
         <div class="grow"><div class="t">${esc(fmtD(day.date, {weekday: "short", day: "numeric", month: "long"}))}${isToday ? ` <span class="badge acc">heute</span>` : ""}</div>
-        <div class="s">${esc(day.base.name)} · ${n ? n + (n === 1 ? " Punkt" : " Punkte") : "frei"}</div></div></summary>` + strip +
+        <div class="s">Tag ${di + 1} · ${esc(day.base.name)} · ${n ? n + (n === 1 ? " Punkt" : " Punkte") : "frei"}</div></div></summary>` +
+      (day.theme ? `<div class="theme">${esc(day.theme)}</div>` : "") + strip +
       (n ? day.activities.map(a => {
         const isNew = a.origin === "umplanung";
         const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
         return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
           <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
           <div class="s">${esc(CATS[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(INT[a.intensity])} · ${esc(chf(a.cost))}</div>
-          ${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`;
+          ${a.note ? `<div class="${isNew ? "note" : "desc"}">${esc(a.note)}</div>` : ""}</div></div>`;
       }).join("") : `<div class="empty">Freier Tag</div>`) + `</details>`;
   }).join("");
 
@@ -777,11 +825,27 @@ function renderTrip(outcome) {
 
   // Hinweise, die schon das Etikett «Schätzung» bzw. der Preis «inklusive» sagt, nicht wiederholen
   const redundant = n => /^Schätzung\.?$|^Geschätzte?r? |im Gesamtpreis inbegriffen/.test((n || "").trim());
-  const trans = t.transports.map(x => `<div class="row tap chev" data-seg="${esc(x.id)}"><div class="grow">
+  const FL = d.flight_live || {};
+  const tm = iso => iso.slice(11, 16), plus = (a, b) => a.slice(0, 10) !== b.slice(0, 10) ? " (+1)" : "";
+  const liveOf = x => { const L = FL[x.id]; return L && L.options && L.options.length ? L : null; };
+  const appliedOpt = x => { const L = liveOf(x); return L ? L.options.findIndex(o => o.depart.slice(0, 16) === x.depart.slice(0, 16) && Math.round(o.price) === Math.round(Number(x.cost))) : -1; };
+  const trans = t.transports.map(x => {
+    const L = liveOf(x), ai = L ? appliedOpt(x) : -1, o = L ? L.options[ai >= 0 ? ai : 0] : null;
+    const mins = o ? `${Math.floor(o.duration_min / 60)} Std. ${String(o.duration_min % 60).padStart(2, "0")} Min.` : "";
+    const waiting = !L && x.mode === "flug" && x.estimated && x.origin_code && INFO.prices.available;
+    const planned = `${esc(fmtD(x.depart))} · ${esc(tm(x.depart))} – ${esc(tm(x.arrive))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""}`;
+    return `<div class="row tap chev" data-seg="${esc(x.id)}"><div class="grow">
       <div class="t">${esc(MODE[x.mode] || x.mode)} ${esc(x.origin.name)} → ${esc(x.destination.name)}</div>
-      <div class="s">${esc(fmtD(x.depart))} · ${esc(x.depart.slice(11, 16))} – ${esc(x.arrive.slice(11, 16))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""}</div>
-      ${x.note && !redundant(x.note) ? `<div class="s">${esc(x.note)}</div>` : ""}</div>
-      <span class="pr"><b>${Number(x.cost) ? esc(chf(x.cost)) : "inklusive"}</b><small class="${x.estimated ? "warnt" : "okc"}">${x.estimated ? "Schätzung" : "gebucht"}</small></span></div>`).join("") || `<div class="empty">Keine Verbindungen</div>`;
+      ${o ? `<div class="s">${esc(fmtD(o.depart))} · <b>${esc(tm(o.depart))} – ${esc(tm(o.arrive))}${plus(o.depart, o.arrive)}</b></div>
+        <div class="s">${mins} · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"} · ${esc(o.carrier)}${o.number ? " " + esc(o.number) : ""}</div>
+        ${ai >= 0 ? "" : `<div class="s fl-plan">Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${esc(chf(x.cost))} · antippen zum Übernehmen</div>`}`
+        : `<div class="s">${planned}</div>`}
+      ${x.note && !redundant(x.note) ? `<div class="s">${esc(x.note)}</div>` : ""}
+      ${waiting ? `<div class="s fl-wait"><span class="spin"></span>Hole aktuelle Flüge von Google Flights …</div>` : ""}
+      ${!L && FL[x.id] && FL[x.id].error ? `<div class="s">Echte Flugdaten: ${esc(FL[x.id].error)}</div>` : ""}</div>
+      <span class="pr"><b>${o ? esc(chf(o.price)) : (Number(x.cost) ? esc(chf(x.cost)) : "inklusive")}</b>
+        <small class="${o ? "okc" : x.estimated ? "warnt" : "okc"}">${o ? (ai >= 0 ? "übernommen" : "Google Flights") : x.estimated ? "Schätzung" : "gebucht"}</small></span></div>`;
+  }).join("") || `<div class="empty">Keine Verbindungen</div>`;
 
   const hotels = t.hotel_suggestions.map(h => `<div class="row"><div class="grow"><div class="t">${esc(h.name)}</div>
       <div class="s">${esc(h.base)}${h.area ? " · " + esc(h.area) : ""} · ca. ${esc(chf(h.price_per_night))}/Nacht</div><div class="s">${esc(h.why)}</div>
@@ -799,19 +863,20 @@ function renderTrip(outcome) {
     <div class="credit">Foto: ${d.hero.page ? `<a href="${esc(d.hero.page)}" target="_blank" rel="noopener noreferrer">${esc(d.hero.source)} – ${esc(d.hero.title)}</a>` : esc(d.hero.source)}</div>`
     : `<h1>${esc(t.title)}</h1><p class="sub">${esc(dateRange)}</p>`;
   const statusHint = t.status === "entwurf"
-    ? `Sobald ihr gebucht habt, auf «Gebucht» stellen – dann prüft Kompass jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) das Wetter und passt den Tag bei Bedarf an.`
+    ? `Sobald ihr gebucht habt, auf «Gebucht» stellen – ab der Reise prüft Kompass jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) automatisch das Wetter und passt den Tag bei Bedarf an.`
     : `Kompass prüft jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) das Wetter und passt den Tag bei Bedarf an.`;
 
   $("tripIn").innerHTML = `
     <div class="topbar"><button class="back" data-close="tripSheet">‹ Reisen</button>
       <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></div>
     ${heroHtml}
+    ${liveCard(d.live_day)}
     <div class="tiles three"><div class="tile"><div class="k">Dauer</div><div class="v">${t.days.length} Tage</div></div>
       <div class="tile"><div class="k">${route.length === 1 ? "Ort" : "Orte"}</div><div class="v">${route.length}</div></div>
       <div class="tile"><div class="k">Kosten ca.</div><div class="v">${esc(chf(d.total))}</div><div class="u">für 2 Personen</div></div></div>
     <div class="seg" id="tStatus" style="margin-top:14px">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
     <p class="hint" style="margin:8px 4px 0">${statusHint}</p>
-    <div class="card" style="margin-top:14px"><button class="lrow" id="tWeather">Wetter jetzt prüfen</button><button class="lrow" id="tImport">Buchung importieren</button></div>
+    <div class="card" style="margin-top:14px"><button class="lrow" id="tImport">Buchung importieren</button></div>
     <div class="card pad res" id="tOut" hidden></div>
     ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
@@ -822,6 +887,7 @@ function renderTrip(outcome) {
     <p class="hint">Tag antippen zum Aufklappen. Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
     <h2>Unterkünfte</h2><div class="card">${stays}</div>
     <h2>Verbindungen</h2><div class="card">${trans}</div>
+    ${!INFO.prices.available && t.transports.some(x => x.mode === "flug" && x.estimated) ? `<p class="hint">Echte Flugzeiten und Preise: SerpApi-Schlüssel unter Profil → KI hinterlegen.</p>` : ""}
     <p class="hint">Zeile antippen für Optionen. Fällt eine Fähre oder ein Flug aus, verlängert Kompass die Unterkunft und schiebt alle Folgetage nach hinten – rückgängig machbar.</p>
     ${hotels ? `<div class="card" style="margin-top:12px"><details><summary>Weitere Hotels (${t.hotel_suggestions.length})</summary>${hotels}</details></div>` : ""}
     ${alts ? `<div class="card" style="margin-top:12px"><details><summary>Schlechtwetter-Programm (${t.alternatives.length})</summary>${alts}</details></div>` : ""}
@@ -834,11 +900,6 @@ function renderTrip(outcome) {
   $("tripIn").querySelector("[data-close]").onclick = () => { closeSheet("tripSheet"); loadTrips(); };
   $("tFav").onclick = async () => reTrip(await api(`/api/trips/${tid}/favorite`, {}));
   $("tStatus").querySelectorAll("button").forEach(b => b.onclick = async () => reTrip(await api(`/api/trips/${tid}/status`, {status: b.dataset.st})));
-  $("tWeather").onclick = async () => {
-    const b = $("tWeather"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Prüfe Wetter …`;
-    try { const r = await api(`/api/trips/${tid}/weathercheck`, {}); reTrip(r); showOutcome(r.outcome); }
-    catch (e) { toast(e.message); b.disabled = false; b.textContent = "Wetter jetzt prüfen"; }
-  };
   $("tDelete").onclick = () => actionSheet(`«${t.title}» wirklich löschen?`, [{label: "Reise löschen", red: true, fn: async () => {
     await api("/api/trips/" + tid, undefined, "DELETE"); closeSheet("tripSheet"); loadTrips(); toast("Gelöscht"); }}]);
   const q = s => $("tripIn").querySelectorAll(s);
@@ -877,8 +938,11 @@ function renderTrip(outcome) {
   q("[data-seg]").forEach(r => r.onclick = () => {
     const x = t.transports.find(v => v.id === r.dataset.seg);
     actionSheet(`${x.origin.name} → ${x.destination.name}`, [
+      ...(liveOf(x) && appliedOpt(x) < 0 ? [{label: `Diesen Flug übernehmen (${chf(liveOf(x).options[0].price)})`, bold: true, fn: async () => {
+        const r = await api(`/api/trips/${tid}/prices/apply`, {token: liveOf(x).token, index: 0});
+        reTrip(r); toast(r.outcome.status === "angewendet" ? "Flug übernommen" : (r.outcome.problems[0] || "Nicht möglich")); }}] : []),
+      ...(x.mode === "flug" && x.estimated && INFO.prices.available ? [{label: liveOf(x) ? "Alle Flüge ansehen" : "Echte Preise laden", fn: () => openPrices(tid, "verbindung", x.id)}] : []),
       ...(x.search_url ? [{label: "Flüge suchen", fn: () => window.open(x.search_url, "_blank", "noopener")}] : []),
-      ...(x.mode === "flug" && x.estimated && INFO.prices.available ? [{label: "Echte Preise laden", fn: () => openPrices(tid, "verbindung", x.id)}] : []),
       {label: x.estimated ? "Als gebucht markieren" : "Als Vorschlag", fn: async () => {
         const reference = x.estimated ? (prompt("Buchungsnummer (optional):") || "") : "";
         reTrip(await api(`/api/trips/${tid}/confirm`, {target: "verbindung", item_id: x.id, confirmed: !!x.estimated, reference})); }},
@@ -895,7 +959,7 @@ function renderTrip(outcome) {
   });
   if (outcome) showOutcome(outcome);
   clearTimeout(renderTrip.photoT);
-  if (d.photos_pending && (renderTrip.tries = (renderTrip.tid === tid ? renderTrip.tries : 0) + 1) <= 3) {
+  if (d.photos_pending && (renderTrip.tries = (renderTrip.tid === tid ? renderTrip.tries : 0) + 1) <= 6) {
     renderTrip.tid = tid;
     renderTrip.photoT = setTimeout(async () => {
       if (!$("tripSheet").classList.contains("open") || !TRIP || TRIP.trip.id !== tid) return;
@@ -1003,19 +1067,14 @@ async function loadToday() {
     const d = await api("/api/trips/" + active.id);
     const day = d.trip.days.find(x => x.date === d.today);
     $("todaySub").textContent = `${d.trip.title}${day ? " · " + day.base.name : ""}`;
-    $("todayBox").innerHTML = `<div class="card">${day ? `<div class="dayh today"><span>${esc(fmtLong(day.date))}</span><span class="s">${esc(day.base.name)}</span></div>` +
+    $("todayBox").innerHTML = liveCard(d.live_day) + `<div class="card">${day ? `<div class="dayh today"><span>${esc(fmtLong(day.date))}</span><span class="s">${esc(day.theme || day.base.name)}</span></div>` +
         (day.activities.map(a => `<div class="row act ${a.origin === "umplanung" ? "new" : ""}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
-          <div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${esc(EXP[a.exposure])} · ${esc(chf(a.cost))}</div>${a.note ? `<div class="note">${esc(a.note)}</div>` : ""}</div></div>`).join("") || `<div class="empty">Freier Tag</div>`)
+          <div class="grow"><div class="t">${esc(a.title)}</div><div class="s">${esc(EXP[a.exposure])} · ${esc(chf(a.cost))}</div>${a.note ? `<div class="${a.origin === "umplanung" ? "note" : "desc"}">${esc(a.note)}</div>` : ""}</div></div>`).join("") || `<div class="empty">Freier Tag</div>`)
         : `<div class="empty">Heute ist kein Reisetag.</div>`}</div>
-      <button class="btn" id="tdWeather">Wetter jetzt prüfen</button>
       <button class="btn plain" id="tdOpen">Ganze Reise öffnen</button>
+      <p class="hint">Kompass prüft jeden Morgen automatisch das Wetter und stellt den Tag bei Bedarf um.</p>
       ${d.actions.length ? `<p class="hint warnt">${d.actions.length} Auftrag/Aufträge warten auf dich – in der Reise unter «Wartet auf dich».</p>` : ""}`;
     $("tdOpen").onclick = () => openTrip(active.id);
-    $("tdWeather").onclick = async () => {
-      const b = $("tdWeather"); b.disabled = true; b.innerHTML = `<span class="spin"></span>Prüfe Wetter …`;
-      try { const r = await api(`/api/trips/${active.id}/weathercheck`, {}); toast(r.outcome.weather ? `${r.outcome.weather}` : "Geprüft"); loadToday(); }
-      catch (e) { toast(e.message); b.disabled = false; }
-    };
   }
   $("notices").innerHTML = n.notices.length ? n.notices.map(x => `<div class="row ${x.trip_id ? "tap" : ""}" data-nt="${esc(x.trip_id || "")}"><div class="grow">
       <div class="t">${x.read ? "" : `<span class="dot"></span>`}${esc(x.title)}</div>

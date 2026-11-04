@@ -16,7 +16,8 @@ from urllib.parse import urlparse
 
 from pydantic import ValidationError
 
-from . import auth, bookings, config, drafting, fx, hotels, llm, photos, prices, service, store, tiles, vision
+from . import auth, bookings, config, drafting, flights, fx, hotels, llm, photos, prices, service, store, tiles, vision
+from . import weather
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -81,6 +82,29 @@ def trip_summary(it) -> dict:
 hotel_options = hotels.options
 
 
+def live_day(it, today) -> dict | None:
+    """Auf der Reise: der heutige Tag der Planung (Nr., Ort) mit der aktuellen Vorhersage für genau diesen Ort."""
+    if today is None:
+        return None
+    out = {"index": it.days.index(today) + 1, "total": len(it.days), "date": today.date.isoformat(),
+           "place": today.base.name, "theme": today.theme, "forecast": None, "error": None,
+           "activities": len(today.activities)}
+    try:
+        fc = weather.forecast(today.base).get(today.date)
+    except weather.WeatherError as e:
+        out["error"] = str(e)
+        return out
+    if fc is None:
+        out["error"] = "Für heute liegt noch keine Vorhersage vor."
+        return out
+    hours = [{"h": h.time.strftime("%H:%M"), "temp": h.temp_c, "p": h.precip_probability, "mm": h.precip_mm,
+              "storm": h.thunderstorm} for h in fc.hourly if h.time.hour in (6, 9, 12, 15, 18, 21)]
+    out["forecast"] = {"summary": fc.summary, "tmin": fc.temp_min_c, "tmax": fc.temp_max_c, "mm": fc.precip_mm,
+                       "p": fc.precip_probability, "wind": fc.wind_kmh_max, "storm": fc.thunderstorm,
+                       "alerts": fc.alerts, "hours": hours}
+    return out
+
+
 def trip_detail(trip_id: str) -> dict:
     sm = service.sm()
     it = sm.get(trip_id)
@@ -98,10 +122,13 @@ def trip_detail(trip_id: str) -> dict:
     if hotels.missing(it):
         hotels.enrich(it)  # echte Preise + Fotos der Hotelvorschläge (SerpApi), ebenfalls im Hintergrund
         pending = True
+    if flights.missing(it):
+        flights.enrich(it)  # echte Flugangebote (SerpApi Google Flights), ebenfalls im Hintergrund
+        pending = True
     tp = photos.trip_photos(it.id)
     # Titelbild: zuerst ein Programmpunkt-Foto (Strand, Wahrzeichen), erst dann das Foto des Ortsartikels
     hero = next((tp["activities"].get(photos.activity_key(a.title)) for d in it.days for a in d.activities
-                 if tp["activities"].get(photos.activity_key(a.title))), None) \
+                 if photos.has_photo_subject(a) and tp["activities"].get(photos.activity_key(a.title))), None) \
         or next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
     hero_meta = (store.get("photo", hero) or {}) if hero else {}
     hotel_opts = {}
@@ -124,7 +151,7 @@ def trip_detail(trip_id: str) -> dict:
     budget = store.household().constraints.budget_for_trip(it)
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
             "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
-            "photos": tp, "photos_pending": pending,
+            "photos": tp, "photos_pending": pending, "flight_live": flights.for_trip(it), "live_day": live_day(it, today),
             "hero": {"id": hero, "title": hero_meta.get("title", ""), "page": hero_meta.get("page", ""),
                      "source": hero_meta.get("source", "")} if hero else None,
             "today": today.date.isoformat() if today else None, "history": list(reversed(hist)),
