@@ -32,9 +32,9 @@ class Reach(Model):
 
     def text(self, home: str) -> str:
         fl = f"höchstens {self.flight_hours:g} Std. Flug" if self.flight_hours else "Flugzeit beliebig"
-        st = "nur Direktflüge" if self.stops == 0 else f"höchstens {self.stops} Umstieg(e)"
+        st = "nur Direktflüge" if self.stops == 0 else f"höchstens {self.stops} Umstieg{'' if self.stops == 1 else 'e'}"
         bases = "nur 1 Aufenthaltsort" if self.max_bases == 1 else f"höchstens {self.max_bases} Aufenthaltsorte"
-        return (f"{self.label} ({self.days} Tage): Anreise ab {home} {fl} ({st}) oder höchstens "
+        return (f"{self.label} ({self.days} Tage): pro Strecke ab {home} {fl} ({st}) oder höchstens "
                 f"{self.ground_hours:g} Std. mit Zug/Auto; {bases}. Weitere Ziele nicht vorschlagen.")
 
 

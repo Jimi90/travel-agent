@@ -260,7 +260,7 @@ textarea.bare:focus{border:0}
     <div class="row"><div class="grow t">Dauer</div>
       <div class="stepper"><button type="button" id="nMinus" aria-label="Ein Tag weniger">−</button>
         <span id="nDaysTxt">7 Tage</span><button type="button" id="nPlus" aria-label="Ein Tag mehr">+</button></div></div>
-    <label class="row"><div class="grow"><div class="t">Anreise bis (CHF)</div><div class="s">hin und zurück, für beide</div></div>
+    <label class="row"><div class="grow"><div class="t">Hin- und Rückreise bis (CHF)</div><div class="s">Flug, Zug oder Auto, für beide</div></div>
       <input class="inl" id="nTravel" type="number" inputmode="numeric" min="0" max="50000" style="max-width:90px"></label>
   </div>
   <h2>Wünsche <span class="r">optional</span></h2>
@@ -566,14 +566,14 @@ async function suggest() {
 
 function renderIdeas(res) {
   const saved = new Set();
-  $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Anreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
+  $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Hin- und Rückreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
     `<div class="card">` + res.ideas.map((i, n) => `<div class="row idea">
       <div class="grow">${photo(i.photo, "idea-img", i.name)}<div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
       <div class="s">${esc(i.why)}</div>
       <div class="s">${esc((i.highlights || []).join(" · "))}</div>
       <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
-      <div class="s">${i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug"} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${(i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : ""}${i.travel_cost_chf ? ` · Anreise ca. ${esc(chf(i.travel_cost_chf))}` : ""}</div>
+      <div class="s">${i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug"} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${(i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : ""}${i.travel_cost_chf ? ` · hin und zurück ca. ${esc(chf(i.travel_cost_chf))}` : ""}</div>
       <div class="s">Ganze Reise ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
       ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
       <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
@@ -1008,7 +1008,7 @@ function renderProfileMain() {
   const fly = (k.max_flight_hours ? `max. ${k.max_flight_hours} Std.` : "beliebig lang") + ` · ${k.max_stops} Umstieg${k.max_stops === 1 ? "" : "e"}`;
   const avoidN = k.avoid_tags.length;
   $("pRules").innerHTML =
-    rNav("Budget", k.budget_per_day_max ? `${chf(k.budget_per_day_max)}/Tag + Anreise` : k.budget_total_max ? `${chf(k.budget_total_max)}/Reise` : "Nur Anreise", 'data-sub="budget"') +
+    rNav("Budget", k.budget_per_day_max ? `${chf(k.budget_per_day_max)}/Tag + Reise` : k.budget_total_max ? `${chf(k.budget_total_max)}/Reise` : "Nur Anreise", 'data-sub="budget"') +
     rNav("Reisedauer", `${k.duration_days_min}–${k.duration_days_max} Tage`, 'data-sub="dauer"') +
     rNav("Flüge", fly, 'data-sub="fluege"') +
     rNav("Anstrengung", INT_TXT[k.max_intensity], 'data-sub="anstrengung"') +
@@ -1096,8 +1096,8 @@ const PAGES = {
       <p class="hint">Für beide zusammen: Unterkunft, Essen und Programm. Wird mit der Reisedauer multipliziert.</p>
       <h2>Ganze Reise</h2>
       <div class="card">${rIn("Höchstens (CHF)", "cBudget", k.budget_total_max ?? "", 'type="number" inputmode="numeric" placeholder="kein Limit" style="max-width:110px"')}</div>
-      <p class="hint">Optional, als Deckel für lange Reisen. Das Anreisebudget wählst du bei jeder neuen Reise
-        (Vorschlag je Dauer). Beispiel: 3 Tage × CHF 250 + CHF 200 Anreise = CHF 950 für ein Weekend. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`; },
+      <p class="hint">Optional, als Deckel für lange Reisen. Das Budget für die Hin- und Rückreise wählst du bei jeder neuen Reise
+        (Vorschlag je Dauer). Beispiel: 3 Tage × CHF 250 + CHF 200 Hin- und Rückreise = CHF 950 für ein Weekend. Den Höchstpreis pro Nacht stellt jede Person bei sich ein – es gilt der tiefere.</p>`; },
     bind: () => {
       const k = HH.constraints;
       $("cBudgetDay").oninput = e => { k.budget_per_day_max = e.target.value === "" ? null : e.target.value; saveSoon(); };

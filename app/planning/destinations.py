@@ -73,7 +73,7 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
                            f" – zu weit für {days} Tage")
             continue
         if m.travel_budget and idea.travel_cost_chf > float(m.travel_budget) * 1.2:
-            dropped.append(f"{idea.name}: Anreise ca. CHF {idea.travel_cost_chf} – über dem Anreisebudget "
+            dropped.append(f"{idea.name}: Hin- und Rückreise ca. CHF {idea.travel_cost_chf} – über dem Budget dafür "
                            f"(CHF {m.travel_budget:.0f})")
             continue
         item = {**idea.model_dump(), "country": cc, "id": new_id(),

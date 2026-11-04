@@ -37,7 +37,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Programm) × Tage + Anreisebudget dieser Reise, höchstens `budget_total_max` (optionaler Deckel) → `budget_for(days, travel)`.
   Das Anreisebudget (hin und zurück für beide) wählt James **im Formular «Neue Reise»** («Anreise bis», Vorschlag je Dauer
   aus `travel_budget` = 200/400/900/1800 für kurztrip/kurzurlaub/ferien/lang, `TRIP_CATEGORIES`; eigener Wert bleibt beim
-  Ändern der Dauer); es geht als `travel_budget` an Zielvorschläge/Varianten/Plan und bleibt am Plan (`Itinerary.travel_budget`,
+  Ändern der Dauer; in der Oberfläche heisst es «Hin- und Rückreise», nicht «Anreise» – Wunsch James); es geht als `travel_budget` an Zielvorschläge/Varianten/Plan und bleibt am Plan (`Itinerary.travel_budget`,
   `budget_for_trip(it)` für Plausibilität, Umplanung, Ausfall, finalen Vorschlag). Nicht in den Einstellungen (Wunsch James).
   Ideen mit `travel_cost_chf` > Anreisebudget × 1.2 fallen weg (mit Grund); Ideen im Budget zuerst.
   Varianten: höchstens `reach.max_bases` Orte (Rest wird gekürzt), Warnung «Weit für X Tage» per Luftlinie ab Heimatflughafen.
@@ -118,7 +118,8 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.1)
+## Stand (04.11.2026, Version 1.7.2)
+- 1.7.2: Texte «Anreise» → «Hin- und Rückreise» (Formular, Vorschläge, Varianten, Begründungen, Budget-Seite).
 - 1.7.1: Budget = vor Ort pro Tag × Tage + Anreisebudget pro Reise, gewählt im Formular «Neue Reise» mit Vorschlag je
   Dauer (James: «nicht 600.– Anreise für ein Weekend», «gehört zur Suche, nicht in die Einstellungen»).
   Im Testmodus bei 390 px hell/dunkel geprüft.
