@@ -225,7 +225,7 @@ def preview(itin: Itinerary, ext: BookingExtract, now: datetime) -> dict:
     if ops:
         try:
             after = apply_operations(itin, ops)
-            k = store.household().constraints.model_copy(update={"budget_total_max": None})
+            k = store.household().constraints.model_copy(update={"budget_total_max": None, "budget_per_day_max": None})
             problems = [p.message for p in PlausibilityChecker().check(itin, after, k, now, set(ack))
                         if p.level == "fehler"]
         except PlanOperationError as e:

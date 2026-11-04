@@ -20,6 +20,49 @@ RAIN_ORDER = {"gering": 0, "mittel": 1, "hoch": 2}
 INTENSITY_TEXT = {Intensity.LEICHT: "leicht", Intensity.MITTEL: "mittel", Intensity.ANSTRENGEND: "anstrengend"}
 
 
+class Reach(Model):
+    """Wie weit eine Reise dieser Länge gehen darf (Hin- bzw. Rückweg je Strecke)."""
+
+    days: int
+    label: str
+    flight_hours: float | None  # None = keine Grenze
+    stops: int
+    ground_hours: float  # Auto/Zug
+    max_bases: int
+
+    def text(self, home: str) -> str:
+        fl = f"höchstens {self.flight_hours:g} Std. Flug" if self.flight_hours else "Flugzeit beliebig"
+        st = "nur Direktflüge" if self.stops == 0 else f"höchstens {self.stops} Umstieg(e)"
+        bases = "nur 1 Aufenthaltsort" if self.max_bases == 1 else f"höchstens {self.max_bases} Aufenthaltsorte"
+        return (f"{self.label} ({self.days} Tage): Anreise ab {home} {fl} ({st}) oder höchstens "
+                f"{self.ground_hours:g} Std. mit Zug/Auto; {bases}. Weitere Ziele nicht vorschlagen.")
+
+
+# Dauer → Reichweite (James: «Für 2–3 Tage höchstens 2 Std. Flug oder 5 Std. Auto»)
+REACH_TABLE = [  # bis Tage, Bezeichnung, Flugstunden, Umstiege, Zug/Auto-Stunden, Orte
+    (3, "Kurztrip", 2.0, 0, 5.0, 1),
+    (6, "Kurzurlaub", 4.0, 1, 7.0, 2),
+    (13, "Ferien", 9.0, 1, 9.0, 3),
+    (10_000, "Lange Reise", None, 2, 10.0, 5),
+]
+
+
+def reach_for(days: int, k) -> Reach:
+    """Reichweite nach Reisedauer; strengere Profil-Grenzen (Flugzeit, Umstiege) gelten immer."""
+    for upto, label, fh, stops, gh, bases in REACH_TABLE:
+        if days <= upto:
+            break
+    if k.max_flight_hours:
+        fh = min(fh, k.max_flight_hours) if fh else k.max_flight_hours
+    return Reach(days=days, label=label, flight_hours=fh, stops=min(stops, k.max_stops), ground_hours=gh,
+                 max_bases=bases)
+
+
+HOME_CITY = {"ZRH": "Zürich", "BSL": "Basel", "GVA": "Genf", "BRN": "Bern", "LUG": "Lugano"}
+HOME_COORDS = {"ZRH": (47.46, 8.55), "BSL": (47.59, 7.53), "GVA": (46.24, 6.11), "BRN": (46.91, 7.50),
+               "LUG": (46.00, 8.91)}
+
+
 class CategoryMatch(Model):
     category: ActivityCategory
     label: str
@@ -44,6 +87,9 @@ class MatchingResult(Model):
     pregnancy_week: int | None = None
     max_flight_hours: float | None = None
     max_stops: int = 1
+    reach: Reach | None = None  # nur wenn die Reisedauer bekannt ist
+    home: str = "Zürich"
+    budget_per_day: Decimal | None = None
 
     @property
     def liked(self) -> list[CategoryMatch]:
@@ -67,21 +113,24 @@ class MatchingResult(Model):
         if self.budget_per_night:
             lines.append(f"Unterkunft höchstens {self.budget_per_night} {self.currency} pro Nacht.")
         if self.budget_total:
-            lines.append(f"Gesamtbudget höchstens {self.budget_total} {self.currency} (Flüge, Unterkünfte, Aktivitäten).")
+            lines.append(f"Gesamtbudget für diese Reise höchstens {self.budget_total} {self.currency} "
+                         f"(Anreise, Unterkünfte, Aktivitäten).")
         lines.append(f"Körperliche Anstrengung höchstens: {INTENSITY_TEXT[self.max_intensity]}.")
         if self.pregnancy_week is not None:
             lines.append(f"Eine Reisende ist schwanger (ca. Woche {self.pregnancy_week}): keine Sauna/Hitzebäder, "
                          "kein Tauchen, keine grossen Höhen, keine extremen Anstrengungen, kurze Wege, Pausen einplanen.")
         if self.avoid_tags:
             lines.append("Ausgeschlossene Merkmale: " + ", ".join(self.avoid_tags))
-        if self.max_flight_hours:
+        if self.reach:
+            lines.append(self.reach.text(self.home))
+        elif self.max_flight_hours:
             lines.append(f"Flugzeit pro Strecke höchstens {self.max_flight_hours:g} Std., höchstens {self.max_stops} Umstieg(e).")
         if self.excluded_countries:
             lines.append("Schon besuchte Länder (nicht vorschlagen): " + ", ".join(self.excluded_countries))
         return "\n".join(lines)
 
 
-def match(h: Household, on: date | None = None) -> MatchingResult:
+def match(h: Household, on: date | None = None, days: int | None = None, home_airport: str = "ZRH") -> MatchingResult:
     cats = []
     for cat in ActivityCategory:
         prefs = [p.preference(cat) for p in h.profiles]
@@ -109,7 +158,9 @@ def match(h: Household, on: date | None = None) -> MatchingResult:
     k = h.constraints
     return MatchingResult(
         names=[p.name for p in h.profiles], categories=cats, temp_min_c=lo, temp_max_c=hi, climate_note=note,
-        rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_total_max,
+        rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_for(days),
+        budget_per_day=k.budget_per_day_max, reach=reach_for(days, k) if days else None,
+        home=HOME_CITY.get(home_airport.upper(), home_airport),
         currency=k.currency, max_intensity=k.effective_max_intensity(), avoid_tags=sorted(k.effective_avoid_tags()),
         excluded_countries=sorted(h.history.visited_countries),
         pregnancy_week=k.pregnancy.week_on(on or date.today()) if k.pregnancy else None,

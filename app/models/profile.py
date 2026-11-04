@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -60,7 +61,8 @@ class PregnancyStatus(Model):
 class TravelConstraints(Model):
     """Feste Randbedingungen – gelten für jede Planung und jede Planänderung."""
 
-    budget_total_max: Money | None = None
+    budget_total_max: Money | None = None  # höchstens pro Reise (Obergrenze)
+    budget_per_day_max: Money | None = None  # pro Tag für beide – wird auf die Reisedauer hochgerechnet
     currency: str = "CHF"
     duration_days_min: int = Field(default=1, ge=1)
     duration_days_max: int = Field(default=21, ge=1)
@@ -75,6 +77,12 @@ class TravelConstraints(Model):
         if self.duration_days_min > self.duration_days_max:
             raise ValueError("duration_days_min ist grösser als duration_days_max")
         return self
+
+    def budget_for(self, days: int | None) -> Decimal | None:
+        """Budget für eine Reise dieser Länge: Tagesbudget × Tage, höchstens das Budget pro Reise."""
+        caps = [c for c in (self.budget_total_max,
+                            self.budget_per_day_max * days if self.budget_per_day_max and days else None) if c]
+        return min(caps) if caps else None
 
     def effective_avoid_tags(self) -> set[str]:
         tags = set(self.avoid_tags)

@@ -151,7 +151,7 @@ def change(trip_id: str, ops: list, reason: str, acknowledged: list[str] | None 
     itin = sm().get(trip_id)
     res = sm().apply(ChangeSet(itinerary_id=trip_id, base_version=itin.version, operations=ops, reason=reason,
                                actor="nutzer", acknowledged_locked=acknowledged or []),
-                     store.household().constraints.model_copy(update={"budget_total_max": None}), local_now(itin))
+                     store.household().constraints.model_copy(update={"budget_total_max": None, "budget_per_day_max": None}), local_now(itin))
     return {"status": res.status.value, "problems": [p.message for p in res.problems]}
 
 

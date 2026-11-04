@@ -113,11 +113,12 @@ class PlausibilityChecker:
         return out
 
     def _budget(self, before: Itinerary, after: Itinerary, k: TravelConstraints) -> list[Problem]:
-        if k.budget_total_max is None:
+        cap = k.budget_for((after.end_date - after.start_date).days + 1)
+        if cap is None:
             return []
         total = after.total_cost()
-        if total > k.budget_total_max and total > before.total_cost():
+        if total > cap and total > before.total_cost():
             level = "warnung" if self.config.allow_budget_overrun else "fehler"
             return [Problem(code="budget", level=level,
-                            message=f"Budget überschritten: {total} von {k.budget_total_max} {k.currency}")]
+                            message=f"Budget überschritten: {total} von {cap:.0f} {k.currency}")]
         return []

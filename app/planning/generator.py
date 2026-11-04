@@ -119,8 +119,9 @@ Regeln:
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
 - hotels: pro Aufenthaltsort genau 3 echte Hotels in verschiedenen Preisklassen; tags enthält genau eines von
   «guenstig», «mittel», «gehoben». Das am besten passende (im Budget) zuerst.
-- transports: Hinflug am Tag 1 ab Heimatflughafen, Rückflug am letzten Tag, dazu alle Ortswechsel
-  (Fähre, Zug, Inlandflug). Umstiege in via. Zeiten und Preise sind Schätzungen – im note-Feld so kennzeichnen.
+- transports: Anreise am Tag 1 ab dem Heimatort, Rückreise am letzten Tag, dazu alle Ortswechsel
+  (Fähre, Zug, Inlandflug). Bei nahen Zielen Zug oder Auto statt Flug. Umstiege in via.
+  Zeiten und Preise sind Schätzungen – im note-Feld so kennzeichnen.
 - bases: Reihenfolge der Aufenthaltsorte mit Nächten; Summe der Nächte = Reisetage − 1.
 - Alle Randbedingungen strikt einhalten."""
 
@@ -128,7 +129,7 @@ Regeln:
 def generate(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
              web_search: bool = False, trip_id: str | None = None,
              route: list[dict] | None = None) -> tuple[Itinerary, list[str]]:
-    m = match(h, start)
+    m = match(h, start, days, home_airport)
     prompt = (f"Ziel: {destination}\nReise: {start:%d.%m.%Y} bis {start + timedelta(days=days - 1):%d.%m.%Y} "
               f"({days} Tage, {days - 1} Nächte). Heimatflughafen: {home_airport}.\n{m.prompt_text()}\n"
               f"Wünsche: {wishes.strip() or 'keine'}")
@@ -319,9 +320,10 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
     notes += [p.message for p in problems if p.level == "warnung" or p.code == "transport_reihenfolge"]
     if errors:
         raise llm.LLMError("Der Plan ist nicht stimmig: " + "; ".join(p.message for p in errors[:3]))
-    if k.budget_total_max and itin.total_cost() > k.budget_total_max:
-        notes.append(f"Geschätzte Kosten {itin.total_cost():.0f} CHF liegen über dem Budget "
-                     f"({k.budget_total_max} CHF)")
+    budget = k.budget_for(days)
+    if budget and itin.total_cost() > budget:
+        notes.append(f"Geschätzte Kosten {itin.total_cost():.0f} CHF liegen über dem Budget für {days} Tage "
+                     f"({budget:.0f} CHF)")
     return itin, notes
 
 

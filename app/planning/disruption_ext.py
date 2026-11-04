@@ -159,14 +159,15 @@ class ExtendedDisruptionHandler:
                 ChangeSet(itinerary_id=itin.id, base_version=itin.version, operations=ops,
                           reason=f"Ausfall: {what} am {start:%d.%m.} ({n} Tag/e)", event_id=ev.id, actor="autonom",
                           external_actions=actions, acknowledged_locked=ack),
-                k.model_copy(update={"budget_total_max": None}), now)
+                k.model_copy(update={"budget_total_max": None, "budget_per_day_max": None}), now)
             if res.status is ChangeStatus.CONFLICT:
                 continue
             if res.status is ChangeStatus.APPLIED:
                 after = self.status.get(itin.id)
-                if k.budget_total_max and after.total_cost() > k.budget_total_max:
+                cap = k.budget_for((after.end_date - after.start_date).days + 1)
+                if cap and after.total_cost() > cap:
                     warnings.append(f"Geschätzte Kosten jetzt {after.total_cost():.0f} CHF – über dem Budget "
-                                    f"({k.budget_total_max} CHF).")
+                                    f"({cap:.0f} CHF).")
                 total_days = (after.end_date - after.start_date).days + 1
                 if total_days > k.duration_days_max:
                     warnings.append(f"Die Reise dauert jetzt {total_days} Tage (Vorgabe höchstens {k.duration_days_max}).")

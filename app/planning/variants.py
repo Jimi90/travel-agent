@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from .. import llm, photos, weather
 from ..models import Household
 from ..models.common import new_id
-from .matching import climate_score, match
+from .matching import HOME_COORDS, climate_score, match
 
 
 class Stop(BaseModel):
@@ -56,14 +56,21 @@ def km(a: Stop, b: Stop) -> float:
 
 
 def suggest(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str) -> dict:
-    m = match(h, start)
+    m = match(h, start, days, home_airport)
     prompt = (f"Ziel: {destination}\nReise: ab {start:%d.%m.%Y}, {days} Tage ({days - 1} Nächte). "
-              f"Heimatflughafen: {home_airport}.\n{m.prompt_text()}\nWünsche: {wishes.strip() or 'keine'}")
+              f"Heimatort: {m.home} (Flughafen {home_airport}).\n{m.prompt_text()}\n"
+              f"Höchstens {m.reach.max_bases} Aufenthaltsort(e) pro Route. Anreise so wählen, wie es für diese Dauer "
+              f"sinnvoll ist (bei nahen Zielen Zug oder Auto). Wünsche: {wishes.strip() or 'keine'}")
     res = llm.ask("varianten", system=SYSTEM, content=prompt, schema=VariantList, max_tokens=8000,
                   fake=lambda: _fake(destination, days))
     out = []
+    home = HOME_COORDS.get(home_airport.upper())
     for v in res.variants[:3]:
         route = [s for s in v.route if s.nights > 0] or v.route[:1]
+        if len(route) > m.reach.max_bases:  # Kurztrip: nicht durch mehrere Orte hetzen
+            extra = sum(s.nights for s in route[m.reach.max_bases:])
+            route = route[:m.reach.max_bases]
+            route[-1].nights += extra
         nights = sum(s.nights for s in route)
         if nights != days - 1 and route:  # Nächte auf die Reisedauer abgleichen (letzter Ort gleicht aus)
             route[-1].nights = max(1, route[-1].nights + (days - 1 - nights))
@@ -83,12 +90,19 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
         dist = sum(km(a, b) for a, b in zip(route, route[1:]))
         if len(route) > 1:
             bullets.append(f"Route ca. {dist:,.0f} km zwischen {len(route)} Orten".replace(",", "'"))
+        warn = ""
+        if home and route:  # Luftlinie ab Heimatflughafen grob in Flugstunden (ca. 750 km/h + 30 Min.)
+            far = max(km(Stop(name="", country="CH", lat=home[0], lon=home[1], nights=0), s_) for s_ in route)
+            est_h = far / 750 + 0.5
+            if m.reach.flight_hours and est_h > m.reach.flight_hours * 1.25:
+                warn = f"Weit für {days} Tage: ca. {est_h:.0f} Std. Flug pro Strecke"
         total = v.flights_chf + v.hotels_chf + v.activities_chf + v.transfers_chf
         item = {"id": new_id(), "name": v.name, "summary": v.summary, "bullets": bullets,
                 "route": [s.model_dump() for s in route], "climate_score": score,
                 "costs": {"Flüge": v.flights_chf, "Unterkünfte": v.hotels_chf, "Programm": v.activities_chf,
                           "Transfers": v.transfers_chf, "Total": total},
                 "over_budget": bool(m.budget_total and total > float(m.budget_total)),
+                "budget": float(m.budget_total) if m.budget_total else None, "warning": warn,
                 "photo": photos.wiki_photo(route[0].name, must_match=route[0].name) if route else None}
         out.append(item)
     return {"id": new_id(), "destination": destination, "start": start.isoformat(), "days": days, "wishes": wishes,

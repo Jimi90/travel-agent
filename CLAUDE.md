@@ -30,6 +30,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Klima = Überschneidung, strengere Regentoleranz, tiefere Budgetgrenze). `prompt_text()` = was die KI bekommt.
 - `destinations.py` Zielvorschläge: KI schlägt vor, Code filtert hart (besuchte Länder, Flugzeit, Umstiege) und bewertet
   das Klima mit echten Messwerten derselben Tage im Vorjahr (Open-Meteo-Archiv).
+  Seit 1.7.0 Reichweite nach Reisedauer (`matching.reach_for`, `REACH_TABLE`; James: «2–3 Tage: max. 2 Std. Flug oder
+  5 Std. Auto»): ≤3 Tage 2 Std. Flug direkt / 5 Std. Zug-Auto / 1 Ort, ≤6: 4 Std./1 Umstieg/7 Std./2 Orte, ≤13: 9 Std./3 Orte,
+  länger: Profil-Grenze; strengere Profil-Grenzen gelten immer. Ideen haben `travel_mode` (flug|zug|auto) + `travel_hours`,
+  gefiltert im Code. Budget: `TravelConstraints.budget_per_day_max` × Tage, höchstens `budget_total_max` (`budget_for(days)`),
+  überall verwendet (Matching, Plausibilität, Umplanung, Ausfall, finaler Vorschlag). Ideen im Budget zuerst.
+  Varianten: höchstens `reach.max_bases` Orte (Rest wird gekürzt), Warnung «Weit für X Tage» per Luftlinie ab Heimatflughafen.
 - `variants.py` (1.5.0) Routen-Varianten: Ziel → KI liefert 3 Routen (Orte + Nächte, Stichpunkte, Wassertemperatur,
   Kosten Flüge/Unterkünfte/Programm/Transfers) → Code gleicht Nächte ab, ergänzt echtes Wetter (Archiv, grösster Ort),
   Distanz (Haversine), Foto. Gemerkt in kv «variants»; `POST /api/trips {variant_set, index}` plant genau diese Route
@@ -101,13 +107,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (40 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (41 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (03.11.2026, Version 1.6.0)
+## Stand (04.11.2026, Version 1.7.0)
+- 1.7.0: James bekam für 3 Tage Doha vorgeschlagen. Jetzt Reichweite und Budget abhängig von der Reisedauer, Anreise
+  auch per Zug/Auto, Hinweis im Formular. Im Testmodus bei 390 px hell/dunkel geprüft; echte Vorschläge nur auf dem NAS.
 - 1.6.0: Wunsch James: Hotelvorschläge mit 3–4 Fotos und echten Preisen für die Nächte; Bilder im Tagesplan (in seinem
   Plan fehlten sie bei Sehenswürdigkeiten wie dem Wiedervereinigungspalast). Im Testmodus bei 390 px hell/dunkel geprüft;
   echte Google-/Wikipedia-Treffer nur auf dem NAS. Pro Reise ca. 3 SerpApi-Suchen je Ort.

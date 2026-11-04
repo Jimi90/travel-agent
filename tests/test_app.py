@@ -103,7 +103,16 @@ class AppTest(unittest.TestCase):
         names = [i["name"] for i in j["result"]["ideas"]]
         self.assertNotIn("Rom", names)
         self.assertNotIn("Kreta (Chania)", names)
-        self.assertEqual(len(j["result"]["dropped"]), 2)
+        self.assertEqual(len(j["result"]["dropped"]), 3)
+        self.assertNotIn("Doha", names)                           # 6.5 Std. Flug – zu weit für 6 Tage
+        self.assertIn("Kurzurlaub (6 Tage)", j["result"]["reach"])
+
+        # --- Kurztrip 3 Tage (James: «max. 2 Std. Flug oder 5 Std. Auto»): nur Nahes bleibt
+        code, r = self.call("POST", "/api/destinations", {"start": start.isoformat(), "days": 3, "wish": ""})
+        j3 = self.wait_job(r["job"])
+        near = sorted(i["name"] for i in j3["result"]["ideas"])
+        self.assertEqual(near, ["Colmar", "Lyon", "Valencia"], j3["result"]["dropped"])
+        self.assertTrue(any("Lissabon: 2.8 Std. Flug – zu weit für 3 Tage" == d for d in j3["result"]["dropped"]))
         self.assertIsNotNone(j["result"]["ideas"][0]["climate_score"])
         self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))
         self.assertEqual(self.call("POST", "/api/destinations", {"start": "2020-01-01", "days": 6})[0], 400)

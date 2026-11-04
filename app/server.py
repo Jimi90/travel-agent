@@ -108,7 +108,7 @@ def trip_detail(trip_id: str) -> dict:
     costs = {"Flüge & Verbindungen": float(sum(t.cost for t in it.transports)),
              "Unterkünfte": float(sum(s.cost for s in it.stays)),
              "Programm": float(sum(a.cost for d in it.days for a in d.activities))}
-    budget = store.household().constraints.budget_total_max
+    budget = store.household().constraints.budget_for((it.end_date - it.start_date).days + 1)
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
             "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
             "photos": tp, "photos_pending": pending,
@@ -488,7 +488,7 @@ class Handler(BaseHTTPRequestHandler):
             res = sm.apply(ChangeSet(itinerary_id=trip_id, base_version=data["version"], operations=ops,
                                      reason=f"Buchung importiert: {data['summary'][:120]}", actor="nutzer",
                                      acknowledged_locked=data.get("ack", [])),
-                           store.household().constraints.model_copy(update={"budget_total_max": None}),
+                           store.household().constraints.model_copy(update={"budget_total_max": None, "budget_per_day_max": None}),
                            service.local_now(it))
             store.delete("import", str(body.get("token")))
             ok = res.status.value == "angewendet"
