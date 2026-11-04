@@ -146,6 +146,25 @@ def climate(lat: float, lon: float, start: date, days: int) -> dict:
             "rain_days": round(sum(1 for r in rain if r >= 1) / max(1, len(rain)), 2), "year": s.year}
 
 
+MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
+
+
+def sea_temperature(lat: float, lon: float, start: date, days: int) -> float | None:
+    """Meerestemperatur (°C) derselben Tage im Vorjahr (Open-Meteo Marine). None, wenn kein Meer in der Nähe/kein Wert."""
+    if config.FAKE_MODE:
+        return 21.0
+    s = _year_before(start)
+    e = s + timedelta(days=max(1, days) - 1)
+    try:
+        data = _get(MARINE_URL, {"latitude": lat, "longitude": lon, "start_date": s.isoformat(),
+                                 "end_date": e.isoformat(), "hourly": "sea_surface_temperature",
+                                 "timezone": "auto"}, 30 * 86400)
+    except WeatherError:
+        return None
+    vals = [v for v in (data.get("hourly") or {}).get("sea_surface_temperature") or [] if v is not None]
+    return round(sum(vals) / len(vals), 1) if vals else None
+
+
 def _year_before(d: date) -> date:
     try:
         y = d.replace(year=d.year - 1)

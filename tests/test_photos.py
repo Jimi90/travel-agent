@@ -109,3 +109,18 @@ class TripPhotoVersionTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CommonsPhotoTest(unittest.TestCase):
+    def test_parse_commons_keeps_landscape_jpeg(self):
+        from app import photos
+        data = {"query": {"pages": [
+            {"index": 1, "title": "File:Hochformat.jpg", "imageinfo": [{"thumburl": "https://upload.wikimedia.org/a.jpg",
+                                                                   "mime": "image/jpeg", "thumbwidth": 400, "thumbheight": 800}]},
+            {"index": 2, "title": "File:Strand Sal.jpg", "imageinfo": [{"thumburl": "https://upload.wikimedia.org/b.jpg",
+                                                                      "mime": "image/jpeg", "thumbwidth": 800, "thumbheight": 533,
+                                                                      "descriptionurl": "https://commons.wikimedia.org/x"}]},
+            {"index": 3, "title": "File:Karte.svg", "imageinfo": [{"thumburl": "https://upload.wikimedia.org/c.png",
+                                                                "mime": "image/svg+xml"}]}]}}
+        hits = photos.parse_commons(data)
+        self.assertEqual([h["title"] for h in hits], ["Strand Sal.jpg"])

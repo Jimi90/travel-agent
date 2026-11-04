@@ -114,13 +114,20 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (65 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (66 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.8.0)
+## Stand (04.11.2026, Version 1.8.1)
+- 1.8.1: Wunsch James: Zielkarten ohne Bilder, Infos schwer lesbar; auf einen Blick Wetter + Wassertemperatur (Vorbild tui.ch).
+  Fotos: `photos.commons_photo` (Wikimedia Commons, Dateisuche, nur JPEG-Querformat, Titel muss Ortswort enthalten, Cache
+  «commons1:») ist jetzt Teil von `destination_photo` (Wahrzeichen → Highlights → Commons → Wikipedia) und von
+  `place_photo` (Orte im Plan, erstes Bild der Varianten). Karte: drei Kacheln Wetter (Ø max/min + Regen % aus dem Vorjahr,
+  `item["climate"]`) · Wasser (`weather.sea_temperature`, Open-Meteo Marine, Vorjahr; sonst KI `water_temp_c` = «geschätzt»)
+  · Anreise (Dauer, Art, Kosten hin/zurück). 66 Tests; Testmodus 390 px hell/dunkel geprüft; echte Commons-Treffer und
+  Marine-Daten nur auf dem NAS prüfbar. Alte Favoriten haben die neuen Felder nicht → Vorschläge neu laden.
 - 1.8.0: Wunsch James: Tagespläne «mager», Bilder passten nicht («Abendessen» zeigte Tacos), Flüge ohne konkrete Zahlen
   trotz hinterlegter API, «Wetter jetzt prüfen» unsinnig, auf der Reise «welcher Tag, welches Wetter». Neu:
   (1) Prompt `generator.SYSTEM`: 4–6 Punkte pro Tag, konkrete Namen, `note` = 2–3 Sätze mit Tipps, `theme` = Tagesmotto
