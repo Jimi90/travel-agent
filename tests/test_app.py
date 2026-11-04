@@ -137,8 +137,12 @@ class AppTest(unittest.TestCase):
         vs = j["result"]
         self.assertEqual(len(vs["variants"]), 3)
         v1 = vs["variants"][1]
-        self.assertTrue(v1["bullets"][0].startswith("Wetter Lissabon"))      # echte Klimadaten (Testmodus)
-        self.assertTrue(any("Wasser" in b for b in v1["bullets"]))
+        self.assertTrue(v1["facts"]["weather"]["place"].startswith("Lissabon"))       # echte Klimadaten (Testmodus)
+        self.assertTrue(v1["facts"]["weather"]["max"] > v1["facts"]["weather"]["min"])
+        self.assertEqual((v1["facts"]["water_c"], v1["facts"]["stops"]), (20, 2))
+        self.assertGreater(v1["facts"]["km"], 100)                           # Strecke zwischen den 2 Orten
+        self.assertTrue(all(st["note"] for st in v1["route"]))
+        self.assertFalse(any("Wetter" in b or "Wasser" in b or " km" in b for b in v1["bullets"]))
         self.assertEqual(sum(st["nights"] for st in v1["route"]), 5)
         self.assertEqual(v1["costs"]["Total"], sum(c for k, c in v1["costs"].items() if k != "Total"))
         code, r = self.call("POST", "/api/trips", {"variant_set": vs["id"], "index": 1})
