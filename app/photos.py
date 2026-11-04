@@ -138,9 +138,11 @@ def parse_wiki(data: dict) -> dict | None:
     return hits[0] if hits else None
 
 
-def wiki_photo(query: str, must_match: str = "") -> str | None:
-    """Foto zum Suchbegriff; must_match: Wörter, von denen der Seitentitel mindestens eins enthalten muss."""
-    key = "wiki2:" + _fold(query).strip()
+def wiki_photo(query: str, must_match: str = "", strict: bool = False) -> str | None:
+    """Foto zum Suchbegriff; must_match: Wörter, von denen der Seitentitel mindestens eins enthalten muss.
+    strict: bei mehreren Wörtern müssen zwei passen, und der Treffer mit den meisten gemeinsamen Wörtern gewinnt
+    (sonst gewinnt bei «Playa Delfines» irgendein «Playa …»)."""
+    key = ("wiki3:" if strict else "wiki2:") + _fold(query).strip()
     cached = store.get("photo_q", key)
     if cached is not None:
         return cached.get("id")
@@ -159,8 +161,11 @@ def wiki_photo(query: str, must_match: str = "") -> str | None:
                 return None  # später nochmals versuchen (nichts merken)
             hits = parse_wiki_all(data)
         # alle Treffer prüfen, nicht nur den ersten (oft ist das der Artikel über die Stadt)
-        hit = next((h for h in hits if (not need or need & _words(h["title"])) and not bad_image(h["url"], h["title"])),
-                   None)
+        ok = [h for h in hits if (not need or need & _words(h["title"])) and not bad_image(h["url"], h["title"])]
+        if strict and len(need) >= 2:
+            ok = [h for h in ok if len(need & _words(h["title"])) >= 2]
+            ok.sort(key=lambda h: -len(need & _words(h["title"])))
+        hit = ok[0] if ok else None
         if hit:
             pid = download(hit["url"], "Wikipedia", hit["title"], hit["page"])
             if pid:
@@ -215,6 +220,12 @@ def destination_photo(landmark: str, name: str, region: str = "", highlights=())
     return wiki_photo(f"{name} {region}".strip(), must_match=name)
 
 
+def has_photo_subject(a) -> bool:
+    """Essen bekommt kein Foto (ein Teller Tacos sagt nichts über den Programmpunkt)."""
+    cat = getattr(a.category, "value", a.category)
+    return cat != "kulinarik"
+
+
 def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
     """Foto zu einem Programmpunkt: Wikipedia-Titel der KI → Suche «Titel Ort» → Suche «Titel»."""
     if wiki:
@@ -223,7 +234,7 @@ def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
             return pid
     if GENERIC.match(title.strip()) or not _words(title):
         return None
-    return wiki_photo(f"{title} {base}", must_match=title) or wiki_photo(title, must_match=title)
+    return wiki_photo(f"{title} {base}", must_match=title, strict=True) or wiki_photo(title, must_match=title, strict=True)
 
 
 # --- Fotos einer Reise -------------------------------------------------------------------------
@@ -261,7 +272,7 @@ def fill_trip(itin) -> None:
                     k = activity_key(a.title)
                     if k in m["activities"]:
                         continue
-                    m["activities"][k] = activity_photo(a.title, a.wiki, b.name)
+                    m["activities"][k] = activity_photo(a.title, a.wiki, b.name) if has_photo_subject(a) else None
                     store.put("trip_photos", itin.id, m)
         except Exception as e:  # Fotos sind nett, aber nie wichtig genug für einen Absturz
             print(f"[Fotos] {itin.id}: {type(e).__name__}: {e}", flush=True)

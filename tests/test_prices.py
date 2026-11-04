@@ -1,5 +1,6 @@
 """Auslesen der SerpApi-Antworten (Google Flights / Google Hotels) mit nachgebildeten Daten."""
 import unittest
+import unittest.mock
 
 from app import prices
 from app.prices import parse_flights, parse_hotels
@@ -53,6 +54,31 @@ class MoneyTest(unittest.TestCase):
         self.assertEqual(prices.stay_total(1, 194, 10), 1940)
         self.assertEqual(prices.stay_total(1900, 194, 10), 1900)
         self.assertEqual(prices.stay_total(None, 100, 3), 300)
+
+
+
+class FlightsLiveTest(unittest.TestCase):
+    def seg(self, **kw):
+        from datetime import datetime, timedelta
+        from app.models import TransportSegment
+        from app.models.common import Place
+        d = datetime.now() + timedelta(days=20)
+        base = dict(mode="flug", origin=Place(name="Zürich", country="CH"), destination=Place(name="Lissabon", country="PT"),
+                    depart=d, arrive=d + timedelta(hours=3), origin_code="ZRH", destination_code="LIS")
+        base.update(kw)
+        return TransportSegment(**base)
+
+    def test_eligible_only_future_estimated_flights_with_codes(self):
+        from datetime import datetime, timedelta
+        from app import flights
+        with unittest.mock.patch.object(prices, "available", return_value=True):
+            self.assertTrue(flights.eligible(self.seg()))
+            self.assertFalse(flights.eligible(self.seg(mode="zug")))
+            self.assertFalse(flights.eligible(self.seg(origin_code=None)))
+            self.assertFalse(flights.eligible(self.seg(depart=datetime.now() - timedelta(days=2),
+                                                       arrive=datetime.now() - timedelta(days=2) + timedelta(hours=3))))
+        with unittest.mock.patch.object(prices, "available", return_value=False):
+            self.assertFalse(flights.eligible(self.seg()))
 
 
 if __name__ == "__main__":

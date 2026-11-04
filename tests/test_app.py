@@ -212,8 +212,20 @@ class AppTest(unittest.TestCase):
             time.sleep(0.05)
         self.assertFalse(d["photos_pending"])
         self.assertTrue(d["hero"]["id"])
+        # --- Heute-Karte: Tag der Planung, Ort, Vorhersage für genau diesen Ort
+        L = d["live_day"]
+        self.assertEqual((L["index"], L["total"]), (1, 6))
+        self.assertEqual(L["place"], d["trip"]["days"][0]["base"]["name"])
+        self.assertTrue(L["forecast"]["summary"])
+        self.assertIn("Küste und Altstadt 1", L["theme"])
+        # --- echte Flugangebote werden automatisch geholt (Testmodus: nachgebaute SerpApi-Antwort)
+        live = d["flight_live"]
+        fl = [t for t in d["trip"]["transports"] if t["mode"] == "flug"]
+        self.assertTrue(live[fl[0]["id"]]["options"][0]["price"] > 0)
+        self.assertTrue(live[fl[0]["id"]]["token"])
         acts = d["photos"]["activities"]
-        self.assertTrue(acts["abendessen 1"])              # Bild über den Wikipedia-Titel der KI («Portugiesische Küche»)
+        self.assertFalse(acts["abendessen 1"])             # Essen bekommt kein Foto
+        self.assertTrue(d["hero"]["id"] != acts["abendessen 1"])
         self.assertTrue(acts["altstadt-museum 3"])         # Bild über den Wikipedia-Titel «Museu 3»
         self.assertTrue(acts["altstadt-museum 2"])
         req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})

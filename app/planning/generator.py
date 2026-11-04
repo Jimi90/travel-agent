@@ -108,12 +108,21 @@ class PlanDraft(BaseModel):
 SYSTEM = f"""Du bist Kompass, ein sorgfältiger Reiseplaner für ein Paar aus der Schweiz. Schreibe Deutsch mit
 Schweizer Rechtschreibung (kein ß). Plane realistisch und konkret mit echten, existierenden Orten.
 Regeln:
-- Pro Tag 2–4 Aktivitäten zwischen 07:00 und 23:00, ohne Überschneidungen, mit Pausen und Wegzeiten.
+- Pro Tag 4–6 Programmpunkte zwischen 07:00 und 23:00: Vormittag, Mittagessen, Nachmittag, Abendessen und wenn es
+  passt ein Abendprogramm – ohne Überschneidungen, mit Pausen und Wegzeiten. Nie Tage mit nur einem Punkt (ausser
+  An-/Abreise).
+- theme: Tagesmotto in 3–6 Wörtern, z. B. «Maya-Ruinen von Tulum» oder «Strandtag auf Isla Mujeres».
+- title: konkret mit Namen, nie allgemein. Nicht «Abendessen», sondern «Abendessen im Restaurant La Parrilla»; nicht
+  «Strand», sondern «Playa Delfines». Essen mit echtem Lokal, Aktivität mit echtem Ort/Veranstalter.
+- note: 2–3 Sätze, die den Punkt aussagekräftig machen: was man dort erlebt, warum es zu BEIDEN passt, dazu praktische
+  Tipps (Anfahrt und Dauer, Eintritt, Reservation, beste Tageszeit, was mitnehmen). Keine Floskeln wie «Genuss der
+  lokalen Küche».
 - An- und Abreisetage leichter planen. Wechsel zwischen Orten als Transport mit Abfahrt/Dauer angeben.
 - exposure ehrlich: outdoor = wetterabhängig, indoor = wetterfest, gemischt = teils.
 - intensity: 1 leicht, 2 mittel, 3 anstrengend. Kosten in CHF für beide zusammen (Schätzung).
-- wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels, der zeigt, was man an diesem Programmpunkt sieht
-  (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast» oder bei Streetfood «Vietnamesische Küche»; sonst "".
+- wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels über genau den Ort, die Sehenswürdigkeit oder die
+  Landschaft dieses Programmpunkts (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast», «Playa Delfines»,
+  «Isla Mujeres». Bei Essen, Transfers, Hotel, Ruhe und Einkaufen immer "" (kein Gericht, keine Küche, kein Foto).
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
@@ -243,7 +252,8 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
                 continue
             acts.append(act)
             acts.sort(key=lambda x: x.start)
-        plan_days.append(DayPlan(date=start + timedelta(days=i), base=base, activities=acts))
+        plan_days.append(DayPlan(date=start + timedelta(days=i), base=base, activities=acts,
+                                 theme=((dd.theme or "").strip()[:160] or None) if dd else None))
         prev_base = base
 
     # Unterkünfte: Reihenfolge der Orte mit Nächten, erstes passendes Hotel
@@ -351,9 +361,13 @@ def fake_draft(destination: str, days: int, home_airport: str, route: list[dict]
     for i in range(1, days + 1):
         b = bases[0].name if (not two or i <= n1) else bases[1].name  # (Testplan: höchstens 2 Orte)
         acts = [DraftActivity(title=f"Küstenwanderung {i}", category="wandern", exposure="outdoor", intensity=2,
-                              start="09:00", end="12:00", cost_chf=0, tags=[], note="", wikipedia=""),
+                              start="09:00", end="12:00", cost_chf=0, tags=[],
+                              note="Gut ausgeschilderter Küstenweg mit Aussicht aufs Meer, etwa drei Stunden. Früh starten, "
+                              "Wasser und Sonnenschutz mitnehmen.", wikipedia=""),
                 DraftActivity(title=f"Altstadt-Museum {i}", category="museum", exposure="indoor", intensity=1,
-                              start="14:00", end="16:00", cost_chf=30, tags=[], note="", wikipedia=f"Museu {i}"),
+                              start="14:00", end="16:00", cost_chf=30, tags=[],
+                              note="Kleines Museum in der Altstadt mit lokaler Geschichte. Eintritt ca. CHF 15 pro Person, "
+                              "am Nachmittag ruhiger.", wikipedia=f"Museu {i}"),
                 DraftActivity(title=f"Abendessen {i}", category="kulinarik", exposure="indoor", intensity=1,
                               start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="",
                               wikipedia="Portugiesische Küche")]
@@ -361,7 +375,7 @@ def fake_draft(destination: str, days: int, home_airport: str, route: list[dict]
             acts = acts[2:]
         if two and i == n1 + 1:  # Fähre am Wechseltag
             acts = acts[1:]
-        ds.append(DraftDay(day=i, base=b, theme="Test", activities=acts))
+        ds.append(DraftDay(day=i, base=b, theme=f"Küste und Altstadt {i}", activities=acts))
     alts = []
     for b in bases:
         alts += [DraftAlternative(base=b.name, title=f"Thermalbad & Sauna {b.name}", category="wellness",

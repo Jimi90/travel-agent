@@ -99,6 +99,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   ALLE Treffer (vorher nur den ersten – meist der Stadtartikel → kein Bild), dann «Titel» ohne Ort. Tagesplan: Bildleiste
   je Tag (`.strip`), Foto antippen = Grossansicht (`#lightbox`, Klick-Abfang in der Capture-Phase, damit kein Hotel gewählt wird).
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise; seit 1.7.3 nicht mehr in der Oberfläche), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
+- `app/flights.py` (1.8.0) automatische echte Flugangebote (SerpApi), siehe «Stand».
 - `app/fx.py` (1.7.3) Währungskurse für den Helfer-Rechner, siehe «Stand».
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -113,13 +114,28 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (64 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (65 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.7.7)
+## Stand (04.11.2026, Version 1.8.0)
+- 1.8.0: Wunsch James: Tagespläne «mager», Bilder passten nicht («Abendessen» zeigte Tacos), Flüge ohne konkrete Zahlen
+  trotz hinterlegter API, «Wetter jetzt prüfen» unsinnig, auf der Reise «welcher Tag, welches Wetter». Neu:
+  (1) Prompt `generator.SYSTEM`: 4–6 Punkte pro Tag, konkrete Namen, `note` = 2–3 Sätze mit Tipps, `theme` = Tagesmotto
+  (neu `DayPlan.theme`, im Tagesplan «Tag N», Motto, Beschreibung in `.desc`); `wikipedia` nur für Orte/Sehenswürdigkeiten,
+  nie Essen. Fotos: `photos.has_photo_subject` – Kategorie «kulinarik» bekommt kein Foto (auch nicht im Streifen/Titelbild);
+  `wiki_photo(strict=True)` für Programmpunkte (zwei gemeinsame Wörter, bester Treffer; Cache «wiki3:»).
+  (2) `app/flights.py`: echte Flugangebote automatisch im Hintergrund (SerpApi, wie `hotels.py`; nur geschätzte Flüge mit
+  Codes, Zukunft ≤ 330 Tage, Neuabruf alle 2 Tage, Fehler 6 Std. gemerkt, max. 6 Suchen/Lauf, kv «flight_live»);
+  `trip_detail.flight_live`; Zeile zeigt Zeit, Dauer, direkt/via, Airline, Preis; Antippen → «Diesen Flug übernehmen»
+  (`prices/apply` mit gemerktem Token), «Alle Flüge ansehen». Übernehmen bleibt Handarbeit, der Plan ändert sich nie ungefragt.
+  (3) «Wetter jetzt prüfen» in Reiseblatt und «Unterwegs» entfernt (Zeitplan prüft automatisch; Endpunkt bleibt).
+  (4) `server.live_day` + `liveCard()`: auf der Reise oben im Reiseblatt und im Tab «Unterwegs» die Karte «Heute · Tag N von M»
+  mit Ort, Vorhersage genau für diesen Ort (Symbol, Min/Max, Regen, Wind, 3-Stunden-Verlauf, Warnungen) und Tagesmotto.
+  Alte Pläne bleiben dünn (Inhalt kommt von der KI beim Planen) → neu planen. Im Testmodus 390 px hell/dunkel geprüft;
+  echte Flugdaten, Wetter und Fotos nur auf dem NAS prüfbar.
 - 1.7.7: Wunsch James: Reiseblatt «schöner und übersichtlicher, wie von Apple». Neu: Titelbild mit Titel/Datum darauf,
   drei Kennzahlen (Dauer/Orte/Kosten), Status + Wetter/Import als Listenzeilen, Tage einzeln aufklappbar (heute bzw.
   erster Tag offen, `OPEN_DAYS`), Unterkünfte als Karte (Preis + Status rechts, Hotelwahl kompakt, Fusszeile Booking.com ·

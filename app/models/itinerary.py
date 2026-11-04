@@ -80,6 +80,7 @@ class Activity(Model):
 class DayPlan(Model):
     date: date
     base: Place  # Aufenthaltsort an diesem Tag
+    theme: str | None = Field(default=None, max_length=160)  # Tagesmotto, z. B. «Maya-Ruinen von Tulum»
     activities: list[Activity] = []
 
     @field_validator("activities")
