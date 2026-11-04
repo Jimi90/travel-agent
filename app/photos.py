@@ -300,12 +300,13 @@ def activity_photo(title: str, wiki: str | None, base: str) -> str | None:
             return pid
     if GENERIC.match(title.strip()) or not _words(title):
         return None
-    return wiki_photo(f"{title} {base}", must_match=title, strict=True) or wiki_photo(title, must_match=title, strict=True)
+    return (wiki_photo(f"{title} {base}", must_match=title, strict=True) or wiki_photo(title, must_match=title, strict=True)
+            or commons_photo(f"{title} {base}", must_match=title))  # Commons kennt auch Strände, Riffe, Nationalparks
 
 
 # --- Fotos einer Reise -------------------------------------------------------------------------
 
-PHOTO_VERSION = 2  # 2: Wappen/Logos aussortiert → ältere Zuordnungen (Orte, Programmpunkte) werden neu geholt
+PHOTO_VERSION = 3  # 3: Commons-Suche dazu → leere Zuordnungen neu versuchen; 2: Wappen/Logos aussortiert → ältere Zuordnungen (Orte, Programmpunkte) werden neu geholt
 
 
 def trip_photos(trip_id: str) -> dict:
