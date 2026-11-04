@@ -114,13 +114,18 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (68 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (69 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.8.4)
+## Stand (04.11.2026, Version 1.9.0)
+- 1.9.0: Wunsch James: für 2 Tage etwas in der Region (Shopping-Trip o. ä.), dafür muss die App den Standort kennen. Neu
+  Einstellung «Wohnort» (Profil → Einstellungen, `settings.home_place`, freier Text, ≤ 80 Zeichen). `matching._home_place()`
+  liest sie; bei Reisen ≤ 3 Tage bekommt die KI «Wohnort: …», soll Ziele in Region/Schweiz/Nachbarländern per Zug/Auto
+  vorschlagen (Städtetrip, Shopping, Märkte, Wellness), mind. die Hälfte ohne Flug. Kein GPS (Umkehr-Ortssuche fehlt, Wohnort
+  ändert sich selten). Test `HomePlaceTest`; echte KI-Vorschläge nur auf dem NAS prüfbar.
 - 1.8.4: James sah oft «Der Plan ist nicht stimmig: Budget überschritten …» (Planen schlug fehl). Ursache: `generator.build`
   behandelte die Budget-Plausibilität als Fehler → Plan abgelehnt. Jetzt nur Hinweis in den Notizen («Geschätzte Kosten … über
   dem Budget»), der Plan wird gezeigt. Test `PlanOverBudgetTest`. Echte KI-Pläne nur auf dem NAS prüfbar.

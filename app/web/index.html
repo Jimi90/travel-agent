@@ -1254,6 +1254,7 @@ function renderProfileMain() {
   $("pSettings").innerHTML =
     rNav("KI", aiSummary(), 'data-sub="ki"', INFO.ai ? "" : "warn") +
     rNav("Wettercheck", s.auto_check ? `täglich ${s.check_time}` : "Aus", 'data-sub="wetter"') +
+    rIn("Wohnort", "sPlace", s.home_place || "", 'maxlength="80" placeholder="z. B. Winterthur" autocapitalize="words"') +
     rIn("Heimatflughafen", "sAir", s.home_airport, 'maxlength="3" autocapitalize="characters" style="max-width:70px"') +
     rNav("Kosten", `${usd(INFO.spent_30d)} · 30 Tage`, 'data-sub="kosten"');
   $("ver").textContent = `Kompass ${INFO.version} · ${INFO.build}${INFO.fake ? " · Testmodus" : ""}`;
@@ -1263,6 +1264,7 @@ function renderProfileMain() {
     if (key === "anstrengung") return actionSheet("Körperliche Anstrengung", [1, 2, 3].map(v => ({label: INT_TXT[v], fn: () => { k.max_intensity = v; renderProfileMain(); saveSoon(); }})));
     openSub(PAGES[key]());
   });
+  $("sPlace").onchange = e => saveSettings({home_place: e.target.value});
   $("sAir").onchange = e => saveSettings({home_airport: e.target.value});
 }
 

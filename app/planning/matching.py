@@ -89,6 +89,7 @@ class MatchingResult(Model):
     max_stops: int = 1
     reach: Reach | None = None  # nur wenn die Reisedauer bekannt ist
     home: str = "Zürich"
+    home_place: str = ""  # Wohnort (Einstellung), für Ziele in der Nähe bei kurzen Reisen
     budget_per_day: Decimal | None = None
     travel_budget: Decimal | None = None  # Anreise hin und zurück für beide, für diese Reiselänge
 
@@ -128,11 +129,25 @@ class MatchingResult(Model):
             lines.append("Ausgeschlossene Merkmale: " + ", ".join(self.avoid_tags))
         if self.reach:
             lines.append(self.reach.text(self.home))
+            if self.home_place and self.reach.days <= 3:
+                lines.append(f"Wohnort: {self.home_place}. Für diese kurze Reise vor allem Ziele in der Region um den "
+                             f"Wohnort bzw. in der Schweiz und den Nachbarländern (Zug/Auto, wenig Reisezeit), "
+                             f"gern Städtetrip, Shopping, Märkte, Wellness oder Kurzausflug in die Natur. "
+                             f"Mindestens die Hälfte der Vorschläge soll ohne Flug erreichbar sein.")
         elif self.max_flight_hours:
             lines.append(f"Flugzeit pro Strecke höchstens {self.max_flight_hours:g} Std., höchstens {self.max_stops} Umstieg(e).")
         if self.excluded_countries:
             lines.append("Schon besuchte Länder (nicht vorschlagen): " + ", ".join(self.excluded_countries))
         return "\n".join(lines)
+
+
+def _home_place() -> str:
+    """Wohnort aus den Einstellungen (leer, wenn nicht gesetzt oder keine Ablage da)."""
+    try:
+        from .. import store
+        return str(store.settings().get("home_place") or "").strip()
+    except Exception:
+        return ""
 
 
 def match(h: Household, on: date | None = None, days: int | None = None, home_airport: str = "ZRH",
@@ -167,7 +182,7 @@ def match(h: Household, on: date | None = None, days: int | None = None, home_ai
         rain_tolerance=rain, budget_per_night=min(nights) if nights else None, budget_total=k.budget_for(days, travel_budget),
         budget_per_day=k.budget_per_day_max, reach=reach_for(days, k) if days else None,
         travel_budget=travel_budget if travel_budget is not None else k.travel_budget_for(days),
-        home=HOME_CITY.get(home_airport.upper(), home_airport),
+        home=HOME_CITY.get(home_airport.upper(), home_airport), home_place=_home_place(),
         currency=k.currency, max_intensity=k.effective_max_intensity(), avoid_tags=sorted(k.effective_avoid_tags()),
         excluded_countries=sorted(h.history.visited_countries),
         pregnancy_week=k.pregnancy.week_on(on or date.today()) if k.pregnancy else None,

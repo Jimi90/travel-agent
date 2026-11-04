@@ -319,3 +319,18 @@ class PlanOverBudgetTest(unittest.TestCase):
         itin, notes = generator.build(draft, h, date(2026, 5, 4), 6, "ZRH")
         self.assertTrue(itin.days)
         self.assertTrue(any("über dem Budget" in n for n in notes), notes)
+
+
+class HomePlaceTest(unittest.TestCase):
+    def test_short_trip_prompt_mentions_home_place(self):
+        from app import store
+        from app.planning import matching
+        h = household()
+        with mock.patch.object(matching, "_home_place", return_value="Winterthur"):
+            short = matching.match(h, date(2026, 5, 4), 2, "ZRH").prompt_text()
+            long_ = matching.match(h, date(2026, 5, 4), 8, "ZRH").prompt_text()
+        self.assertIn("Wohnort: Winterthur", short)
+        self.assertIn("Shopping", short)
+        self.assertNotIn("Wohnort: Winterthur", long_)
+        with mock.patch.object(matching, "_home_place", return_value=""):
+            self.assertNotIn("Wohnort:", matching.match(h, date(2026, 5, 4), 2, "ZRH").prompt_text())
