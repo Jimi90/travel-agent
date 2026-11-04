@@ -126,6 +126,7 @@ class AppTest(unittest.TestCase):
         self.assertTrue(any("Lissabon: 2.8 Std. Flug – zu weit für 3 Tage" == d for d in j3["result"]["dropped"]))
         self.assertIsNotNone(j["result"]["ideas"][0]["climate_score"])
         self.assertTrue(all(i["photo"] for i in j["result"]["ideas"]))
+        self.assertTrue(all(i["region"] and i["landmark_wiki"] for i in j["result"]["ideas"]))
         self.assertEqual(self.call("POST", "/api/destinations", {"start": "2020-01-01", "days": 6})[0], 400)
 
         # --- Routen-Varianten → Plan aus Variante → Hotel wählen → Kostenaufstellung

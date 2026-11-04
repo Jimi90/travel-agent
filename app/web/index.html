@@ -129,6 +129,21 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 .band{display:block;width:100%;height:120px;object-fit:cover;background:var(--card2)}
 .thumb{width:54px;height:54px;border-radius:10px;object-fit:cover;flex:none;background:var(--card2)}
 .thumb.s{width:44px;height:44px;border-radius:9px}
+.dcard .ph{position:relative;aspect-ratio:4/3;background:linear-gradient(135deg,var(--accent),#0f1417);overflow:hidden}
+.dcard .ph .dimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.dcard .ph .shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.78) 0,rgba(0,0,0,.35) 38%,rgba(0,0,0,0) 62%);pointer-events:none}
+.dcard .ph .cap{position:absolute;left:16px;right:16px;bottom:14px;color:#fff;pointer-events:none;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.dcard .nm{font-size:26px;font-weight:700;letter-spacing:-.4px;line-height:1.15}
+.dcard .where{font-size:15px;margin-top:3px;opacity:.95}
+.dcard .price{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.58);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;border-radius:12px;padding:6px 11px;text-align:right;pointer-events:none;line-height:1.2}
+.dcard .price b{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums;display:block}
+.dcard .price small{font-size:11px;opacity:.85}
+.dbody{padding:12px 16px 14px}
+.hl{display:flex;flex-wrap:wrap;gap:6px}
+.hl .chip{font-size:14px;padding:4px 10px;background:var(--card2);color:var(--text)}
+.facts{font-size:14px;margin-top:10px;line-height:1.45}
+.facts b{font-weight:600}
+.dbody .s.why{margin-top:8px}
 .idea-img{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--card2)}
 .stepper{display:flex;align-items:center;gap:12px;flex:none}
 .stepper span{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
@@ -575,20 +590,32 @@ async function suggest() {
   } catch (e) { b.disabled = false; msg($("nMsg"), esc(e.message), "err"); }
 }
 
+const cflag = cc => /^[A-Z]{2}$/.test(cc || "") ? String.fromCodePoint(...[...cc].map(x => 127397 + x.charCodeAt(0))) : "";
+let REGION_NAMES = null;
+function cname(cc) {
+  try { REGION_NAMES = REGION_NAMES || new Intl.DisplayNames(["de-CH", "de"], {type: "region"}); return REGION_NAMES.of(cc) || cc; } catch { return cc || ""; }
+}
 function renderIdeas(res) {
   const saved = new Set();
   $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Hin- und Rückreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
-    `<div class="card">` + res.ideas.map((i, n) => `<div class="row idea">
-      <div class="grow">${photo(i.photo, "idea-img", i.name)}<div class="t">${esc(i.name)} <span class="chip">${esc(i.country)}</span></div>
-      <div class="s">${esc(i.why)}</div>
-      <div class="s">${esc((i.highlights || []).join(" · "))}</div>
-      <div class="s"><b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> – ${esc(i.climate_text)}</div>
-      <div class="s">${i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug"} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${(i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : ""}${i.travel_cost_chf ? ` · hin und zurück ca. ${esc(chf(i.travel_cost_chf))}` : ""}</div>
-      <div class="s">Ganze Reise ca. ${esc(chf(i.est_total_chf))} (Schätzung)</div>
-      ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
-      <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
-      </div></div>`).join("") + `</div>` +
+    res.ideas.map((i, n) => {
+      const cn = cname(i.country), reg = (i.region || "").trim();
+      const where = [`${cflag(i.country)} ${esc(cn)}`.trim(), reg && ![i.name, cn].some(x => actKey(x) === actKey(reg)) ? esc(reg) : ""].filter(Boolean).join(" · ");
+      const mode = i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug";
+      const stops = (i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : "";
+      return `<div class="card dcard"><div class="ph">${photo(i.photo, "dimg", `${i.name}, ${cn}`)}<div class="shade"></div>
+        <div class="price"><b>ca. ${esc(chf(i.est_total_chf))}</b><small>ganze Reise · 2 Personen</small></div>
+        <div class="cap"><div class="nm">${esc(i.name)}</div><div class="where">${where}</div></div></div>
+        <div class="dbody">
+          <div class="hl">${(i.highlights || []).slice(0, 4).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
+          <div class="facts">${mode} ca. ${esc(i.travel_hours ?? i.typical_flight_hours)} Std.${stops}${i.travel_cost_chf ? ` · hin und zurück ca. ${esc(chf(i.travel_cost_chf))}` : ""}<br>
+            <b>${i.climate_score != null ? "Klima " + i.climate_score + "/10" : "Klima unbekannt"}</b> · ${esc(i.climate_text)}</div>
+          <div class="s why">${esc(i.why)}</div>
+          ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
+          <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
+        </div></div>`;
+    }).join("") +
     (res.dropped.length ? `<p class="hint">Aussortiert: ${esc(res.dropped.join(" · "))}</p>` : "") +
     `<p class="hint">Klima = echte Messwerte derselben Tage im Vorjahr. Kosten und Flugzeiten sind Schätzungen der KI.</p>`;
   $("ideas").querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
