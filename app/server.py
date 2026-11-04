@@ -99,7 +99,10 @@ def trip_detail(trip_id: str) -> dict:
         hotels.enrich(it)  # echte Preise + Fotos der Hotelvorschläge (SerpApi), ebenfalls im Hintergrund
         pending = True
     tp = photos.trip_photos(it.id)
-    hero = next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
+    # Titelbild: zuerst ein Programmpunkt-Foto (Strand, Wahrzeichen), erst dann das Foto des Ortsartikels
+    hero = next((tp["activities"].get(photos.activity_key(a.title)) for d in it.days for a in d.activities
+                 if tp["activities"].get(photos.activity_key(a.title))), None) \
+        or next((tp["places"].get(d.base.name) for d in it.days if tp["places"].get(d.base.name)), None)
     hero_meta = (store.get("photo", hero) or {}) if hero else {}
     hotel_opts = {}
     for st in it.stays:
@@ -111,7 +114,8 @@ def trip_detail(trip_id: str) -> dict:
                          "total": float(h.price_per_night) * nights, "why": h.why,
                          "tier": next((t for t in ("guenstig", "mittel", "gehoben") if t in h.tags), ""),
                          "url": h.search_url, "chosen": h.name == st.name, "photos": live.get("photos", []),
-                         "live": {k: live.get(k) for k in ("night", "total", "rating", "reviews", "link", "ts")}
+                         "live": {**{k: live.get(k) for k in ("night", "total", "rating", "reviews", "link", "ts")},
+                                  "total": prices.stay_total(live.get("total"), live.get("night"), nights)}
                          if live.get("found") and live.get("night") else None})
         hotel_opts[st.id] = opts
     costs = {"Flüge & Verbindungen": float(sum(t.cost for t in it.transports)),
