@@ -123,7 +123,13 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.10.0)
+## Stand (05.11.2026, Version 1.10.1)
+- 1.10.1: James: am PC sah die App aus wie auf dem Handy. Ab 900 px Breite (`@media (min-width: 900px)` am Ende des
+  CSS) Seitenleiste links wie eine Mac-/iPad-App (`#tabbar` wird senkrecht, `--side` 248 px, «Kompass» als Titel),
+  Inhalt breiter (Reisen bis 1040 px, Helfer/Profil 720 px), Blätter rechts neben der Seitenleiste (920 px, Neue Reise
+  ab 1400 px 1180 px), Zielvorschläge und Routen 2-spaltig (ab 1400 px 3-spaltig), Titelleiste über die ganze Breite
+  (`.topbar::before`), Hover-Zustände (`@media (hover: hover)`). Unter 900 px unverändert. Mit Playwright bei 1440×900,
+  1024×768 und 390 px hell/dunkel geprüft.
 - 1.10.0: Wunsch James: «mehr wie Apple». Nur `index.html` (CSS + wenig JS): iOS-Systemfarben (hell #f2f2f7/#fff,
   dunkel #000/#1c1c1e, Separator/Label-Töne, `--press`, `--segon`, `--bar`), Haarlinien .5px, Typo wie iOS (Large Title 34,
   Zeilen 17 px, Untertitel 14–15 px, Abschnittstitel 13 px), Karten 12 px Ecken, kleine Knöpfe «getönt» (Akzent 14 %),
