@@ -329,6 +329,15 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
   #ideas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #ideas>*:not(.dcard):not(.vcard){grid-column:1/-1}
   #ideas .card+.card{margin-top:0}
+  /* gleiche Abschnitte auf gleicher Höhe: jede Karte nutzt die Zeilen des Rasters (Subgrid) */
+  #ideas{row-gap:0}
+  #ideas .dcard{display:grid;grid-template-rows:subgrid;grid-row:span 8;margin-bottom:16px}
+  #ideas .dcard .dbody{display:contents}
+  #ideas .dcard .dbody>*{margin-left:16px;margin-right:16px}
+  #ideas .dcard .hl{margin-top:12px}
+  #ideas .dcard .btns{align-self:end;margin-bottom:16px;margin-top:14px}
+  #ideas .vcard{display:grid;grid-template-rows:subgrid;grid-row:span 9;margin-bottom:16px}
+  #ideas .vcard>.go{align-self:end}
   .tphero{aspect-ratio:auto;height:360px}
   .hero{aspect-ratio:auto;height:340px}
   h1{margin-top:12px}
@@ -756,18 +765,18 @@ function renderVariants(res) {
     res.variants.map((v, i) => {
       const f = v.facts || null, nights = v.route.reduce((n, st) => n + st.nights, 0), w = f && f.weather;
       const tiles = f ? [w ? tile("Wetter", `${w.max}° / ${w.min}°`, `${w.score != null ? "Klima " + w.score + "/10 · " : ""}Regen ${w.rain_pct} %`) : "",
-        f.water_c ? tile("Meer", `${f.water_c} °C`, "geschätzt") : "",
-        f.km ? tile("Strecke", `${Number(f.km).toLocaleString("de-CH")} km`, `${f.stops} Orte`) : ""].join("") : "";
+        f.water_c ? tile("Meer", `${f.water_c} °C`, "geschätzt") : tile("Meer", "–", "kein Badeort"),
+        f.km ? tile("Strecke", `${Number(f.km).toLocaleString("de-CH")} km`, `${f.stops} Orte`) : tile("Strecke", "–", "1 Ort, keine Wechsel")].join("") : "";
       const bullets = (v.bullets || []).slice(0, f ? 3 : 5);
-      return `<div class="card vcard">${mapHtml(v.route, "big")}
+      return `<div class="card vcard">${mapHtml(v.route, "big") || `<div></div>`}
         <div class="vhead"><div class="grow"><div class="vname">${esc(v.name)}</div>
             <div class="s">${nights} Nächte · ${v.route.length === 1 ? "1 Ort" : v.route.length + " Orte"}${v.over_budget ? `<span class="badge warn">über Budget</span>` : ""}</div></div>
           <div class="vprice ${v.over_budget ? "over" : ""}"><b>ca. ${esc(chf(v.costs.Total))}</b><small>für 2 Personen</small></div></div>
-        ${v.warning ? `<div class="vwarn">${esc(v.warning)}</div>` : ""}
+        ${v.warning ? `<div class="vwarn">${esc(v.warning)}</div>` : `<div></div>`}
         <div class="vsum">${esc(v.summary)}</div>
         <ol class="stops">${v.route.map((st, n) => `<li><span class="num">${n + 1}</span><div class="grow"><div class="t">${esc(st.name)}</div>${st.note ? `<div class="s">${esc(st.note)}</div>` : ""}</div><span class="chip">${st.nights} ${st.nights === 1 ? "Nacht" : "Nächte"}</span></li>`).join("")}</ol>
-        ${tiles ? `<div class="tiles">${tiles}</div>` : ""}
-        ${bullets.length ? `<ul class="vbul">${bullets.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${tiles ? `<div class="tiles">${tiles}</div>` : `<div></div>`}
+        ${bullets.length ? `<ul class="vbul">${bullets.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : `<div></div>`}
         <details class="vcost"><summary>Kosten im Detail</summary><div class="costs">${Object.entries(v.costs).filter(([k]) => k !== "Total").map(([k, c]) => `<span>${esc(k)}</span><span>${esc(chf(c))}</span>`).join("")}<b>Total ca.</b><b>${esc(chf(v.costs.Total))}</b>${v.budget ? `<span>Budget</span><span class="${v.over_budget ? "warnt" : ""}">${esc(chf(v.budget))}</span>` : ""}</div></details>
         <button class="btn go" data-var="${i}">Diese Route planen</button>
       </div>`;
@@ -816,6 +825,15 @@ let REGION_NAMES = null;
 function cname(cc) {
   try { REGION_NAMES = REGION_NAMES || new Intl.DisplayNames(["de-CH", "de"], {type: "region"}); return REGION_NAMES.of(cc) || cc; } catch { return cc || ""; }
 }
+// «Wetter im …» aus echten Messwerten (Vorjahr) statt aus der KI – die KI lag z. B. bei Agadir 5 °C daneben
+function climateText(c, sea) {
+  const tx = Math.round(c.temp_max), tn = Math.round(c.temp_min), r = c.rain_days || 0;
+  const day = tx >= 29 ? "heiss" : tx >= 24 ? "sommerlich warm" : tx >= 19 ? "angenehm mild" : tx >= 13 ? "frühlingshaft frisch" : "kühl";
+  const night = tn >= 18 ? "laue Abende draussen" : tn >= 12 ? "abends genügt eine leichte Jacke" : tn >= 6 ? "abends wird es kühl – eine warme Jacke einpacken" : "nachts kalt, warm anziehen";
+  const rain = r < .15 ? "fast immer trocken" : r < .35 ? "ab und zu ein Schauer" : "öfter Regen – Schirm nicht vergessen";
+  const swim = sea ? (sea >= 23 ? ` Das Meer lädt mit ${sea} °C zum Baden ein.` : sea >= 20 ? ` Baden ist mit ${sea} °C erfrischend.` : ` Mit ${sea} °C ist das Meer eher zu kühl zum Baden.`) : "";
+  return `Tagsüber ${day} um ${tx} °C, ${rain}; ${night} (um ${tn} °C).${swim}`;
+}
 function renderIdeas(res) {
   const month = res.start ? new Date(res.start + "T12:00").toLocaleDateString("de-CH", {month: "long"}) : "Reisemonat";
   const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
@@ -832,16 +850,16 @@ function renderIdeas(res) {
         <div class="cap"><div class="nm">${esc(i.name)}</div><div class="where">${where}</div></div></div>
         <div class="dbody">
           <div class="hl">${(i.highlights || []).slice(0, 4).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
-          ${i.pitch ? `<p class="pitch">${esc(i.pitch)}</p>` : ""}
+          ${i.pitch ? `<p class="pitch">${esc(i.pitch)}</p>` : `<div></div>`}
           <div class="tiles four">${[
             c ? tile("Wetter", `${Math.round(c.temp_max)}° / ${Math.round(c.temp_min)}°`, `${wxIcon(c.rain_days > .45 ? "regen" : c.rain_days > .2 ? "teils bewölkt" : "klar")} ${Math.round(c.rain_days * 100)} % Regen`) : "",
-            i.sea_temp ? tile("Wasser", `${i.sea_temp} °C`, i.sea_source || "") : "",
-            tile("Anreise", `${i.travel_hours ?? i.typical_flight_hours} Std.`, `${mode}${stops}${i.travel_cost_chf ? ` · ${chf(i.travel_cost_chf)} hin/zurück` : ""}`)].join("")}</div>
+            i.sea_temp ? tile("Wasser", `${i.sea_temp} °C`, i.sea_source || "") : tile("Wasser", "–", "kein Badeort"),
+            tile("Anreise", `${i.travel_hours ?? i.typical_flight_hours} Std.`, `${mode}${stops}${i.travel_cost_chf ? ` · ${chf(i.travel_cost_chf)}` : ""}`)].join("")}</div>
           <div class="dsec"><div class="dk">Wetter im ${esc(month)}</div>
-            ${i.climate_note ? `<p>${esc(i.climate_note)}</p>` : ""}
+            ${c ? `<p>${esc(climateText(c, i.sea_temp))}</p>` : i.climate_note ? `<p>${esc(i.climate_note)}</p>` : ""}
             ${i.climate_score != null ? `<div class="s">Passt zu euren Wetterwünschen: ${Math.round(i.climate_score)} von 10 (Messwerte derselben Tage im Vorjahr)</div>` : `<div class="s">${esc(i.climate_text || "")}</div>`}</div>
-          ${i.why ? `<div class="dsec"><div class="dk">Warum es zu euch passt</div><p>${esc(i.why)}</p></div>` : ""}
-          ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
+          ${i.why ? `<div class="dsec"><div class="dk">Warum es zu euch passt</div><p>${esc(i.why)}</p></div>` : `<div></div>`}
+          ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : `<div></div>`}
           <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
         </div></div>`;
     }).join("") +

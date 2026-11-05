@@ -137,6 +137,11 @@ class FreeLLMTest(unittest.TestCase):
             self.assertEqual(self.ask("reiseplan").title, "Lite")
         self.assertEqual(SEEN[-1][1]["model"], "gemini-3.5-flash-lite")
 
+    def test_swiss_spelling(self):  # «ß» der KI → «ss»
+        SCRIPT["groq"] = [ok('{"title":"Genießt die Straße","items":["groß"]}')]
+        out = self.ask()
+        self.assertEqual((out.title, out.items), ("Geniesst die Strasse", ["gross"]))
+
     def test_overload_short_spike_same_model(self):
         SCRIPT["gemini"] = [(503, "{}"), ok('{"title":"Wieder da","items":[]}')]
         with mock.patch("time.sleep") as sl:

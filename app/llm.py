@@ -66,6 +66,12 @@ def route(purpose: str, has_image: bool = False) -> list[str]:
     return [p for p in order if _has_key(p)]
 
 
+def _swiss(result: T, schema: type[T]) -> T:
+    """Schweizer Rechtschreibung: die KI schreibt trotz Anweisung manchmal «ß» («genießt») → «ss»."""
+    raw = result.model_dump_json()
+    return schema.model_validate_json(raw.replace("ß", "ss")) if "ß" in raw else result
+
+
 def cost_usd(model: str, tin: int, tout: int, searches: int = 0) -> float:
     pin, pout = config.PRICES.get(model, (0.0, 0.0))
     return round(tin / 1e6 * pin + tout / 1e6 * pout + searches * config.WEB_SEARCH_USD, 5)
@@ -96,8 +102,8 @@ def ask(
     for prov in order:
         try:
             if prov == "claude":
-                return _claude(purpose, system, content, schema, trip_id, max_tokens, web_search)
-            return _compat(prov, purpose, system, content, schema, trip_id, max_tokens)
+                return _swiss(_claude(purpose, system, content, schema, trip_id, max_tokens, web_search), schema)
+            return _swiss(_compat(prov, purpose, system, content, schema, trip_id, max_tokens), schema)
         except _Skip as e:
             reasons.append(f"{LABEL[prov]}: {e}")
             print(f"[KI] {LABEL[prov]} für «{purpose}» nicht möglich: {e}", flush=True)
