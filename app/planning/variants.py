@@ -28,9 +28,9 @@ class Stop(BaseModel):
 
 class Variant(BaseModel):
     name: str  # z. B. «Stadt & Strand»
-    summary: str  # 1–2 Sätze
+    summary: str  # 1–2 einladende Sätze wie im Reisekatalog
     route: list[Stop]
-    bullets: list[str]  # 2–4 sehr kurze Stichpunkte (Reisetempo, Besonderheiten) – keine Kosten/Wetter/Distanzen
+    bullets: list[str]  # 3 Erlebnisse im Reisebüro-Stil (je 6–14 Wörter) – keine Kosten/Wetter/Distanzen
     water_temp_c: float  # Meerwassertemperatur zur Reisezeit, 0 wenn kein Meer
     flights_chf: int  # Anreise hin und zurück (Flug/Zug/Auto) – Schätzungen für beide zusammen
     hotels_chf: int
@@ -46,7 +46,11 @@ SYSTEM = """Du bist Kompass, ein Reiseplaner für ein Paar aus der Schweiz. Deut
 Erstelle 3 deutlich verschiedene Routen-Varianten für das Ziel (z. B. ruhig an einem Ort, Rundreise, Stadt + Strand).
 Jede Route: Orte in Reisereihenfolge mit Nächten; Summe der Nächte = Reisetage − 1. Nur echte Orte mit Koordinaten.
 Pro Ort: «note» = 3 bis 6 Wörter, was man dort sieht oder macht (z. B. «Altstadt, Goldmuseum»).
-bullets: 2 bis 4 sehr kurze Stichpunkte (höchstens 8 Wörter), z. B. Reisetempo, Wege, Besonderheiten zur Reisezeit.
+summary: 1–2 einladende Sätze wie in einem guten Reisekatalog: Stimmung und Charakter der Route, konkret statt Floskeln.
+bullets: genau 3 Erlebnisse dieser Route, so geschrieben, wie ein gutes Reisebüro sie anpreist: lebendig, sinnlich,
+konkret mit Namen, je 6 bis 14 Wörter, ganze Ausdrücke statt Schlagworte. Gut: «Sonnenaufgang über dem Toten Meer
+in Ein Gedi», «Abends Hummus und Live-Musik in den Gassen von Jaffa», «Drei Orte, nur zwei Hotelwechsel – viel Zeit
+zum Ankommen». Schlecht: «Mischung Kultur/Natur», «Zugverbindungen genutzt», «Weniger Hotelwechsel».
 KEINE Kosten, Wetter, Wassertemperatur oder Distanzen in bullets und notes – die zeigt die App getrennt.
 Alle Orte liegen im genannten Ziel (Land/Region) – keine Orte in anderen Ländern, ausser das Ziel nennt sie.
 name beschreibt den Stil der Route und passt zu ihren Orten (z. B. «Gemütlich in Valletta», «Inseln & Altstadt»).
@@ -150,7 +154,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
         nights = sum(s.nights for s in route)
         if nights != days - 1 and route:  # Nächte auf die Reisedauer abgleichen (letzter Ort gleicht aus)
             route[-1].nights = max(1, route[-1].nights + (days - 1 - nights))
-        bullets = [b for b in v.bullets if b.strip()][:4]
+        bullets = [b.strip() for b in v.bullets if b.strip()][:3]
         # Wetter: echte Messwerte am ersten (Haupt-)Ort, gleiche Tage im Vorjahr
         score, facts = None, {"weather": None, "water_c": None, "km": None, "stops": len(route)}
         try:
@@ -212,7 +216,8 @@ def _fake(destination: str, days: int) -> VariantList:
                                       note="Altstadt, Aussichtspunkte, Essen")
     return VariantList(variants=[
         Variant(name="Gemütlich an einem Ort", summary=f"Alles von {a} aus, kurze Wege.",
-                route=[mk(a, 38.72, -9.14, n)], bullets=["Ruhiges Tempo", "Tagesausflüge möglich"],
+                route=[mk(a, 38.72, -9.14, n)], bullets=["Morgens Kaffee in der Altstadt, abends Fado in der Alfama",
+                                                         "Tagesausflüge nach Sintra und an die Küste von Cascais"],
                 water_temp_c=17, flights_chf=500, hotels_chf=160 * n, activities_chf=400, transfers_chf=60),
         Variant(name="Stadt & Insel", summary=f"Erst {a}, dann Erholung auf der Insel.",
                 route=[mk(a, 38.72, -9.14, n // 2), mk(f"{a} Insel", 32.65, -16.91, n - n // 2)],
