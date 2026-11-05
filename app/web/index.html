@@ -493,7 +493,10 @@ function watchJob(id, label, onDone, again) {
   const tick = async () => {
     let j;
     try { j = await api("/api/jobs/" + id); } catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; clearJob(); return; }
-    if (j.status === "laeuft") { jobTimer = setTimeout(tick, 2000); return; }
+    if (j.status === "laeuft") {  // KI überlastet: Kompass wartet selbst und zeigt den nächsten Versuch
+      box.innerHTML = `<span class="spin"></span>${esc(label)}<div class="s">${esc(j.note || "Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.")}</div>`;
+      jobTimer = setTimeout(tick, 2000); return;
+    }
     clearJob();
     if (j.status === "fehler") {
       box.innerHTML = `<span class="warnt">${esc(j.error)}</span>` + (again ? `<button class="btn" id="jobAgain" style="margin-top:12px">Nochmals versuchen</button>` : "");
@@ -639,10 +642,11 @@ async function startVariants(dest) {
   msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen …`);
   $("ideas").innerHTML = "";
   try {
+    const base0 = $("nMsg").innerHTML;
     const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
-      if (j.status === "laeuft") return setTimeout(poll, 2000);
+      if (j.status === "laeuft") { $("nMsg").innerHTML = j.note ? `<span class="spin"></span>${esc(j.note)}` : base0; return setTimeout(poll, 2000); }
       b.disabled = false;
       if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
       msg($("nMsg"), ""); renderVariants(j.result);
@@ -701,10 +705,11 @@ async function suggest() {
   const b = $("nGo"); b.disabled = true;
   msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen …`);
   try {
+    const base0 = $("nMsg").innerHTML;
     const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
-      if (j.status === "laeuft") return setTimeout(poll, 2000);
+      if (j.status === "laeuft") { $("nMsg").innerHTML = j.note ? `<span class="spin"></span>${esc(j.note)}` : base0; return setTimeout(poll, 2000); }
       b.disabled = false;
       if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
       msg($("nMsg"), ""); renderIdeas(j.result);

@@ -36,7 +36,13 @@ OVERLOADED = "überlastet"
 
 
 class LLMError(Exception):
-    """Fehler mit Text, der so in der Oberfläche angezeigt werden kann."""
+    """Fehler mit Text, der so in der Oberfläche angezeigt werden kann.
+
+    `temporary`: nur vorübergehend (Anbieter überlastet) – ein Hintergrund-Auftrag versucht es später selbst nochmals."""
+
+    def __init__(self, msg: str = "", temporary: bool = False):
+        super().__init__(msg)
+        self.temporary = temporary
 
 
 class _Skip(Exception):
@@ -101,7 +107,7 @@ def ask(
                 "für Kompass in AI Studio einen eigenen Schlüssel in einem neuen Projekt anlegen.")
     if any(OVERLOADED in r for r in reasons):  # vorübergehend beim Anbieter – kein Fehler von Kompass
         raise LLMError("Die KI ist gerade überlastet (bei Google, nicht bei Kompass). Das ist meist nach ein paar "
-                       "Minuten vorbei – bitte dann nochmals versuchen. Details: " + " · ".join(reasons))
+                       "Minuten vorbei – bitte dann nochmals versuchen. Details: " + " · ".join(reasons), temporary=True)
     if len(reasons) == 1:
         raise LLMError(reasons[0] + hint)
     raise LLMError("Alle KI-Anbieter sind ausgefallen – " + " · ".join(reasons) + hint)
