@@ -123,7 +123,13 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.10.2)
+## Stand (05.11.2026, Version 1.10.3)
+- 1.10.3: James (Foto PC): Zielkarten «nicht symmetrisch». Am PC nutzen Ziel- und Routenkarten CSS-Subgrid (`#ideas .dcard`
+  `grid-row:span 8`, `.dbody{display:contents}`; `.vcard` span 9) → gleiche Abschnitte auf gleicher Höhe, gleiche
+  Kartenhöhe, Knöpfe unten. Darum rendern Karten fehlende Teile als leeres `<div>` (Anzahl Kinder fix!) und immer drei
+  Kacheln («Wasser – kein Badeort», «Strecke – 1 Ort»). «Wetter im <Monat>» kommt jetzt aus den Messwerten
+  (`climateText` in index.html: Temperatur-/Regen-/Badestufen), nicht mehr aus der KI (`climate_note` lag bei Agadir 5 °C
+  daneben; bleibt nur Ersatz ohne Messwerte). `llm._swiss`: «ß» in jeder KI-Antwort → «ss». 1440/1024/390 px geprüft.
 - 1.10.2: Wunsch James: Schrift Helvetica (`--sans`/`--display` = "Helvetica Neue", Helvetica, Arial; auch Anmelde-/
   Einrichtungsseite; keine Webfont – CSP und Lizenz; Windows zeigt Arial) und modernere Farbe statt Grün: Ozeanblau
   (hell `--accent:#2459e0`, dunkel `#6e9bff`), Verläufe/Avatar/Heute-Karte blau, App-Symbol (`icon.svg`, `apple-touch-icon.png`
