@@ -117,13 +117,20 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (80 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (82 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.9.5)
+## Stand (05.11.2026, Version 1.9.6)
+- 1.9.6: James wollte eine Route planen: «Alle KI-Anbieter sind ausgefallen – Gemini: Fehler 503 high demand · Groq: Aufgabe
+  zu gross». Gemini war bei Google überlastet; Kompass wartete nur 5 s. Jetzt `llm.OVERLOAD_WAITS` (8/20/40 s), dann das
+  andere Gemini-Modell (`FREE_PROVIDERS[...]["models"]`, z. B. flash-lite, eigenes Kontingent), dann `_Skip("überlastet …")`
+  → verständliche Meldung «Die KI ist gerade überlastet (bei Google, nicht bei Kompass) …». Planen-Fehler zeigen
+  «Nochmals versuchen» (`watchJob(…, again)` schickt dieselbe Anfrage an `/api/trips`, auch nach Neuladen). Tausender-Format
+  in der Groq-Meldung korrigiert («34'964 Tokens'»). Mit nachgebildetem Server + Playwright 390 px hell/dunkel geprüft;
+  echtes Gemini-Verhalten nur auf dem NAS.
 - 1.9.5: James klickte «Routen ansehen» für Malta und bekam «Malediven-Entspannung» (Valletta) und eine Route über
   Griechenland/Türkei/Pakistan. Ursache vermutlich: Varianten gingen als «kleine Aufgabe» zuerst an Groq, und der Code prüfte
   nicht, ob die Orte im Ziel liegen. Jetzt Gemini zuerst + Ortsprüfung (s. variants.py). Mit nachgebildeter Ortssuche getestet

@@ -118,13 +118,29 @@ class FreeLLMTest(unittest.TestCase):
 
     def test_all_fail_names_each_provider(self):
         SCRIPT["groq"] = [(401, '{"error":{"message":"invalid key"}}')]
-        SCRIPT["gemini"] = [(503, '{"error":{"message":"high demand"}}'), (503, '{"error":{"message":"high demand"}}')]
-        with mock.patch("time.sleep"):
+        SCRIPT["gemini"] = [(503, '{"error":{"message":"high demand"}}')] * 6
+        with mock.patch("time.sleep") as sl:
             with self.assertRaises(llm.LLMError) as cm:
                 self.ask()
         msg = str(cm.exception)
         self.assertIn("Groq: Schlüssel abgelehnt", msg)
-        self.assertIn("Gemini: Fehler 503: high demand", msg)
+        self.assertIn("Gemini: überlastet (Fehler 503: high demand)", msg)
+        self.assertIn("gerade überlastet (bei Google, nicht bei Kompass)", msg)
+        models = [b["model"] for prov, b, _ in SEEN if prov == "gemini"]
+        self.assertEqual(models, ["gemini-3.8-flash"] * 4 + ["gemini-3.5-flash-lite"] * 2)  # 3× warten, dann Ersatzmodell
+        self.assertEqual([c.args[0] for c in sl.call_args_list], [8, 20, 40, 40])
+
+    def test_overload_then_other_gemini_model_answers(self):
+        SCRIPT["gemini"] = [(503, '{"error":{"message":"high demand"}}')] * 4 + [ok('{"title":"Lite","items":[]}')]
+        with mock.patch("time.sleep"):
+            self.assertEqual(self.ask("reiseplan").title, "Lite")
+        self.assertEqual(SEEN[-1][1]["model"], "gemini-3.5-flash-lite")
+
+    def test_overload_short_spike_same_model(self):
+        SCRIPT["gemini"] = [(503, "{}"), ok('{"title":"Wieder da","items":[]}')]
+        with mock.patch("time.sleep") as sl:
+            self.assertEqual(self.ask("reiseplan").title, "Wieder da")
+        sl.assert_called_once_with(8)
 
     def test_truncated_answer_skips_to_next(self):
         SCRIPT["gemini"] = [ok('{"title":"x"', finish="length")]
@@ -166,7 +182,7 @@ class FreeLLMTest(unittest.TestCase):
         SCRIPT["gemini"] = [ok('{"title":"Gross","items":[]}')]
         out = llm.ask("reiseplan", system="Test", content="Plan", schema=Answer, fake=lambda: None, max_tokens=32000)
         self.assertEqual(out.title, "Gross")
-        SCRIPT["gemini"] = [(503, "{}"), (503, "{}")]
+        SCRIPT["gemini"] = [(503, "{}")] * 6
         with mock.patch("time.sleep"):
             with self.assertRaises(llm.LLMError) as cm:
                 llm.ask("reiseplan", system="Test", content="Plan", schema=Answer, fake=lambda: None, max_tokens=32000)
