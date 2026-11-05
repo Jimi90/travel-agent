@@ -146,6 +146,12 @@ input[type=search]{-webkit-appearance:none;appearance:none;border-radius:10px}
 .facts{font-size:14px;margin-top:10px;line-height:1.45}
 .facts b{font-weight:600}
 .dbody .s.why{margin-top:8px}
+.pitch{font-size:16px;line-height:1.5;margin:12px 0 0;color:var(--text)}
+.dsec{margin-top:14px}
+.dsec .dk{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.dsec p{font-size:16px;line-height:1.5;margin:4px 0 0;color:var(--text)}
+.dsec .s{margin-top:4px}
+button.small.on{color:var(--accent,inherit)}
 .idea-img{display:block;width:100%;aspect-ratio:2/1;object-fit:cover;border-radius:10px;margin-bottom:10px;background:var(--card2)}
 .stepper{display:flex;align-items:center;gap:12px;flex:none}
 .stepper span{min-width:64px;text-align:center;font-size:16px;font-variant-numeric:tabular-nums}
@@ -546,14 +552,20 @@ async function loadTrips() {
   $("tripList").querySelectorAll("[data-trip]").forEach(r => r.onclick = () => openTrip(r.dataset.trip));
   $("favDestWrap").hidden = !ideas.saved.length;
   $("favDest").innerHTML = ideas.saved.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.name)}</div>
-      <div class="s">${esc(i.why || "")}</div></div><button class="small" data-plan="${esc(i.name)}">Planen</button></div>`).join("");
+      <div class="s">${esc(i.pitch || i.why || "")}</div></div><button class="small" data-plan="${esc(i.name)}">Planen</button>
+      <button class="small" data-unfav="${esc(i.id)}" aria-label="Nicht mehr merken">★</button></div>`).join("");
   $("favDest").querySelectorAll("[data-plan]").forEach(b => b.onclick = () => openNew(b.dataset.plan));
+  $("favDest").querySelectorAll("[data-unfav]").forEach(b => b.onclick = async () => {  // ★ antippen = nicht mehr merken
+    const i = ideas.saved.find(x => x.id === b.dataset.unfav);
+    try { await api("/api/fav-destination", {idea: i, remove: true}); toast(`«${i.name}» nicht mehr gemerkt`); loadTrips(); }
+    catch (e) { toast(e.message); }
+  });
 }
 
 // Neue Reise: zwei Wege – Ziele vorschlagen lassen oder ein bekanntes Ziel planen
 let NEW_MODE = "vorschlag", NEW_DAYS = 7;
 const NEW_TXT = {
-  vorschlag: {hint: "Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima zur Reisezeit.",
+  vorschlag: {hint: "Kompass sucht Ziele, die zu euch beiden passen.",
     wish: "z. B. Meer, warm, gutes Essen, nicht zu weit", go: "Ziele vorschlagen"},
   ziel: {hint: "Kompass plant Tage, Unterkünfte, Verbindungen und ein Schlechtwetter-Programm.",
     wish: "z. B. ruhig, kein Mietauto, ein Tag Spa", go: "Plan erstellen"},
@@ -624,7 +636,7 @@ $("nGo").onclick = async () => {
 // Routen-Varianten (2–3) für ein Ziel – erst danach entsteht der ganze Plan
 async function startVariants(dest) {
   const b = $("nGo"); b.disabled = true;
-  msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen und prüft das Wetter …`);
+  msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen …`);
   $("ideas").innerHTML = "";
   try {
     const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
@@ -687,7 +699,7 @@ async function startPlan(dest) {
 
 async function suggest() {
   const b = $("nGo"); b.disabled = true;
-  msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen, und prüft das Klima …`);
+  msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen …`);
   try {
     const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
@@ -708,7 +720,7 @@ function cname(cc) {
   try { REGION_NAMES = REGION_NAMES || new Intl.DisplayNames(["de-CH", "de"], {type: "region"}); return REGION_NAMES.of(cc) || cc; } catch { return cc || ""; }
 }
 function renderIdeas(res) {
-  const saved = new Set();
+  const month = res.start ? new Date(res.start + "T12:00").toLocaleDateString("de-CH", {month: "long"}) : "Reisemonat";
   const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
   $("ideas").innerHTML = `<h2>Vorschläge für euch</h2>` + (res.reach ? `<p class="hint" style="margin:0 16px 10px">${esc(res.reach.replace(" Weitere Ziele nicht vorschlagen.", ""))}${res.travel_budget ? ` Hin- und Rückreise höchstens ${esc(chf(res.travel_budget))}.` : ""}${res.budget ? ` Budget gesamt: ${esc(chf(res.budget))}.` : ""}</p>` : "") +
     (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Vorschlag liegt in der Reichweite – mehr Tage wählen oder Wünsche anpassen.</div></div>`) +
@@ -723,12 +735,15 @@ function renderIdeas(res) {
         <div class="cap"><div class="nm">${esc(i.name)}</div><div class="where">${where}</div></div></div>
         <div class="dbody">
           <div class="hl">${(i.highlights || []).slice(0, 4).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
+          ${i.pitch ? `<p class="pitch">${esc(i.pitch)}</p>` : ""}
           <div class="tiles four">${[
             c ? tile("Wetter", `${Math.round(c.temp_max)}° / ${Math.round(c.temp_min)}°`, `${wxIcon(c.rain_days > .45 ? "regen" : c.rain_days > .2 ? "teils bewölkt" : "klar")} ${Math.round(c.rain_days * 100)} % Regen`) : "",
             i.sea_temp ? tile("Wasser", `${i.sea_temp} °C`, i.sea_source || "") : "",
             tile("Anreise", `${i.travel_hours ?? i.typical_flight_hours} Std.`, `${mode}${stops}${i.travel_cost_chf ? ` · ${chf(i.travel_cost_chf)} hin/zurück` : ""}`)].join("")}</div>
-          ${i.climate_score != null ? `<div class="s">Klima ${i.climate_score}/10 · ${esc(i.climate_text)}</div>` : ""}
-          <div class="s why">${esc(i.why)}</div>
+          <div class="dsec"><div class="dk">Wetter im ${esc(month)}</div>
+            ${i.climate_note ? `<p>${esc(i.climate_note)}</p>` : ""}
+            ${i.climate_score != null ? `<div class="s">Passt zu euren Wetterwünschen: ${Math.round(i.climate_score)} von 10 (Messwerte derselben Tage im Vorjahr)</div>` : `<div class="s">${esc(i.climate_text || "")}</div>`}</div>
+          ${i.why ? `<div class="dsec"><div class="dk">Warum es zu euch passt</div><p>${esc(i.why)}</p></div>` : ""}
           ${i.warning ? `<div class="s warnt">${esc(i.warning)}</div>` : ""}
           <div class="btns"><button class="small" data-go="${n}">Routen ansehen</button><button class="small" data-fav="${n}">☆ Merken</button></div>
         </div></div>`;
@@ -738,7 +753,15 @@ function renderIdeas(res) {
   $("ideas").querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
     const i = res.ideas[+b.dataset.go]; setNewMode("ziel"); $("nDest").value = `${i.name}, ${i.country}`; startVariants($("nDest").value); });
   $("ideas").querySelectorAll("[data-fav]").forEach(b => b.onclick = async () => {
-    const i = res.ideas[+b.dataset.fav]; await api("/api/fav-destination", {idea: i}); b.textContent = "★ Gemerkt"; b.disabled = true;
+    const i = res.ideas[+b.dataset.fav], on = b.dataset.on === "1";  // nochmals tippen = nicht mehr merken
+    b.disabled = true;
+    try {
+      const r = await api("/api/fav-destination", on ? {idea: i, remove: true} : {idea: i});
+      b.dataset.on = on ? "" : "1"; b.textContent = on ? "☆ Merken" : "★ Gemerkt"; b.classList.toggle("on", !on);
+      toast(on ? `«${i.name}» nicht mehr gemerkt` : `«${i.name}» gemerkt`);
+      loadTrips().catch(() => {});
+    } catch (e) { toast(e.message); }
+    b.disabled = false;
   });
 }
 

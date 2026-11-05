@@ -28,7 +28,9 @@ class DestinationIdea(BaseModel):
     landmark_wiki: str = ""  # Wikipedia-Titel eines ikonischen Wahrzeichens/einer Landschaft – das Bild der Karte
     lat: float
     lon: float
-    why: str
+    why: str  # 1 Satz: warum es zu BEIDEN passt
+    pitch: str = ""  # 2–3 Sätze im Reisebüro-Stil: was das Ziel auszeichnet
+    climate_note: str = ""  # 1–2 Sätze: wie sich das Wetter zur Reisezeit anfühlt
     highlights: list[str]
     travel_mode: Literal["flug", "zug", "auto"]  # beste Anreise ab dem Heimatort
     travel_hours: float  # Reisezeit pro Strecke (Flug: reine Flugzeit)
@@ -54,7 +56,12 @@ Pro Ziel: «country» = genau der zweibuchstabige ISO-Code des Landes (Mexiko = 
 Stichworte (je höchstens 3 Wörter, z. B. «Vulkan Poás», «Altstadt Alfama»), «landmark_wiki» = Titel des Wikipedia-Artikels
 eines weltbekannten Wahrzeichens oder einer ikonischen Landschaft dieses Ziels, die man auf einem Foto sofort dem Ziel
 zuordnet (z. B. «Torre de Belém», «Vulkan Arenal»). NICHT der Artikel über die Stadt oder das Land, kein Wappen, keine Flagge.
-«water_temp_c» = übliche Meerwassertemperatur am Ziel zur Reisezeit in °C (0, wenn kein Meer/Badestrand)."""
+«water_temp_c» = übliche Meerwassertemperatur am Ziel zur Reisezeit in °C (0, wenn kein Meer/Badestrand).
+Texte wie ein gutes Reisebüro – einladend, lebendig, konkret mit Namen, ohne Floskeln («ein Paradies», «für jeden etwas»):
+«pitch» = 2 bis 3 Sätze, was dieses Ziel auszeichnet und wie es sich anfühlt, dort zu sein (Landschaft, Atmosphäre,
+Essen, besondere Erlebnisse). «climate_note» = 1 bis 2 Sätze, wie das Wetter zur Reisezeit ist und sich anfühlt
+(z. B. «Im Dezember angenehm warm, perfekt für den Strand; abends genügt eine leichte Jacke.»), ehrlich auch bei
+Regen oder Kälte. «why» = 1 kurzer Satz, warum es zu euch beiden passt (Du-Form plural, «euch»)."""
 
 
 def resolve_country(idea: DestinationIdea) -> str:
@@ -161,7 +168,10 @@ def _fake(h: Household) -> DestinationList:
             ("Colmar", "FR", "Elsass", "Petite Venise (Colmar)", 48.08, 7.36, "auto", 1.8, 0, 90)]
     return DestinationList(ideas=[DestinationIdea(
         name=n, country=c, country_name=c, region=rg, landmark_wiki=lm, lat=la, lon=lo,
-        why=f"Testvorschlag {n}: mildes Klima, gute Mischung.",
+        why=f"Passt zu euch: Kultur für James, Wellness und gutes Essen für beide.",
+        pitch=f"{n} verbindet verwinkelte Gassen, lebendige Märkte und lange Abende am Wasser. Tagsüber entdeckt ihr "
+              "Aussichtspunkte und kleine Museen, abends wartet frischer Fisch in einer Taverne am Hafen.",
+        climate_note="Mild und meist sonnig, ideal zum Flanieren; abends wird es frisch, eine leichte Jacke genügt.",
         highlights=["Altstadt", "Küste", "Essen"], travel_mode=mode, travel_hours=hrs, typical_stops=st,
         travel_cost_chf=tc, cost_level="mittel", est_total_chf=1500 + i * 300)
         for i, (n, c, rg, lm, la, lo, mode, hrs, st, tc) in enumerate(base)])

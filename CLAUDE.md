@@ -123,7 +123,14 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.9.6)
+## Stand (05.11.2026, Version 1.9.7)
+- 1.9.7: Wünsche James: Ladetext nur «Kompass sucht Ziele, die zu euch beiden passen …» (auch Routen ohne «prüft das
+  Wetter»). Zielkarte wie im Reisebüro: KI liefert `pitch` (2–3 Sätze, was das Ziel auszeichnet) und `climate_note`
+  (wie sich das Wetter zur Reisezeit anfühlt); Karte zeigt Pitch, Kacheln, «Wetter im <Monat>» + Wertung «x von 10»,
+  «Warum es zu euch passt» – alles 16 px statt grauer 13-px-Zeilen. «Merken» lässt sich durch nochmaliges Tippen
+  aufheben; gemerkte Ziele unter «Reisen» haben einen ★-Knopf zum Entfernen. Varianten: Prompt verlangt 3 Erlebnisse im
+  Reisebüro-Stil (6–14 Wörter, Beispiele gut/schlecht) und einen einladenden Satz. Alte gemerkte Vorschläge haben keinen
+  Pitch. Im Testmodus bei 390 px hell/dunkel geprüft; echte Texte von Gemini nur auf dem NAS.
 - 1.9.6: James wollte eine Route planen: «Alle KI-Anbieter sind ausgefallen – Gemini: Fehler 503 high demand · Groq: Aufgabe
   zu gross». Gemini war bei Google überlastet; Kompass wartete nur 5 s. Jetzt `llm.OVERLOAD_WAITS` (8/20/40 s), dann das
   andere Gemini-Modell (`FREE_PROVIDERS[...]["models"]`, z. B. flash-lite, eigenes Kontingent), dann `_Skip("überlastet …")`

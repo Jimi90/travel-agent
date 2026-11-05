@@ -456,7 +456,7 @@ class Handler(BaseHTTPRequestHandler):
             if body.get("remove"):
                 store.delete("fav_dest", str(item["id"]))
             else:
-                keep = {k: item.get(k) for k in ("id", "name", "country", "why", "highlights", "climate_text",
+                keep = {k: item.get(k) for k in ("id", "name", "country", "why", "pitch", "climate_note", "highlights", "climate_text",
                                                  "est_total_chf", "typical_flight_hours")}
                 store.put("fav_dest", str(item["id"]), keep)
             return self._send(200, {"saved": list(store.all_of("fav_dest").values())})
