@@ -117,7 +117,8 @@ def save_household(h: Household) -> None:
 
 DEFAULT_SETTINGS = {"model": config.MODEL, "effort": config.EFFORT, "check_time": config.CHECK_TIME,
                     "auto_check": True, "web_search": False, "home_airport": config.HOME_AIRPORT, "home_place": "",
-                    "prefer": "gratis", "gemini_model": ""}  # gratis = Gemini/Groq zuerst, Claude nur als Reserve
+                    "prefer": "gratis", "gemini_model": "",
+                    "dest_style": "geheimtipps"}  # gratis = Gemini/Groq zuerst, Claude nur als Reserve
 
 
 def settings() -> dict:

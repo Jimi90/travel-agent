@@ -314,6 +314,10 @@ class AppTest(unittest.TestCase):
         self.assertEqual(self.call("POST", "/api/settings", {"model": "gpt"})[0], 400)
         code, info = self.call("POST", "/api/settings", {"model": "claude-haiku-5-5", "check_time": "07:15"})
         self.assertEqual(info["settings"]["model"], "claude-haiku-5-5")
+        self.assertEqual(info["settings"]["dest_style"], "geheimtipps")             # Standard: Geheimtipps
+        self.assertEqual(self.call("POST", "/api/settings", {"dest_style": "alles"})[0], 400)
+        code, info = self.call("POST", "/api/settings", {"dest_style": "gemischt"})
+        self.assertEqual(info["settings"]["dest_style"], "gemischt")
         code, n = self.call("GET", "/api/notices")
         self.assertTrue(any(x["kind"] == "umplanung" for x in n["notices"]))
         # --- Buchung importieren: Vorschau, dann übernehmen (Testmodus: Hinflug + erstes Hotel)
