@@ -157,7 +157,8 @@ class AppTest(unittest.TestCase):
         self.assertFalse(d["photos_pending"])
         bases = list(dict.fromkeys(day["base"]["name"] for day in d["trip"]["days"]))
         self.assertEqual(bases, [st["name"] for st in v1["route"]])
-        self.assertTrue(d["trip"]["summary"].startswith("Stadt & Insel"))
+        self.assertFalse(d["trip"]["summary"].startswith("Stadt & Insel"))  # kein zusammengeklebter Doppeltext mehr
+        self.assertTrue(d["trip"]["summary"].strip())
         self.assertEqual(float(d["trip"]["travel_budget"]), 650.0)      # Anreisebudget aus dem Formular bleibt beim Plan
         s0 = d["trip"]["stays"][0]
         opts = d["hotel_options"][s0["id"]]
