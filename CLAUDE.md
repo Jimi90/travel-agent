@@ -123,7 +123,13 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.11.2)
+## Stand (05.11.2026, Version 1.11.3)
+- 1.11.3: James (Foto PC): Werte im Formular «Neue Reise» nicht bündig – Datumsfelder endeten vor der «900», weil der
+  Browser rechts Platz fürs Kalendersymbol hält. Jetzt `input.inl[type=date]`: Wert rechtsbündig
+  (`::-webkit-date-and-time-value`), Kalendersymbol unsichtbar über das ganze Feld (Klick öffnet die Auswahl). Formular
+  am PC höchstens 720 px breit (`#newSheet .in>*:not(#ideas)`, Spezifität beachten!), Abschnittstitel/Hinweise 688 px
+  (bündig mit dem Zeileninhalt). Zeile heisst «Hin- und Rückreise», darunter «höchstens, in CHF · …» (brach auf dem Handy um).
+  Rechte Kanten per Playwright gemessen (alle gleich); Safari/iPhone-Datumsfeld nur dort prüfbar.
 - 1.11.2: James (Fotos echte Agadir-Reise, «stümperhaft»): Überblick war zusammengeklebt («Strand & Ruhe in Agadir:
   Entspannen Sie …» + Planer-Text) → `service.start_plan` nimmt den Varianten-Text nur noch, wenn der Planer keinen
   schreibt; alle Prompts (Plan, Varianten, Ziele): «ihr/euch», nie «Sie»; `esc()` im Browser macht aus «ß» «ss» (auch alte

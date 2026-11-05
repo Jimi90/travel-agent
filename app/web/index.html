@@ -140,6 +140,12 @@ img.prev{max-width:100%;max-height:260px;border-radius:10px;display:block;margin
 .val{color:var(--muted);font-size:16px;text-align:right;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .val.pos{color:var(--accent)}.val.neg{color:var(--err)}.val.warn{color:var(--warn)}
 input.inl{background:none;border:0;border-radius:0;padding:0;text-align:right;flex:1;min-width:0;max-width:58%;color:var(--muted)}
+/* Datumsfelder bündig rechts wie alle Werte: Kalendersymbol unsichtbar über das ganze Feld (Klick öffnet die Auswahl) */
+input.inl[type=date]{position:relative;-webkit-appearance:none;appearance:none;font-variant-numeric:tabular-nums}
+input.inl[type=date]::-webkit-date-and-time-value{text-align:right;margin:0}
+input.inl[type=date]::-webkit-datetime-edit{padding:0}
+input.inl[type=date]::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:auto;height:auto;margin:0;padding:0;opacity:0;cursor:pointer}
+input.inl[type=number]{font-variant-numeric:tabular-nums}
 input.inl:focus{color:var(--text);border:0}
 input.inl::placeholder{color:var(--muted);opacity:.7}
 .row.center{justify-content:center;font-size:17px}
@@ -416,6 +422,9 @@ details.errd .s{margin-top:4px}
   /* Vorschläge und Routen nebeneinander */
   #ideas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
   #ideas>*:not(.dcard):not(.vcard):not(.skc){grid-column:1/-1}
+  /* Formular «Neue Reise» am PC nicht über die ganze Breite (Werte sonst weit weg von den Bezeichnungen) */
+  #newSheet .in>*:not(#ideas):not(.topbar){max-width:720px}
+  #newSheet .in>h2:not(#ideas):not(.topbar),#newSheet .in>.hint:not(#ideas):not(.topbar){max-width:688px}
   #tripList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
   #tripList .tcard{margin-top:0}
   #tripList>.card,#tripList>h2,#tripList>.past{grid-column:1/-1}
@@ -556,7 +565,7 @@ details.errd .s{margin-top:4px}
     <label class="row"><div class="grow t">Abreise</div><input class="inl" type="date" id="nStart" style="max-width:170px"></label>
     <label class="row"><div class="grow"><div class="t">Rückreise</div><div class="s" id="nDaysTxt">7 Tage</div></div>
       <input class="inl" type="date" id="nEnd" style="max-width:170px"></label>
-    <label class="row"><div class="grow"><div class="t">Hin- und Rückreise bis (CHF)</div><div class="s">Flug, Zug oder Auto, für beide</div></div>
+    <label class="row"><div class="grow"><div class="t">Hin- und Rückreise</div><div class="s">höchstens, in CHF · Flug, Zug oder Auto, für beide</div></div>
       <input class="inl" id="nTravel" type="number" inputmode="numeric" min="0" max="50000" style="max-width:90px"></label>
   </div>
   <h2>Wünsche <span class="r">optional</span></h2>
