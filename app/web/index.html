@@ -296,6 +296,80 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
 .desc{font-size:14px;line-height:1.45;margin-top:4px;color:var(--text);opacity:.82}
 .fl-plan{font-size:12px}
 .fl-wait{display:flex;align-items:center}
+/* Startseite (1.11.0): Reisekarten, gemerkte Ziele, leerer Zustand */
+.tcard{position:relative;display:block;border-radius:16px;overflow:hidden;aspect-ratio:16/9;background:linear-gradient(135deg,var(--accent),#0b1a3a);cursor:pointer;margin-top:12px}
+.tcard .timg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.tcard .shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.75) 0,rgba(0,0,0,.2) 50%,rgba(0,0,0,.05) 100%)}
+.tcard .when{position:absolute;top:12px;left:12px;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;border-radius:999px;padding:5px 11px;font-size:13px;font-weight:600}
+.tcard .cap{position:absolute;left:16px;right:16px;bottom:14px;color:#fff;display:flex;align-items:flex-end;gap:12px;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+.tcard .nm{font-family:var(--display);font-size:22px;font-weight:700;line-height:1.2}
+.tcard .dt{font-size:14px;opacity:.92;margin-top:3px}
+.tcard .pz{margin-left:auto;text-align:right;flex:none;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums}
+.tcard .pz small{display:block;font-size:12px;font-weight:500;opacity:.85}
+.tcard:active{transform:scale(.99)}
+.carousel{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:2px 2px 6px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.carousel::-webkit-scrollbar{display:none}
+.fcard{flex:none;width:230px;scroll-snap-align:start;background:var(--card);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.fcard .fph{position:relative;height:130px;background:linear-gradient(135deg,var(--accent),#0b1a3a)}
+.fcard .fph img{width:100%;height:100%;object-fit:cover;display:block}
+.fcard .fph .star{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.45);border-radius:50%;width:34px;height:34px;padding:0;font-size:18px;color:#ffd60a}
+.fcard .fb{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.fcard .fn{font-weight:600;font-size:17px}
+.fcard .fp{font-size:14px;color:var(--muted);line-height:1.35;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.fcard .small{align-self:flex-start;margin-top:auto}
+.welcome{text-align:center;padding:34px 24px 26px}
+.welcome .wic{width:64px;height:64px;margin:0 auto 14px;border-radius:16px;background:linear-gradient(135deg,#5b8cff,#1d3fb0);display:flex;align-items:center;justify-content:center}
+.welcome .wic svg{width:38px;height:38px}
+.welcome .wt{font-family:var(--display);font-size:22px;font-weight:700}
+.welcome .ws{font-size:15px;color:var(--muted);line-height:1.45;margin-top:6px}
+/* Reiseblatt als Angebot (1.11.0) */
+.offer{padding:18px 16px 8px}
+.offer .ok{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.1px}
+.offer .big{font-family:var(--display);font-size:34px;font-weight:700;letter-spacing:-.3px;font-variant-numeric:tabular-nums;margin-top:2px;line-height:1.15}
+.offer .meta{font-size:15px;color:var(--muted);margin-top:3px}
+.offer .routeline{font-size:17px;font-weight:600;margin-top:14px;line-height:1.4}
+.offer .desc2{font-size:16px;line-height:1.5;margin-top:6px}
+.budgetbar{margin:14px 0 2px}
+.budgetbar .track{height:6px;border-radius:3px;background:var(--card2);overflow:hidden}
+.budgetbar .track i{display:block;height:100%;background:var(--ok);border-radius:3px}
+.budgetbar.over .track i{background:var(--warn)}
+.budgetbar .lbl{display:flex;justify-content:space-between;gap:8px;font-size:13px;color:var(--muted);margin-top:6px}
+.budgetbar.over .lbl b{color:var(--warn)}
+.incl{list-style:none;margin:16px 0 4px;padding:0;border-top:.5px solid var(--line)}
+.incl li{display:flex;gap:12px;align-items:flex-start;padding:11px 0 0;font-size:16px;line-height:1.35}
+.incl .ic{flex:none;width:24px;height:24px;border-radius:50%;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center}
+.incl .ic svg{width:14px;height:14px}
+.incl .sm{display:block;font-size:14px;color:var(--muted);margin-top:1px}
+details.pdet>summary{padding:12px 0}
+details.pdet .costs{margin:0 0 12px}
+.steps{display:flex;padding:16px 4px 2px}
+.steps .st{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--muted);position:relative;text-align:center}
+.steps .st::before{content:"";position:absolute;top:12px;left:-50%;right:50%;height:2px;background:var(--card2)}
+.steps .st:first-child::before{display:none}
+.steps .st.done::before,.steps .st.cur::before{background:var(--accent)}
+.steps .dot{width:26px;height:26px;border-radius:50%;background:var(--card2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;position:relative}
+.steps .dot svg{width:14px;height:14px}
+.steps .done .dot{background:var(--accent);color:var(--onaccent)}
+.steps .cur .dot{background:var(--card);box-shadow:inset 0 0 0 2px var(--accent);color:var(--accent)}
+.steps .cur{color:var(--text);font-weight:600}
+.nextstep{padding:12px 16px 16px}
+.nextstep .k{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.1px}
+.nextstep .t{font-weight:600;margin-top:2px}
+.nextstep .btns{margin-top:10px}
+.callout{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;font-size:14px;line-height:1.45;color:var(--warn)}
+/* Laden und Fehler (1.11.0) */
+.sk .b{background:linear-gradient(90deg,var(--card2) 0,color-mix(in srgb,var(--card2) 35%,var(--card)) 50%,var(--card2) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite;border-radius:6px}
+@keyframes shim{to{background-position:-200% 0}}
+.sk .ph{height:200px;border-radius:0}
+.sk .pd{padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px}
+.pbar{height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-top:12px}
+.pbar i{display:block;height:100%;width:40%;background:var(--accent);border-radius:2px;animation:pb 1.5s ease-in-out infinite}
+@keyframes pb{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
+.jobt{font-weight:600;font-size:16px}
+.errh{color:var(--err);font-weight:600;line-height:1.4}
+details.errd>summary{padding:6px 0 0;font-size:14px;justify-content:flex-start;gap:6px}
+details.errd .s{margin-top:4px}
+
 /* PC / grosse Bildschirme (1.10.1): Seitenleiste wie eine Mac-/iPad-App statt Leiste unten */
 @media (min-width: 900px){
   :root{--side:248px}
@@ -327,7 +401,10 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
   #asheet .box{max-width:420px;padding:0 8px}
   /* Vorschläge und Routen nebeneinander */
   #ideas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
-  #ideas>*:not(.dcard):not(.vcard){grid-column:1/-1}
+  #ideas>*:not(.dcard):not(.vcard):not(.skc){grid-column:1/-1}
+  #tripList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  #tripList .tcard{margin-top:0}
+  #tripList>.card,#tripList>h2,#tripList>.past{grid-column:1/-1}
   #ideas .card+.card{margin-top:0}
   /* gleiche Abschnitte auf gleicher Höhe: jede Karte nutzt die Zeilen des Rasters (Subgrid) */
   #ideas{row-gap:0}
@@ -361,11 +438,11 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
   <p class="sub">Plant Reisen für euch beide und passt sie unterwegs selbständig an.</p>
   <button class="btn" id="newTrip">Neue Reise planen</button>
   <div id="jobBox" class="card pad" style="margin-top:12px" hidden></div>
-  <h2>Eure Reisen</h2>
-  <div class="card" id="tripList"></div>
+  <h2 id="tripsHead">Eure Reisen</h2>
+  <div id="tripList"></div>
   <div id="favDestWrap" hidden>
     <h2>Gemerkte Ziele</h2>
-    <div class="card" id="favDest"></div>
+    <div class="carousel" id="favDest"></div>
   </div>
 </main>
 
@@ -512,6 +589,42 @@ $("lightbox").onclick = () => { $("lightbox").hidden = true; };
 const actKey = t => t.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => e.classList.remove("on"), 2600); }
 function msg(el, text, kind = "") { el.className = "msg " + kind; el.innerHTML = text; }
+const ICO = {
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>`,
+  plane: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5 3 11l1.5-1.5 7.5 1L16.5 6c1-1 2.6-1.4 3.2-.7.7.6.3 2.2-.7 3.2l-4.5 4.5 1 7.5L14 22l-2.5-7.5-3 3V20l-1.5 1-1-3-3-1L4 15.5h2.5z"/></svg>`,
+  bed: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5M7 11.5a1.5 1.5 0 1 0 0-.01"/></svg>`,
+  map: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14"/></svg>`,
+  sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
+  compass: `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z" fill="#fff"/></svg>`,
+};
+// Fehlermeldung: kurze Überschrift, technische Einzelheiten zum Aufklappen
+function errHtml(m) {
+  m = String(m || "Unbekannter Fehler.");
+  let head = m, more = "";
+  const i = m.indexOf(" Details: ");
+  if (i > 0) { head = m.slice(0, i); more = m.slice(i + 10); }
+  else if (m.length > 120) {
+    const j = m.search(/(\. | – )/);
+    if (j > 15 && j < 120) { head = m.slice(0, j) + (m[j] === "." ? "." : ""); more = m.slice(j + (m[j] === "." ? 2 : 3)); }
+  }
+  return `<div class="errh">${esc(head)}</div>` + (more ? `<details class="errd"><summary>Details</summary><div class="s">${esc(more)}</div></details>` : "");
+}
+// Platzhalter-Karten, solange Kompass sucht
+function skeleton(n, title) {
+  const one = `<div class="card sk skc"><div class="b ph"></div><div class="pd"><div class="b" style="height:22px;width:55%"></div>
+    <div class="b" style="height:14px;width:85%"></div><div class="b" style="height:14px;width:70%"></div>
+    <div style="display:flex;gap:8px"><div class="b" style="height:58px;flex:1"></div><div class="b" style="height:58px;flex:1"></div><div class="b" style="height:58px;flex:1"></div></div></div></div>`;
+  return `<h2>${esc(title)}</h2>` + Array(n).fill(one).join("");
+}
+// «in 12 Tagen», «Tag 3 von 6» …
+function countdown(start, end) {
+  const d0 = new Date(new Date().toDateString()), s = new Date(start + "T00:00"), e = new Date(end + "T00:00");
+  const days = Math.round((s - d0) / 864e5);
+  if (days > 1) return `in ${days} Tagen`;
+  if (days === 1) return "morgen";
+  if (d0 <= e) return `Tag ${Math.round((d0 - s) / 864e5) + 1} von ${Math.round((e - s) / 864e5) + 1}`;
+  return "vorbei";
+}
 
 async function api(path, body, method) {
   const opt = {credentials: "same-origin", method: method || (body === undefined ? "GET" : "POST")};
@@ -588,19 +701,20 @@ let jobTimer = null;
 function watchJob(id, label, onDone, again) {
   const box = $("jobBox");
   box.hidden = false;
-  box.innerHTML = `<span class="spin"></span>${esc(label)}<div class="s">Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.</div>`;
+  const busy = note => `<div class="jobt">${esc(label)}</div><div class="s">${esc(note || "Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.")}</div><div class="pbar"><i></i></div>`;
+  box.innerHTML = busy();
   try { localStorage.setItem("job", JSON.stringify({id, label, again})); } catch {}
   clearTimeout(jobTimer);
   const tick = async () => {
     let j;
     try { j = await api("/api/jobs/" + id); } catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; clearJob(); return; }
     if (j.status === "laeuft") {  // KI überlastet: Kompass wartet selbst und zeigt den nächsten Versuch
-      box.innerHTML = `<span class="spin"></span>${esc(label)}<div class="s">${esc(j.note || "Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.")}</div>`;
+      box.innerHTML = busy(j.note);
       jobTimer = setTimeout(tick, 2000); return;
     }
     clearJob();
     if (j.status === "fehler") {
-      box.innerHTML = `<span class="warnt">${esc(j.error)}</span>` + (again ? `<button class="btn" id="jobAgain" style="margin-top:12px">Nochmals versuchen</button>` : "");
+      box.innerHTML = errHtml(j.error) + (again ? `<button class="btn" id="jobAgain" style="margin-top:12px">Nochmals versuchen</button>` : "");
       if (again) $("jobAgain").onclick = async () => {  // gleiche Anfrage (z. B. gewählte Route) nochmals
         try { const r = await api("/api/trips", again); watchJob(r.job, label, onDone, again); }
         catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; }
@@ -648,16 +762,30 @@ function drawMaps(root) {
 // ---------- Reisen ----------
 async function loadTrips() {
   const [t, ideas] = await Promise.all([api("/api/trips"), api("/api/ideas")]);
-  $("tripList").innerHTML = t.trips.length ? t.trips.map(x => `<div class="row tap chev" data-trip="${esc(x.id)}">
-      ${photo(x.photo, "thumb s")}<div class="grow"><div class="t">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
-      <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div>
-      <span class="chip">${esc(STATUS[x.status])}</span></div>`).join("")
-    : `<div class="empty">Noch keine Reise. Tippe auf «Neue Reise planen».<br>Tipp: Zuerst unter «Profil» eure Vorlieben eintragen.</div>`;
+  const today = new Date().toISOString().slice(0, 10);
+  const coming = t.trips.filter(x => x.end >= today).sort((a, b) => a.start.localeCompare(b.start));
+  const past = t.trips.filter(x => x.end < today).sort((a, b) => b.start.localeCompare(a.start));
+  const tcard = x => `<div class="tcard" data-trip="${esc(x.id)}">${photo(x.photo, "timg", x.title)}<div class="shade"></div>
+      <span class="when">${esc(countdown(x.start, x.end))}${x.status !== "entwurf" ? " · " + esc(STATUS[x.status]) : ""}</span>
+      <div class="cap"><div class="grow"><div class="nm">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
+        <div class="dt">${esc(fmtD(x.start, {day: "numeric", month: "short"}))} – ${esc(fmtD(x.end, {day: "numeric", month: "short", year: "numeric"}))}</div></div>
+        <div class="pz">${esc(chf(x.total))}<small>${x.status === "entwurf" ? "Entwurf" : "2 Personen"}</small></div></div></div>`;
+  $("tripList").innerHTML = (coming.length ? coming.map(tcard).join("") : t.trips.length ? "" :
+      `<div class="card welcome"><div class="wic">${ICO.compass}</div><div class="wt">Wohin geht's als Nächstes?</div>
+        <div class="ws">Kompass schlägt Ziele vor, die zu euch beiden passen, plant Route, Hotels und Programm – und passt alles unterwegs an.</div>
+        <button class="btn" id="welcomeGo" style="max-width:280px;margin:18px auto 0">Erste Reise planen</button></div>`) +
+    (past.length ? `<h2>Vergangene Reisen</h2><div class="card past">${past.map(x => `<div class="row tap chev" data-trip="${esc(x.id)}">
+      ${photo(x.photo, "thumb s")}<div class="grow"><div class="t">${esc(x.title)}</div>
+      <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div></div>`).join("")}</div>` : "");
+  $("tripsHead").hidden = !coming.length;
+  $("newTrip").hidden = !t.trips.length;  // leere Seite hat ihren eigenen Knopf
+  if ($("welcomeGo")) $("welcomeGo").onclick = () => $("newTrip").click();
   $("tripList").querySelectorAll("[data-trip]").forEach(r => r.onclick = () => openTrip(r.dataset.trip));
   $("favDestWrap").hidden = !ideas.saved.length;
-  $("favDest").innerHTML = ideas.saved.map(i => `<div class="row"><div class="grow"><div class="t">${esc(i.name)}</div>
-      <div class="s">${esc(i.pitch || i.why || "")}</div></div><button class="small" data-plan="${esc(i.name)}">Planen</button>
-      <button class="small" data-unfav="${esc(i.id)}" aria-label="Nicht mehr merken">★</button></div>`).join("");
+  $("favDest").innerHTML = ideas.saved.map(i => `<div class="fcard"><div class="fph">${photo(i.photo, "", i.name)}
+      <button class="star" data-unfav="${esc(i.id)}" aria-label="Nicht mehr merken">★</button></div>
+      <div class="fb"><div class="fn">${esc(i.name)}</div><div class="fp">${esc(i.pitch || i.why || "")}</div>
+      <button class="small" data-plan="${esc(i.name)}">Planen</button></div></div>`).join("");
   $("favDest").querySelectorAll("[data-plan]").forEach(b => b.onclick = () => openNew(b.dataset.plan));
   $("favDest").querySelectorAll("[data-unfav]").forEach(b => b.onclick = async () => {  // ★ antippen = nicht mehr merken
     const i = ideas.saved.find(x => x.id === b.dataset.unfav);
@@ -741,7 +869,7 @@ $("nGo").onclick = async () => {
 async function startVariants(dest) {
   const b = $("nGo"); b.disabled = true;
   msg($("nMsg"), `<span class="spin"></span>Kompass stellt 2–3 Routen für «${esc(dest)}» zusammen …`);
-  $("ideas").innerHTML = "";
+  $("ideas").innerHTML = skeleton(2, "Routen werden zusammengestellt");
   try {
     const base0 = $("nMsg").innerHTML;
     const r = await api("/api/variants", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
@@ -749,7 +877,7 @@ async function startVariants(dest) {
       const j = await api("/api/jobs/" + r.job);
       if (j.status === "laeuft") { $("nMsg").innerHTML = j.note ? `<span class="spin"></span>${esc(j.note)}` : base0; return setTimeout(poll, 2000); }
       b.disabled = false;
-      if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
+      if (j.status === "fehler") { $("ideas").innerHTML = ""; msg($("nMsg"), errHtml(j.error)); return; }
       msg($("nMsg"), ""); renderVariants(j.result);
     };
     poll();
@@ -806,13 +934,14 @@ async function suggest() {
   const b = $("nGo"); b.disabled = true;
   msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ziele, die zu euch beiden passen …`);
   try {
+    $("ideas").innerHTML = skeleton(3, "Vorschläge werden gesucht");
     const base0 = $("nMsg").innerHTML;
     const r = await api("/api/destinations", {start: $("nStart").value, days: NEW_DAYS, wish: $("nWish").value, travel_budget: travelValue()});
     const poll = async () => {
       const j = await api("/api/jobs/" + r.job);
       if (j.status === "laeuft") { $("nMsg").innerHTML = j.note ? `<span class="spin"></span>${esc(j.note)}` : base0; return setTimeout(poll, 2000); }
       b.disabled = false;
-      if (j.status === "fehler") { msg($("nMsg"), esc(j.error), "err"); return; }
+      if (j.status === "fehler") { $("ideas").innerHTML = ""; msg($("nMsg"), errHtml(j.error)); return; }
       msg($("nMsg"), ""); renderIdeas(j.result);
       $("ideas").scrollIntoView({behavior: "smooth", block: "start"});
     };
@@ -985,14 +1114,6 @@ function renderTrip(outcome) {
         <button data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
 
   const C = d.costs || {}, total = Object.values(C).reduce((a, b) => a + b, 0);
-  const steps = ["Hotels über «Booking.com» buchen", "Flüge über «Flüge suchen» buchen", "Bestätigungen mit «Buchung importieren» eintragen",
-    "Oben auf «Gebucht» stellen – ab dann passt Kompass den Plan unterwegs selbst an"];
-  const finalHtml = `<h2>Finaler Vorschlag</h2><div class="card final">
-    <div class="row"><div class="grow"><div class="t">Route</div><div class="s">${esc(route.map(r => r.name).join(" → "))}</div></div></div>
-    <div class="pad"><div class="costs" style="margin:0">${Object.entries(C).map(([k, v]) => `<span>${esc(k)}</span><span>${esc(chf(v))}</span>`).join("")}
-      <b>Total ca.</b><b>${esc(chf(total))}</b>${d.budget ? `<span>Budget</span><span class="${total > d.budget ? "warnt" : ""}">${esc(chf(d.budget))}</span>` : ""}</div></div></div>
-    ${t.status === "entwurf" ? `<h2>So geht's weiter</h2><div class="card">${steps.map((x, i) => `<div class="row"><span class="num">${i + 1}</span><div class="grow t" style="font-size:15px">${esc(x)}</div></div>`).join("")}</div>` : ""}`;
-
   // Hinweise, die schon das Etikett «Schätzung» bzw. der Preis «inklusive» sagt, nicht wiederholen
   const redundant = n => /^Schätzung\.?$|^Geschätzte?r? |im Gesamtpreis inbegriffen/.test((n || "").trim());
   const FL = d.flight_live || {};
@@ -1032,6 +1153,51 @@ function renderTrip(outcome) {
       <div class="cap"><h1>${esc(t.title)}</h1><div class="when">${esc(dateRange)}</div></div></div>
     <div class="credit">Foto: ${d.hero.page ? `<a href="${esc(d.hero.page)}" target="_blank" rel="noopener noreferrer">${esc(d.hero.source)} – ${esc(d.hero.title)}</a>` : esc(d.hero.source)}</div>`
     : `<h1>${esc(t.title)}</h1><p class="sub">${esc(dateRange)}</p>`;
+  // ---- Angebot: Preis, Route, was drin ist, Budget ----
+  const nightsAll = t.stays.reduce((n, s) => n + nightsOf(s.check_in, s.check_out), 0);
+  const nActs = t.days.reduce((n, day) => n + day.activities.length, 0);
+  const tBooked = t.transports.filter(x => !x.estimated).length, sBooked = t.stays.filter(s => s.confirmed).length;
+  const transTxt = t.transports.length ? t.transports.map(x => `${x.origin.name} → ${x.destination.name}`).slice(0, 3).join(" · ") : "";
+  const incl = [
+    t.transports.length ? [ICO.plane, `Hin- und Rückreise${t.transports.length > 2 ? " und Verbindungen" : ""}`,
+      `${transTxt}${tBooked ? ` · ${tBooked} von ${t.transports.length} gebucht` : " · Preise geschätzt"}`] : null,
+    t.stays.length ? [ICO.bed, `${nightsAll} ${nightsAll === 1 ? "Nacht" : "Nächte"} in ${t.stays.length === 1 ? "einem Hotel" : t.stays.length + " Hotels"}`,
+      `${t.stays.map(s => s.name).join(" · ")}${sBooked ? ` · ${sBooked} gebucht` : ""}`] : null,
+    [ICO.map, `${nActs} Programmpunkte an ${t.days.length} Tagen`, t.alternatives.length ? `dazu ${t.alternatives.length} Ideen für Regentage` : "Tag für Tag geplant"],
+    [ICO.sun, "Begleitung unterwegs", `Wetter-Check jeden Morgen um ${INFO.settings.check_time} Uhr, Umplanung bei Regen oder Ausfällen`],
+  ].filter(Boolean);
+  const over = d.budget && d.total > d.budget;
+  const budgetHtml = d.budget ? `<div class="budgetbar ${over ? "over" : ""}"><div class="track"><i style="width:${Math.min(100, Math.round(d.total / d.budget * 100))}%"></i></div>
+      <div class="lbl"><span>Budget ${esc(chf(d.budget))}</span><b>${over ? `${esc(chf(d.total - d.budget))} darüber` : `noch ${esc(chf(d.budget - d.total))} frei`}</b></div></div>` : "";
+  const offerHtml = `<div class="card" style="margin-top:14px"><div class="offer">
+      <div class="ok">Euer Angebot</div>
+      <div class="big">${esc(chf(d.total))}</div>
+      <div class="meta">für 2 Personen · ${t.days.length} Tage · ${route.length === 1 ? "1 Ort" : route.length + " Orte"}</div>
+      ${budgetHtml}
+      <div class="routeline">${esc(route.map(r => r.name).join(" → "))}</div>
+      ${t.summary ? `<div class="desc2">${esc(t.summary)}</div>` : ""}
+      <ul class="incl">${incl.map(([ic, a, b]) => `<li><span class="ic">${ic}</span><div>${esc(a)}<span class="sm">${esc(b)}</span></div></li>`).join("")}</ul>
+      <details class="pdet"><summary>Preis im Detail</summary><div class="costs">${Object.entries(C).map(([k, v]) => `<span>${esc(k)}</span><span>${esc(chf(v))}</span>`).join("")}
+        <b>Total ca.</b><b>${esc(chf(total))}</b></div>${t.cost_note ? `<div class="s" style="margin:-4px 0 12px">${esc(t.cost_note)}</div>` : ""}</details>
+    </div></div>`;
+  // ---- Fortschritt: Plan → Auswählen → Buchen → Unterwegs ----
+  let picked = false; try { picked = localStorage.getItem("picked:" + t.id) === "1"; } catch {}
+  const anyBooked = tBooked + sBooked > 0;
+  const stage = t.status === "abgeschlossen" ? 4 : t.status === "unterwegs" ? 3 : t.status === "gebucht" ? 3 : (picked || anyBooked) ? 2 : 1;
+  const STEPS = ["Plan", "Auswählen", "Buchen", "Unterwegs"];
+  const stepsHtml = `<div class="steps">${STEPS.map((x, i) => `<div class="st ${i < stage ? "done" : i === stage ? "cur" : ""}"><span class="dot">${i < stage ? ICO.check : i + 1}</span>${x}</div>`).join("")}</div>`;
+  const NEXT = {
+    1: ["Hotel je Ort wählen und Verbindungen prüfen", "Unter «Unterkünfte» stehen je Ort drei Hotels in verschiedenen Preisklassen.",
+        `<button class="small" data-next="hotels">Zu den Hotels</button><button class="small" data-next="picked">Auswahl passt</button>`],
+    2: ["Hotels und Verbindungen buchen", "Über die Links bei Booking.com bzw. Google Flights buchen, Bestätigung mit «Buchung importieren» eintragen.",
+        `<button class="small" data-next="import">Buchung importieren</button><button class="small" data-next="booked">Alles gebucht</button>`],
+    3: t.status === "unterwegs" ? ["Gute Reise!", "Kompass prüft jeden Morgen das Wetter und passt den Tag bei Bedarf an.", ""]
+       : ["Alles bereit – gute Vorfreude!", `Ab ${fmtD(t.start_date, {day: "numeric", month: "long"})} prüft Kompass jeden Morgen um ${INFO.settings.check_time} Uhr (Ortszeit) das Wetter und passt den Tag bei Bedarf an.`, ""],
+    4: ["Reise abgeschlossen", "Schön, dass ihr unterwegs wart.", ""],
+  }[stage];
+  const progressHtml = `<div class="card" style="margin-top:12px">${stepsHtml}
+      <div class="nextstep"><div class="k">${stage < 4 ? "Nächster Schritt" : "Status"}</div><div class="t">${esc(NEXT[0])}</div><div class="s">${esc(NEXT[1])}</div>
+      ${NEXT[2] ? `<div class="btns">${NEXT[2]}</div>` : ""}</div></div>`;
   const statusHint = t.status === "entwurf"
     ? `Sobald ihr gebucht habt, auf «Gebucht» stellen – ab der Reise prüft Kompass jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) automatisch das Wetter und passt den Tag bei Bedarf an.`
     : `Kompass prüft jeden Morgen um ${esc(INFO.settings.check_time)} Uhr (Ortszeit) das Wetter und passt den Tag bei Bedarf an.`;
@@ -1041,28 +1207,25 @@ function renderTrip(outcome) {
       <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></div>
     ${heroHtml}
     ${liveCard(d.live_day)}
-    <div class="tiles three"><div class="tile"><div class="k">Dauer</div><div class="v">${t.days.length} Tage</div></div>
-      <div class="tile"><div class="k">${route.length === 1 ? "Ort" : "Orte"}</div><div class="v">${route.length}</div></div>
-      <div class="tile"><div class="k">Kosten ca.</div><div class="v">${esc(chf(d.total))}</div><div class="u">für 2 Personen</div></div></div>
-    <div class="seg" id="tStatus" style="margin-top:14px">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
-    <p class="hint" style="margin:8px 4px 0">${statusHint}</p>
-    <div class="card" style="margin-top:14px"><button class="lrow" id="tImport">Buchung importieren</button></div>
+    ${offerHtml}
+    ${progressHtml}
+    <div class="card" style="margin-top:12px"><button class="lrow" id="tImport">Buchung importieren</button></div>
     <div class="card pad res" id="tOut" hidden></div>
     ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
-    ${t.summary ? `<h2>Überblick</h2><div class="card pad"><div class="t">${esc(t.summary)}</div>${t.cost_note ? `<div class="s">${esc(t.cost_note)}</div>` : ""}</div>` : ""}
-    ${d.notes.length ? `<div class="card pad" style="margin-top:12px"><div class="s warnt">${d.notes.map(esc).join("<br>")}</div></div>` : ""}
+    ${d.notes.length ? `<div class="card" style="margin-top:12px"><div class="callout"><div>${d.notes.map(esc).join("<br>")}</div></div></div>` : ""}
     ${routeHtml}
     <h2>Tagesplan</h2><div class="card">${days}</div>
-    <p class="hint">Tag antippen zum Aufklappen. Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
-    <h2>Unterkünfte</h2><div class="card">${stays}</div>
+    <p class="hint">Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
+    <h2 id="tStays">Unterkünfte</h2><div class="card">${stays}</div>
     <h2>Verbindungen</h2><div class="card">${trans}</div>
     ${!INFO.prices.available && t.transports.some(x => x.mode === "flug" && x.estimated) ? `<p class="hint">Echte Flugzeiten und Preise: SerpApi-Schlüssel unter Profil → KI hinterlegen.</p>` : ""}
-    <p class="hint">Zeile antippen für Optionen. Fällt eine Fähre oder ein Flug aus, verlängert Kompass die Unterkunft und schiebt alle Folgetage nach hinten – rückgängig machbar.</p>
+    <p class="hint">Zeile antippen für Optionen, z. B. «Fällt aus …».</p>
     ${hotels ? `<div class="card" style="margin-top:12px"><details><summary>Weitere Hotels (${t.hotel_suggestions.length})</summary>${hotels}</details></div>` : ""}
     ${alts ? `<div class="card" style="margin-top:12px"><details><summary>Schlechtwetter-Programm (${t.alternatives.length})</summary>${alts}</details></div>` : ""}
-    ${finalHtml}
-    <div class="card" style="margin-top:12px"><details><summary>Verlauf (${d.history.length})</summary>${hist}</details></div>
+    <div class="card" style="margin-top:12px"><details><summary>Verlauf (${d.history.length})</summary>${hist}</details>
+      <details><summary>Status von Hand ändern</summary><div style="padding:0 16px 14px"><div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
+        <p class="hint" style="margin:8px 0 0">${statusHint}</p></div></details></div>
     <p class="hint">Version ${t.version} · KI-Kosten dieser Reise: ${esc(usd(d.ai_cost))}</p>
     <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button>`;
 
@@ -1089,6 +1252,14 @@ function renderTrip(outcome) {
     reTrip(await api(`/api/trips/${tid}/confirm`, {target, item_id: id, confirmed: on === "1", reference}));
   });
   $("tImport").onclick = () => openImport(tid);
+  q("[data-next]").forEach(b => b.onclick = async () => {
+    const k = b.dataset.next;
+    if (k === "hotels") $("tStays").scrollIntoView({behavior: "smooth", block: "start"});
+    else if (k === "picked") { try { localStorage.setItem("picked:" + tid, "1"); } catch {} renderTrip(); }
+    else if (k === "import") openImport(tid);
+    else if (k === "booked") actionSheet("Alles gebucht? Ab Reisebeginn passt Kompass den Plan dann jeden Morgen ans Wetter an.",
+      [{label: "Ja, alles gebucht", fn: async () => reTrip(await api(`/api/trips/${tid}/status`, {status: "gebucht"}))}]);
+  });
   drawMaps($("tripIn"));
   q("[data-hprices]").forEach(b => b.onclick = async e => {
     e.stopPropagation(); b.disabled = true; b.innerHTML = `<span class="spin"></span>Lade …`;
