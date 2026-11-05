@@ -123,7 +123,18 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.10.3)
+## Stand (05.11.2026, Version 1.11.0)
+- 1.11.0: James: «für eine Reisebüro-App noch zu unprofessionell» – gewählt: Reiseblatt als Angebot, Startseite, Laden/Fehler.
+  Reiseblatt (`renderTrip`): Karte «Euer Angebot» (Preis gross, 2 Personen · Tage · Orte, Budget-Balken wenn Budget,
+  Route, KI-Überblick, «Inbegriffen» mit Symbolen `ICO` – Reise, Hotels, Programm, Begleitung –, «Preis im Detail»);
+  darunter Fortschritt Plan → Auswählen → Buchen → Unterwegs mit «Nächster Schritt» und Knöpfen (`data-next`:
+  Zu den Hotels, Auswahl passt = `localStorage picked:<id>`, Buchung importieren, Alles gebucht = Status gebucht).
+  Stufe: abgeschlossen 4, gebucht/unterwegs 3, «Auswahl passt» oder etwas gebucht 2, sonst 1. Status-Schalter und
+  «Finaler Vorschlag»/«So geht's weiter»/Kennzahl-Kacheln entfallen (Status von Hand: unten, eingeklappt). Startseite:
+  grosse Reisekarten mit Foto, Countdown (`countdown`: «in N Tagen», «Tag k von n»), Preis; vergangene Reisen als Liste;
+  leere Seite mit Willkommen-Karte; gemerkte Ziele als Bildleiste (`.carousel`, Foto-Kennung wird beim Merken mitgespeichert,
+  Server nimmt nur `[0-9a-f]{24}`). PC: Reisekarten 2-spaltig. Laden: Platzhalter-Karten (`skeleton`) bei Vorschlägen/Routen,
+  Planen mit Ladebalken; Fehler: `errHtml` = kurze Überschrift + «Details» aufklappbar. 390 px + 1440 px hell/dunkel geprüft.
 - 1.10.3: James (Foto PC): Zielkarten «nicht symmetrisch». Am PC nutzen Ziel- und Routenkarten CSS-Subgrid (`#ideas .dcard`
   `grid-row:span 8`, `.dbody{display:contents}`; `.vcard` span 9) → gleiche Abschnitte auf gleicher Höhe, gleiche
   Kartenhöhe, Knöpfe unten. Darum rendern Karten fehlende Teile als leeres `<div>` (Anzahl Kinder fix!) und immer drei

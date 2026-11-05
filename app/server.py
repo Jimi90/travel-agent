@@ -456,8 +456,10 @@ class Handler(BaseHTTPRequestHandler):
             if body.get("remove"):
                 store.delete("fav_dest", str(item["id"]))
             else:
-                keep = {k: item.get(k) for k in ("id", "name", "country", "why", "pitch", "climate_note", "highlights", "climate_text",
+                keep = {k: item.get(k) for k in ("id", "name", "country", "why", "pitch", "climate_note", "highlights", "climate_text", "photo",
                                                  "est_total_chf", "typical_flight_hours")}
+                if not (isinstance(keep.get("photo"), str) and re.fullmatch(r"[0-9a-f]{24}", keep["photo"])):
+                    keep["photo"] = None  # nur echte Foto-Kennungen aus der eigenen Ablage
                 store.put("fav_dest", str(item["id"]), keep)
             return self._send(200, {"saved": list(store.all_of("fav_dest").values())})
 
