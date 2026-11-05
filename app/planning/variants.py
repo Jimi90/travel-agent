@@ -48,6 +48,8 @@ Jede Route: Orte in Reisereihenfolge mit Nächten; Summe der Nächte = Reisetage
 Pro Ort: «note» = 3 bis 6 Wörter, was man dort sieht oder macht (z. B. «Altstadt, Goldmuseum»).
 bullets: 2 bis 4 sehr kurze Stichpunkte (höchstens 8 Wörter), z. B. Reisetempo, Wege, Besonderheiten zur Reisezeit.
 KEINE Kosten, Wetter, Wassertemperatur oder Distanzen in bullets und notes – die zeigt die App getrennt.
+Alle Orte liegen im genannten Ziel (Land/Region) – keine Orte in anderen Ländern, ausser das Ziel nennt sie.
+name beschreibt den Stil der Route und passt zu ihren Orten (z. B. «Gemütlich in Valletta», «Inseln & Altstadt»).
 Kosten ehrlich schätzen, in CHF für beide zusammen. Alle Randbedingungen strikt einhalten.
 BUDGET ist eine harte Grenze: Die Summe aus flights_chf + hotels_chf + activities_chf + transfers_chf darf das genannte
 Gesamtbudget nicht überschreiten. Wähle dafür günstigere Orte, einfachere Unterkünfte, weniger Ortswechsel und
@@ -55,6 +57,8 @@ kostenlose Programmpunkte. Mindestens eine Variante soll klar unter dem Budget l
 
 
 BUDGET_SLACK = 1.10
+MAX_KM_COUNTRY = 3000  # Ziel «Name, CC»: Ort muss in CC liegen und höchstens so weit vom Zielort weg sein
+MAX_KM_REGION = 1500  # frei eingegebenes Ziel: gleiches Land wie der gefundene Zielort oder in diesem Umkreis
 
 
 def km(a: Stop, b: Stop) -> float:
@@ -82,6 +86,29 @@ def _locate(stop: Stop) -> None:
             return
 
 
+def target(destination: str, geo=None):
+    """Ländercode («Malta, MT» → MT) und Mittelpunkt des Ziels (Ortssuche), soweit bestimmbar."""
+    geo = geo or weather.geocode
+    m = re.search(r",\s*([A-Za-z]{2})\s*$", destination)
+    cc = m.group(1).upper() if m else None
+    name = destination[:m.start()].strip() if m else destination.strip()
+    try:
+        center = geo(name, cc)
+    except (weather.WeatherError, ValueError, KeyError):
+        center = None
+    return cc, center
+
+
+def inside(stop: Stop, cc: str | None, center) -> bool:
+    """Liegt der Ort im gewählten Ziel? (James: Malta-Route mit «Malediven-Entspannung» und einem Ort in Pakistan.)
+    Nach `_locate`: Koordinaten stammen dann aus der Ortssuche, sonst von der KI – darum auch die Distanz prüfen."""
+    dist = km(Stop(name="", country="", lat=center.lat, lon=center.lon, nights=0), stop) \
+        if center is not None and center.lat is not None and center.lon is not None else 0.0
+    if cc:
+        return stop.country.upper() == cc and dist <= MAX_KM_COUNTRY
+    return center is None or stop.country.upper() == (center.country or "").upper() or dist <= MAX_KM_REGION
+
+
 def suggest(h: Household, destination: str, start: date, days: int, wishes: str, home_airport: str,
             travel_budget=None) -> dict:
     m = match(h, start, days, home_airport, travel_budget)
@@ -89,14 +116,33 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
               f"Heimatort: {m.home} (Flughafen {home_airport}).\n{m.prompt_text()}\n"
               f"Höchstens {m.reach.max_bases} Aufenthaltsort(e) pro Route. Anreise so wählen, wie es für diese Dauer "
               f"sinnvoll ist (bei nahen Zielen Zug oder Auto). Wünsche: {wishes.strip() or 'keine'}")
-    res = llm.ask("varianten", system=SYSTEM, content=prompt, schema=VariantList, max_tokens=8000,
-                  fake=lambda: _fake(destination, days))
+    check = not config.FAKE_MODE  # Testmodus: Testrouten haben feste Koordinaten
+    cc, center = target(destination) if check else (None, None)
+    good: list[tuple[Variant, list[Stop]]] = []
+    outside: list[str] = []
+    for _attempt in range(2):  # passt keine Route zum Ziel: einmal mit Hinweis nachfragen
+        res = llm.ask("varianten", system=SYSTEM, content=prompt, schema=VariantList, max_tokens=8000,
+                      fake=lambda: _fake(destination, days))
+        good, outside = [], []
+        for v in res.variants[:3]:
+            route = [s for s in v.route if s.nights > 0] or v.route[:1]
+            for s_ in route:
+                _locate(s_)
+            if check:
+                outside += [s_.name for s_ in route if not inside(s_, cc, center)]
+                route = [s_ for s_ in route if inside(s_, cc, center)]
+            if route:
+                good.append((v, route))
+        if good:
+            break
+        prompt += (f"\nACHTUNG: Die letzte Antwort enthielt nur Orte ausserhalb von {destination} "
+                   f"({', '.join(outside[:6])}). Nur Orte in {destination}!")
+    if not good:
+        raise llm.LLMError(f"Die KI hat keine Route in {destination} geliefert (vorgeschlagen: "
+                           f"{', '.join(outside[:6]) or 'nichts'}). Bitte nochmals versuchen.")
     out = []
     home = HOME_COORDS.get(home_airport.upper())
-    for v in res.variants[:3]:
-        route = [s for s in v.route if s.nights > 0] or v.route[:1]
-        for s_ in route:
-            _locate(s_)
+    for v, route in good:
         if len(route) > m.reach.max_bases:  # Kurztrip: nicht durch mehrere Orte hetzen
             extra = sum(s.nights for s in route[m.reach.max_bases:])
             route = route[:m.reach.max_bases]
@@ -151,7 +197,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
             dropped = [f"{o['name']}: ca. CHF {o['costs']['Total']:.0f}" for o in out if o is not cheapest]
             out = [cheapest]
     return {"id": new_id(), "destination": destination, "start": start.isoformat(), "days": days, "wishes": wishes,
-            "dropped": dropped,
+            "dropped": dropped, "outside": sorted(set(outside)),
             "travel_budget": float(m.travel_budget) if m.travel_budget is not None else None, "variants": out}
 
 
