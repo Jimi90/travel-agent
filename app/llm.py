@@ -30,6 +30,9 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 WEB_SEARCH_TOOL = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 HEAVY = {"reiseplan", "zielvorschlaege", "varianten", "bild_uebersetzen", "buchung_lesen"}
 LABEL = {"claude": "Claude", "gemini": "Gemini", "groq": "Groq"}
+# Überlastung beim Anbieter (Gemini 503 «high demand»): kurz warten und nochmals, dann das andere Modell des Anbieters
+OVERLOAD_WAITS = (8, 20, 40)
+OVERLOADED = "überlastet"
 
 
 class LLMError(Exception):
@@ -96,6 +99,9 @@ def ask(
     if any("Tageslimit" in r for r in reasons):
         hint = (" Tipp: Teilt sich Kompass den Gemini-Schlüssel mit Hörwerk? Dann teilen sich beide das Tageslimit – "
                 "für Kompass in AI Studio einen eigenen Schlüssel in einem neuen Projekt anlegen.")
+    if any(OVERLOADED in r for r in reasons):  # vorübergehend beim Anbieter – kein Fehler von Kompass
+        raise LLMError("Die KI ist gerade überlastet (bei Google, nicht bei Kompass). Das ist meist nach ein paar "
+                       "Minuten vorbei – bitte dann nochmals versuchen. Details: " + " · ".join(reasons))
     if len(reasons) == 1:
         raise LLMError(reasons[0] + hint)
     raise LLMError("Alle KI-Anbieter sind ausgefallen – " + " · ".join(reasons) + hint)
@@ -170,6 +176,10 @@ def _limit_info(body: str, headers) -> tuple[bool, float, bool]:
     return daily, wait, no_free
 
 
+def _n(x: int) -> str:
+    return f"{x:,}".replace(",", "'")
+
+
 def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip_id, max_tokens: int) -> T:
     c = config.FREE_PROVIDERS[prov]
     model = store.settings().get(f"{prov}_model") or c["model"]
@@ -183,15 +193,16 @@ def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip
     if c.get("tpm") and est_in + max_tokens > c["tpm"]:
         room = c["tpm"] - est_in - 300
         if room < 1500 or room < max_tokens // 3:  # Antwort müsste zu stark gekürzt werden – wird nichts
-            raise _Skip(f"Aufgabe zu gross für das Gratis-Kontingent (ca. {est_in + max_tokens:,} Tokens, "
-                        f"erlaubt {c['tpm']:,} pro Minute)".replace(",", "'"))
+            raise _Skip(f"Aufgabe zu gross für das Gratis-Kontingent (ca. {_n(est_in + max_tokens)} Tokens, "
+                        f"erlaubt {_n(c['tpm'])} pro Minute)")
         max_tokens = room
     payload = {"model": model, "messages": messages, "max_tokens": max_tokens,
                "response_format": {"type": "json_object"}, "reasoning_effort": "low"}
     url = c["base_url"].rstrip("/") + "/chat/completions"
     tin = tout = 0
     fixes = waits = errors5 = 0
-    for _ in range(8):
+    alternatives = [m for m in c.get("models", []) if m != model]
+    for _ in range(14):
         try:
             data = _post(url, payload, key)
         except urllib.error.HTTPError as e:
@@ -216,10 +227,17 @@ def _compat(prov: str, purpose: str, system: str, content, schema: type[T], trip
                 raise _Skip(("Tageslimit erreicht" if daily else "Tempolimit") + f" ({_api_msg(body)[:140]})")
             if e.code == 413:
                 raise _Skip("Anfrage zu gross für das Gratis-Kontingent")
-            if e.code in (500, 502, 503, 529) and errors5 < 1:
-                errors5 += 1
-                time.sleep(5)
-                continue
+            if e.code in (500, 502, 503, 529):
+                if errors5 < len(OVERLOAD_WAITS):  # Überlastung ist meist nach Sekunden bis Minuten vorbei
+                    time.sleep(OVERLOAD_WAITS[errors5])
+                    errors5 += 1
+                    continue
+                if alternatives:  # anderes Modell desselben Anbieters (eigenes Kontingent, oft weniger belastet)
+                    model = payload["model"] = alternatives.pop(0)
+                    print(f"[KI] {LABEL[prov]} überlastet – versuche Modell {model}", flush=True)
+                    errors5 = len(OVERLOAD_WAITS) - 1  # beim Ersatzmodell nur noch einmal warten
+                    continue
+                raise _Skip(f"{OVERLOADED} (Fehler {e.code}: {_api_msg(body)[:120]})")
             raise _Skip(f"Fehler {e.code}: {_api_msg(body)}")
         except (urllib.error.URLError, TimeoutError) as e:
             raise _Skip(f"nicht erreichbar ({type(e).__name__})")

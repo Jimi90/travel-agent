@@ -478,18 +478,25 @@ async function loadInfo() {
 
 // ---------- Hintergrund-Aufträge ----------
 let jobTimer = null;
-function watchJob(id, label, onDone) {
+function watchJob(id, label, onDone, again) {
   const box = $("jobBox");
   box.hidden = false;
   box.innerHTML = `<span class="spin"></span>${esc(label)}<div class="s">Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.</div>`;
-  try { localStorage.setItem("job", JSON.stringify({id, label})); } catch {}
+  try { localStorage.setItem("job", JSON.stringify({id, label, again})); } catch {}
   clearTimeout(jobTimer);
   const tick = async () => {
     let j;
     try { j = await api("/api/jobs/" + id); } catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; clearJob(); return; }
     if (j.status === "laeuft") { jobTimer = setTimeout(tick, 2000); return; }
     clearJob();
-    if (j.status === "fehler") { box.innerHTML = `<span class="warnt">${esc(j.error)}</span>`; return; }
+    if (j.status === "fehler") {
+      box.innerHTML = `<span class="warnt">${esc(j.error)}</span>` + (again ? `<button class="btn" id="jobAgain" style="margin-top:12px">Nochmals versuchen</button>` : "");
+      if (again) $("jobAgain").onclick = async () => {  // gleiche Anfrage (z. B. gewählte Route) nochmals
+        try { const r = await api("/api/trips", again); watchJob(r.job, label, onDone, again); }
+        catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; }
+      };
+      return;
+    }
     box.hidden = true;
     onDone(j.result);
   };
@@ -662,17 +669,19 @@ function renderVariants(res) {
   $("ideas").querySelectorAll("[data-var]").forEach(btn => btn.onclick = async () => {
     const v = res.variants[+btn.dataset.var];
     try {
-      const r = await api("/api/trips", {variant_set: res.id, index: +btn.dataset.var});
+      const body = {variant_set: res.id, index: +btn.dataset.var};
+      const r = await api("/api/trips", body);
       closeSheet("newSheet"); show("v-trips");
-      watchJob(r.job, `Kompass plant «${v.name}» …`, out => { loadTrips(); openTrip(out.trip_id); });
+      watchJob(r.job, `Kompass plant «${v.name}» …`, out => { loadTrips(); openTrip(out.trip_id); }, body);
     } catch (e) { toast(e.message); }
   });
 }
 async function startPlan(dest) {
   try {
-    const r = await api("/api/trips", {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()});
+    const body = {destination: dest, start: $("nStart").value, days: NEW_DAYS, wishes: $("nWish").value, travel_budget: travelValue()};
+    const r = await api("/api/trips", body);
     closeSheet("newSheet"); show("v-trips");
-    watchJob(r.job, `Kompass plant «${dest}» …`, res => { loadTrips(); openTrip(res.trip_id); });
+    watchJob(r.job, `Kompass plant «${dest}» …`, res => { loadTrips(); openTrip(res.trip_id); }, body);
   } catch (e) { msg($("nMsg"), esc(e.message), "err"); }
 }
 
@@ -1533,7 +1542,7 @@ $("logoutAll").onclick = () => actionSheet("Alle Geräte abmelden?", [{label: "�
     await loadInfo();
     let v = "v-trips"; try { v = localStorage.getItem("view") || v; } catch {}
     show($(v) ? v : "v-trips");
-    try { const j = JSON.parse(localStorage.getItem("job") || "null"); if (j) watchJob(j.id, j.label, res => { loadTrips(); if (res.trip_id) openTrip(res.trip_id); }); } catch {}
+    try { const j = JSON.parse(localStorage.getItem("job") || "null"); if (j) watchJob(j.id, j.label, res => { loadTrips(); if (res.trip_id) openTrip(res.trip_id); }, j.again); } catch {}
   } catch (e) { toast(e.message); }
 })();
 </script>
