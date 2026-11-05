@@ -123,7 +123,16 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.11.0)
+## Stand (05.11.2026, Version 1.11.1)
+- 1.11.1: James (Foto PC, «soll das ein Witz sein?»): Ladekarte schmaler als die Willkommen-Karte, klebte daran, und
+  «Erste Reise planen» stand da, während schon geplant wurde. Jetzt: Ladekarte `.jobcard` mit drehendem Kompass, volle
+  Breite, Ladebalken wird nicht mehr alle 2 s neu gezeichnet (nur `#jobNote` ändert sich); Willkommen-Karte und doppelter
+  Knopf verschwinden, solange geplant wird oder eine Fehlermeldung steht (`planning` in `loadTrips`); Fehler mit
+  !-Symbol, Überschrift in Textfarbe, «Nochmals versuchen» + «Schliessen». Danach Rundgang über alle Seiten (390/1440 px,
+  hell/dunkel): Verbindungen mit Linien-Symbolen (`MODE_ICO`, `.mic`) statt Emojis (auch Anreise-Kachel, Wetter-Kachel
+  ohne Emoji), Reiseblatt ab 1200 px zweispaltig (`.tgrid`: Plan links, Angebot/Fortschritt/Import rechts klebend; im
+  Handy oben), Karten-Subgrid mit `grid-template-columns:minmax(0,1fr)` (sonst lief der Inhalt rechts über den Rand),
+  Stopp-Notizen am PC einzeilig.
 - 1.11.0: James: «für eine Reisebüro-App noch zu unprofessionell» – gewählt: Reiseblatt als Angebot, Startseite, Laden/Fehler.
   Reiseblatt (`renderTrip`): Karte «Euer Angebot» (Preis gross, 2 Personen · Tage · Orte, Budget-Balken wenn Budget,
   Route, KI-Überblick, «Inbegriffen» mit Symbolen `ICO` – Reise, Hotels, Programm, Begleitung –, «Preis im Detail»);

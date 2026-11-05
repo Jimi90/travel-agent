@@ -356,6 +356,8 @@ details.pdet .costs{margin:0 0 12px}
 .nextstep .k{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.1px}
 .nextstep .t{font-weight:600;margin-top:2px}
 .nextstep .btns{margin-top:10px}
+.mic{flex:none;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;align-self:flex-start;margin-top:2px}
+.mic svg{width:19px;height:19px}
 .callout{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;font-size:14px;line-height:1.45;color:var(--warn)}
 /* Laden und Fehler (1.11.0) */
 .sk .b{background:linear-gradient(90deg,var(--card2) 0,color-mix(in srgb,var(--card2) 35%,var(--card)) 50%,var(--card2) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite;border-radius:6px}
@@ -365,8 +367,16 @@ details.pdet .costs{margin:0 0 12px}
 .pbar{height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-top:12px}
 .pbar i{display:block;height:100%;width:40%;background:var(--accent);border-radius:2px;animation:pb 1.5s ease-in-out infinite}
 @keyframes pb{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
-.jobt{font-weight:600;font-size:16px}
-.errh{color:var(--err);font-weight:600;line-height:1.4}
+.jobt{font-weight:600;font-size:17px;line-height:1.3}
+.jobcard{margin:16px 0 4px;padding:16px}
+.jobrow{display:flex;gap:14px;align-items:flex-start}
+.jobic{flex:none;width:44px;height:44px;border-radius:11px;background:linear-gradient(135deg,#5b8cff,#1d3fb0);display:flex;align-items:center;justify-content:center}
+.jobic svg{width:26px;height:26px;animation:sp 3s linear infinite}
+.jobcard .s{margin-top:3px}
+#tripList{margin-top:12px}
+.errrow{display:flex;gap:12px;align-items:flex-start}
+.erric{flex:none;width:26px;height:26px;border-radius:50%;background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn);font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.errh{color:var(--text);font-weight:600;line-height:1.4;font-size:16px}
 details.errd>summary{padding:6px 0 0;font-size:14px;justify-content:flex-start;gap:6px}
 details.errd .s{margin-top:4px}
 
@@ -395,7 +405,7 @@ details.errd .s{margin-top:4px}
   .topbar.solid::before{background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
     box-shadow:0 .5px 0 var(--line)}
   #newTrip{display:inline-block;width:auto;padding:11px 24px;font-size:15px;margin-top:6px}
-  #jobBox{max-width:720px}
+  .welcome .ws{max-width:520px;margin-left:auto;margin-right:auto}
   #toast{left:calc(var(--side) + 24px);bottom:24px}
   #asheet{left:var(--side);align-items:center}
   #asheet .box{max-width:420px;padding:0 8px}
@@ -408,16 +418,30 @@ details.errd .s{margin-top:4px}
   #ideas .card+.card{margin-top:0}
   /* gleiche Abschnitte auf gleicher Höhe: jede Karte nutzt die Zeilen des Rasters (Subgrid) */
   #ideas{row-gap:0}
-  #ideas .dcard{display:grid;grid-template-rows:subgrid;grid-row:span 8;margin-bottom:16px}
+  #ideas .dcard{display:grid;grid-template-rows:subgrid;grid-template-columns:minmax(0,1fr);grid-row:span 8;margin-bottom:16px}
   #ideas .dcard .dbody{display:contents}
   #ideas .dcard .dbody>*{margin-left:16px;margin-right:16px}
   #ideas .dcard .hl{margin-top:12px}
   #ideas .dcard .btns{align-self:end;margin-bottom:16px;margin-top:14px}
-  #ideas .vcard{display:grid;grid-template-rows:subgrid;grid-row:span 9;margin-bottom:16px}
+  #ideas .vcard{display:grid;grid-template-rows:subgrid;grid-template-columns:minmax(0,1fr);grid-row:span 9;margin-bottom:16px}
   #ideas .vcard>.go{align-self:end}
   .tphero{aspect-ratio:auto;height:360px}
   .hero{aspect-ratio:auto;height:340px}
   h1{margin-top:12px}
+}
+@media (min-width: 1200px){
+  #tripSheet>.in{max-width:1240px}
+  .tgrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
+  .tside{grid-column:2;grid-row:1;position:sticky;top:70px;max-height:calc(100vh - 80px);overflow-y:auto;scrollbar-width:none}
+  .tside::-webkit-scrollbar{display:none}
+  .tmain{grid-column:1;grid-row:1;min-width:0}
+  .tmain>*:first-child{margin-top:14px}
+  .tmain>h2:first-child{margin-top:20px}
+  .tphero{height:400px}
+}
+@media (min-width: 900px){
+  ol.stops li .s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  ol.stops li{padding-top:8px;padding-bottom:8px}
 }
 @media (min-width: 1400px){
   #ideas{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -437,7 +461,7 @@ details.errd .s{margin-top:4px}
   <h1>Reisen</h1>
   <p class="sub">Plant Reisen für euch beide und passt sie unterwegs selbständig an.</p>
   <button class="btn" id="newTrip">Neue Reise planen</button>
-  <div id="jobBox" class="card pad" style="margin-top:12px" hidden></div>
+  <div id="jobBox" class="card jobcard" hidden></div>
   <h2 id="tripsHead">Eure Reisen</h2>
   <div id="tripList"></div>
   <div id="favDestWrap" hidden>
@@ -562,7 +586,15 @@ details.errd .s{margin-top:4px}
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const EXP = {indoor: "drinnen", outdoor: "draussen", gemischt: "drinnen & draussen"};
-const MODE = {flug: "✈︎ Flug", faehre: "⛴ Fähre", zug: "🚆 Zug", bus: "🚌 Bus", auto: "🚗 Auto"};
+const MODE = {flug: "Flug", faehre: "Fähre", zug: "Zug", bus: "Bus", auto: "Auto"};
+// einheitliche Linien-Symbole statt Emojis (✈ ⛴ 🚆 …)
+const MODE_ICO = {
+  flug: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5 3 11l1.5-1.5 7.5 1L16.5 6c1-1 2.6-1.4 3.2-.7.7.6.3 2.2-.7 3.2l-4.5 4.5 1 7.5L14 22l-2.5-7.5-3 3V20l-1.5 1-1-3-3-1L4 15.5h2.5z"/></svg>`,
+  faehre: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c1.5 1.3 3 1.3 4.5 0s3-1.3 4.5 0 3 1.3 4.5 0 3-1.3 4.5 0M5 14l-1-4h16l-1 4M8 10V6h8v4M12 3v3"/></svg>`,
+  zug: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l1.5-4M15 21l-1.5-4M9 14h.01M15 14h.01"/></svg>`,
+  bus: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="15" rx="3"/><path d="M4 11h16M7 21v-3M17 21v-3M8 14.5h.01M16 14.5h.01"/></svg>`,
+  auto: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 16V11l2-5h10l2 5v5M3 16h18v2H3zM7 19v1M17 19v1M5 11h14"/></svg>`,
+};
 const STATUS = {entwurf: "Entwurf", gebucht: "Gebucht", unterwegs: "Unterwegs", abgeschlossen: "Beendet"};
 const KIND = {buchung_stornieren: "Stornieren", buchung_aendern: "Buchung verschieben", buchung_anfragen: "Anfragen",
   hotel_verlaengern: "Hotel verlängern", transport_umbuchen: "Umbuchen", nachricht: "Nachricht"};
@@ -607,7 +639,8 @@ function errHtml(m) {
     const j = m.search(/(\. | – )/);
     if (j > 15 && j < 120) { head = m.slice(0, j) + (m[j] === "." ? "." : ""); more = m.slice(j + (m[j] === "." ? 2 : 3)); }
   }
-  return `<div class="errh">${esc(head)}</div>` + (more ? `<details class="errd"><summary>Details</summary><div class="s">${esc(more)}</div></details>` : "");
+  return `<div class="errrow"><span class="erric">!</span><div class="grow"><div class="errh">${esc(head)}</div>` +
+    (more ? `<details class="errd"><summary>Details</summary><div class="s">${esc(more)}</div></details>` : "") + `</div></div>`;
 }
 // Platzhalter-Karten, solange Kompass sucht
 function skeleton(n, title) {
@@ -701,20 +734,25 @@ let jobTimer = null;
 function watchJob(id, label, onDone, again) {
   const box = $("jobBox");
   box.hidden = false;
-  const busy = note => `<div class="jobt">${esc(label)}</div><div class="s">${esc(note || "Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.")}</div><div class="pbar"><i></i></div>`;
-  box.innerHTML = busy();
+  const DEF = "Das dauert meist 30 Sekunden bis 3 Minuten. Du kannst die App solange schliessen.";
+  box.innerHTML = `<div class="jobrow"><span class="jobic">${ICO.compass}</span><div class="grow"><div class="jobt">${esc(label)}</div>
+    <div class="s" id="jobNote">${esc(DEF)}</div><div class="pbar"><i></i></div></div></div>`;
+  const busy = note => { const n = $("jobNote"); if (n && n.textContent !== (note || DEF)) n.textContent = note || DEF; };
+  if (typeof loadTrips === "function") loadTrips().catch(() => {});  // Willkommen-Karte ausblenden, solange geplant wird
   try { localStorage.setItem("job", JSON.stringify({id, label, again})); } catch {}
   clearTimeout(jobTimer);
   const tick = async () => {
     let j;
     try { j = await api("/api/jobs/" + id); } catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; clearJob(); return; }
     if (j.status === "laeuft") {  // KI überlastet: Kompass wartet selbst und zeigt den nächsten Versuch
-      box.innerHTML = busy(j.note);
+      busy(j.note);
       jobTimer = setTimeout(tick, 2000); return;
     }
     clearJob();
     if (j.status === "fehler") {
-      box.innerHTML = errHtml(j.error) + (again ? `<button class="btn" id="jobAgain" style="margin-top:12px">Nochmals versuchen</button>` : "");
+      loadTrips().catch(() => {});
+      box.innerHTML = errHtml(j.error) + `<div class="btns" style="margin:12px 0 0 38px">${again ? `<button class="small" id="jobAgain">Nochmals versuchen</button>` : ""}<button class="small" id="jobClose" style="background:none;color:var(--muted);padding-left:8px;padding-right:8px">Schliessen</button></div>`;
+      $("jobClose").onclick = () => { box.hidden = true; loadTrips().catch(() => {}); };
       if (again) $("jobAgain").onclick = async () => {  // gleiche Anfrage (z. B. gewählte Route) nochmals
         try { const r = await api("/api/trips", again); watchJob(r.job, label, onDone, again); }
         catch (e) { box.innerHTML = `<span class="warnt">${esc(e.message)}</span>`; }
@@ -770,7 +808,8 @@ async function loadTrips() {
       <div class="cap"><div class="grow"><div class="nm">${x.favorite ? "★ " : ""}${esc(x.title)}</div>
         <div class="dt">${esc(fmtD(x.start, {day: "numeric", month: "short"}))} – ${esc(fmtD(x.end, {day: "numeric", month: "short", year: "numeric"}))}</div></div>
         <div class="pz">${esc(chf(x.total))}<small>${x.status === "entwurf" ? "Entwurf" : "2 Personen"}</small></div></div></div>`;
-  $("tripList").innerHTML = (coming.length ? coming.map(tcard).join("") : t.trips.length ? "" :
+  let planning = !$("jobBox").hidden; try { planning = planning || !!localStorage.getItem("job"); } catch {}
+  $("tripList").innerHTML = (coming.length ? coming.map(tcard).join("") : (t.trips.length || planning) ? "" :
       `<div class="card welcome"><div class="wic">${ICO.compass}</div><div class="wt">Wohin geht's als Nächstes?</div>
         <div class="ws">Kompass schlägt Ziele vor, die zu euch beiden passen, plant Route, Hotels und Programm – und passt alles unterwegs an.</div>
         <button class="btn" id="welcomeGo" style="max-width:280px;margin:18px auto 0">Erste Reise planen</button></div>`) +
@@ -778,7 +817,7 @@ async function loadTrips() {
       ${photo(x.photo, "thumb s")}<div class="grow"><div class="t">${esc(x.title)}</div>
       <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div></div>`).join("")}</div>` : "");
   $("tripsHead").hidden = !coming.length;
-  $("newTrip").hidden = !t.trips.length;  // leere Seite hat ihren eigenen Knopf
+  $("newTrip").hidden = !t.trips.length && !planning;  // leere Seite hat ihren eigenen Knopf
   if ($("welcomeGo")) $("welcomeGo").onclick = () => $("newTrip").click();
   $("tripList").querySelectorAll("[data-trip]").forEach(r => r.onclick = () => openTrip(r.dataset.trip));
   $("favDestWrap").hidden = !ideas.saved.length;
@@ -972,7 +1011,7 @@ function renderIdeas(res) {
       const cn = i.country ? cname(i.country) : (i.country_name || "").trim(), reg = (i.region || "").trim();
       const where = [`${cflag(i.country)} ${esc(cn)}`.trim(), reg && ![i.name, cn].some(x => actKey(x) === actKey(reg)) ? esc(reg) : ""].filter(Boolean).join(" · ");
       const c = i.climate || null;
-      const mode = i.travel_mode === "zug" ? "🚆 Zug" : i.travel_mode === "auto" ? "🚗 Auto" : "✈︎ Flug";
+      const mode = MODE[i.travel_mode] || "Flug";
       const stops = (i.travel_mode || "flug") === "flug" ? (i.typical_stops ? `, ${i.typical_stops} Umstieg` : ", direkt") : "";
       return `<div class="card dcard"><div class="ph">${photo(i.photo, "dimg", `${i.name}, ${cn}`)}<div class="shade"></div>
         <div class="price"><b>ca. ${esc(chf(i.est_total_chf))}</b><small>ganze Reise · 2 Personen</small></div>
@@ -981,7 +1020,7 @@ function renderIdeas(res) {
           <div class="hl">${(i.highlights || []).slice(0, 4).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
           ${i.pitch ? `<p class="pitch">${esc(i.pitch)}</p>` : `<div></div>`}
           <div class="tiles four">${[
-            c ? tile("Wetter", `${Math.round(c.temp_max)}° / ${Math.round(c.temp_min)}°`, `${wxIcon(c.rain_days > .45 ? "regen" : c.rain_days > .2 ? "teils bewölkt" : "klar")} ${Math.round(c.rain_days * 100)} % Regen`) : "",
+            c ? tile("Wetter", `${Math.round(c.temp_max)}° / ${Math.round(c.temp_min)}°`, `${Math.round(c.rain_days * 100)} % Regentage`) : "",
             i.sea_temp ? tile("Wasser", `${i.sea_temp} °C`, i.sea_source || "") : tile("Wasser", "–", "kein Badeort"),
             tile("Anreise", `${i.travel_hours ?? i.typical_flight_hours} Std.`, `${mode}${stops}${i.travel_cost_chf ? ` · ${chf(i.travel_cost_chf)}` : ""}`)].join("")}</div>
           <div class="dsec"><div class="dk">Wetter im ${esc(month)}</div>
@@ -1125,8 +1164,8 @@ function renderTrip(outcome) {
     const mins = o ? `${Math.floor(o.duration_min / 60)} Std. ${String(o.duration_min % 60).padStart(2, "0")} Min.` : "";
     const waiting = !L && x.mode === "flug" && x.estimated && x.origin_code && INFO.prices.available;
     const planned = `${esc(fmtD(x.depart))} · ${esc(tm(x.depart))} – ${esc(tm(x.arrive))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""}`;
-    return `<div class="row tap chev" data-seg="${esc(x.id)}"><div class="grow">
-      <div class="t">${esc(MODE[x.mode] || x.mode)} ${esc(x.origin.name)} → ${esc(x.destination.name)}</div>
+    return `<div class="row tap chev" data-seg="${esc(x.id)}"><span class="mic">${MODE_ICO[x.mode] || MODE_ICO.flug}</span><div class="grow">
+      <div class="t">${esc(x.origin.name)} → ${esc(x.destination.name)}</div><div class="s" style="margin-top:0">${esc(MODE[x.mode] || x.mode)}</div>
       ${o ? `<div class="s">${esc(fmtD(o.depart))} · <b>${esc(tm(o.depart))} – ${esc(tm(o.arrive))}${plus(o.depart, o.arrive)}</b></div>
         <div class="s">${mins} · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"} · ${esc(o.carrier)}${o.number ? " " + esc(o.number) : ""}</div>
         ${ai >= 0 ? "" : `<div class="s fl-plan">Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${esc(chf(x.cost))} · antippen zum Übernehmen</div>`}`
@@ -1206,11 +1245,13 @@ function renderTrip(outcome) {
     <div class="topbar"><button class="back" data-close="tripSheet">Reisen</button>
       <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></div>
     ${heroHtml}
-    ${liveCard(d.live_day)}
+    <div class="tgrid"><aside class="tside">
     ${offerHtml}
     ${progressHtml}
     <div class="card" style="margin-top:12px"><button class="lrow" id="tImport">Buchung importieren</button></div>
     <div class="card pad res" id="tOut" hidden></div>
+    </aside><div class="tmain">
+    ${liveCard(d.live_day)}
     ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
     ${d.notes.length ? `<div class="card" style="margin-top:12px"><div class="callout"><div>${d.notes.map(esc).join("<br>")}</div></div></div>` : ""}
@@ -1227,7 +1268,7 @@ function renderTrip(outcome) {
       <details><summary>Status von Hand ändern</summary><div style="padding:0 16px 14px"><div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
         <p class="hint" style="margin:8px 0 0">${statusHint}</p></div></details></div>
     <p class="hint">Version ${t.version} · KI-Kosten dieser Reise: ${esc(usd(d.ai_cost))}</p>
-    <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button>`;
+    <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button></div></div>`;
 
   const tid = t.id;
   $("tripIn").querySelector("[data-close]").onclick = () => { closeSheet("tripSheet"); loadTrips(); };
