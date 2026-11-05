@@ -391,6 +391,10 @@ class Handler(BaseHTTPRequestHandler):
                 if not re.fullmatch(r"[A-Z]{3}", code):
                     raise BadRequest("Flughafen als 3-Buchstaben-Code (z. B. ZRH).")
                 allowed["home_airport"] = code
+            if "dest_style" in body:
+                if body["dest_style"] not in ("geheimtipps", "gemischt", "klassiker"):
+                    raise BadRequest("Unbekannte Art von Zielvorschlägen.")
+                allowed["dest_style"] = body["dest_style"]
             if "home_place" in body:
                 place = re.sub(r"\s+", " ", str(body["home_place"] or "")).strip()[:80]
                 if re.search(r"[<>{}\[\]]", place):
@@ -457,6 +461,7 @@ class Handler(BaseHTTPRequestHandler):
                 store.delete("fav_dest", str(item["id"]))
             else:
                 keep = {k: item.get(k) for k in ("id", "name", "country", "why", "pitch", "climate_note", "highlights", "climate_text", "photo",
+                                                 "gem", "why_now",
                                                  "est_total_chf", "typical_flight_hours")}
                 if not (isinstance(keep.get("photo"), str) and re.fullmatch(r"[0-9a-f]{24}", keep["photo"])):
                     keep["photo"] = None  # nur echte Foto-Kennungen aus der eigenen Ablage

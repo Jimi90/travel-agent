@@ -117,13 +117,22 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (85 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (86 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.11.3)
+## Stand (05.11.2026, Version 1.12.0)
+- 1.12.0: Wunsch James: Ziele «cooler» – «hidden gems»: noch nicht überlaufen, aber gut ausgebaut, kurz vor dem Boom.
+  Einstellung «Zielvorschläge» (Profil → Einstellungen, `settings.dest_style` = geheimtipps (Standard) | gemischt |
+  klassiker, Aktionsblatt). `destinations.STYLE_TEXT` steht im Prompt: bei Geheimtipps mind. 6 von 8 `gem=true`, gut
+  erschlossen (Flug/Bahn, Hotels aller Preisklassen, Restaurants, sicher), keine Massenklassiker (`CLASSICS`), lieber die
+  Nachbarregion; `why_now` = 1 konkreter Satz, warum gerade jetzt (nichts erfinden). Sortierung: Geheimtipps zuerst (nach
+  Budget-Warnung, vor Klima). Karte: Abzeichen «✦ Geheimtipp» oben links, Kasten «Warum gerade jetzt» im Pitch-Feld
+  (Subgrid bleibt 8 Zeilen); Überschrift «Geheimtipps für euch». Gemerkte Ziele behalten gem/why_now. Tests
+  `tests/test_destinations.py` + Einstellung in test_app; Playwright 390/1440 px hell/dunkel. Wie gut Gemini echte
+  Geheimtipps findet (und ob «why_now» stimmt), nur auf dem NAS prüfbar.
 - 1.11.3: James (Foto PC): Werte im Formular «Neue Reise» nicht bündig – Datumsfelder endeten vor der «900», weil der
   Browser rechts Platz fürs Kalendersymbol hält. Jetzt `input.inl[type=date]`: Wert rechtsbündig
   (`::-webkit-date-and-time-value`), Kalendersymbol unsichtbar über das ganze Feld (Klick öffnet die Auswahl). Formular

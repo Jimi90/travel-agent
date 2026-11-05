@@ -11,7 +11,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from .. import config, llm, photos, weather
+from .. import config, llm, photos, store, weather
 from ..models import Household
 from ..models.common import new_id
 from .matching import climate_score, match
@@ -31,6 +31,8 @@ class DestinationIdea(BaseModel):
     why: str  # 1 Satz: warum es zu BEIDEN passt
     pitch: str = ""  # 2–3 Sätze im Reisebüro-Stil: was das Ziel auszeichnet
     climate_note: str = ""  # 1–2 Sätze: wie sich das Wetter zur Reisezeit anfühlt
+    gem: bool = False  # Geheimtipp: noch nicht überlaufen, aber gut erschlossen und im Kommen
+    why_now: str = ""  # 1 Satz: warum das Ziel gerade im Kommen ist
     highlights: list[str]
     travel_mode: Literal["flug", "zug", "auto"]  # beste Anreise ab dem Heimatort
     travel_hours: float  # Reisezeit pro Strecke (Flug: reine Flugzeit)
@@ -91,10 +93,38 @@ def resolve_country(idea: DestinationIdea) -> str:
     return by_name or iso or by_place
 
 
+# Wunsch James: «hidden gems» – noch nicht überlaufen, aber gut ausgebaut und kurz vor dem Boom
+CLASSICS = ("Paris, Rom, Barcelona, Venedig, Amsterdam, London, Lissabon, Mallorca, Santorini, Mykonos, Dubai, Bali, "
+            "Phuket, Antalya, Hurghada, Sharm el Sheikh, Gran Canaria, Teneriffa, Malediven, Marrakesch, Prag")
+STYLE_TEXT = {
+    "geheimtipps": (
+        "ZIELART: Geheimtipps. Mindestens 6 der 8 Ziele sind Geheimtipps (gem=true): noch nicht überlaufen und selten "
+        "in grossen Reisekatalogen, ABER gut erschlossen – gute Flug- oder Bahnverbindung, schöne Hotels in allen "
+        f"Preisklassen, gute Restaurants, sicher – und gerade im Kommen. Keine Massenklassiker wie {CLASSICS}; statt "
+        "der bekannten Stadt lieber die spannende Nachbarregion oder -insel. «why_now» = 1 konkreter Satz, warum das "
+        "Ziel gerade im Kommen ist (z. B. neue Direktflüge, neue Boutique-Hotels, wachsende Kulinarik-Szene); nichts "
+        "erfinden – wenn du dir nicht sicher bist, allgemein bleiben."),
+    "gemischt": (
+        "ZIELART: gemischt – etwa die Hälfte Geheimtipps (gem=true, noch nicht überlaufen, aber gut erschlossen und im "
+        "Kommen, mit «why_now» = 1 konkreter Satz, warum gerade jetzt), die andere Hälfte bewährte Lieblingsziele."),
+    "klassiker": "ZIELART: bewährte, beliebte Ziele sind willkommen. gem nur bei echten Geheimtipps setzen.",
+}
+
+
+def style() -> str:
+    try:
+        st = store.settings().get("dest_style") or "geheimtipps"
+    except Exception:  # Tests ohne Ablage
+        st = "geheimtipps"
+    return st if st in STYLE_TEXT else "geheimtipps"
+
+
 def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, travel_budget=None) -> dict:
     m = match(h, start, days, home_airport, travel_budget)
+    st = style()
     prompt = (f"Reisezeit: ab {start:%d.%m.%Y}, {days} Tage. Heimatort: {m.home} (Flughafen {home_airport}).\n"
               f"{m.prompt_text()}\n"
+              f"{STYLE_TEXT[st]}\n"
               f"Wunsch/Hinweis: {wish.strip() or 'keiner – überrasche uns, gerne abwechslungsreich'}\n"
               "Schlage 8 unterschiedliche Ziele vor, die innerhalb der Reichweite liegen. "
               "Koordinaten (lat/lon) des Hauptorts angeben.")
@@ -150,8 +180,9 @@ def suggest(h: Household, start: date, days: int, wish: str, home_airport: str, 
             dropped += [f"{i['name']}: ca. CHF {i['est_total_chf']} – über dem Budget" for i in out if i not in fits]
             out = fits
     # zuerst, was ins Budget passt, dann nach Klima
-    out.sort(key=lambda x: (bool(x.get("warning")), -(x["climate_score"] if x["climate_score"] is not None else 5)))
-    return {"start": start.isoformat(), "days": days, "wish": wish, "ideas": out[:6], "dropped": dropped,
+    out.sort(key=lambda x: (bool(x.get("warning")), st == "geheimtipps" and not x.get("gem"),
+                            -(x["climate_score"] if x["climate_score"] is not None else 5)))
+    return {"start": start.isoformat(), "days": days, "wish": wish, "ideas": out[:6], "dropped": dropped, "style": st,
             "reach": m.reach.text(m.home), "budget": float(m.budget_total) if m.budget_total else None,
             "travel_budget": float(m.travel_budget) if m.travel_budget else None}
 
@@ -172,6 +203,7 @@ def _fake(h: Household) -> DestinationList:
         pitch=f"{n} verbindet verwinkelte Gassen, lebendige Märkte und lange Abende am Wasser. Tagsüber entdeckt ihr "
               "Aussichtspunkte und kleine Museen, abends wartet frischer Fisch in einer Taverne am Hafen.",
         climate_note="Mild und meist sonnig, ideal zum Flanieren; abends wird es frisch, eine leichte Jacke genügt.",
+        gem=i % 2 == 1, why_now="Neue Direktflüge ab Zürich und eine wachsende Szene kleiner Boutique-Hotels." if i % 2 else "",
         highlights=["Altstadt", "Küste", "Essen"], travel_mode=mode, travel_hours=hrs, typical_stops=st,
         travel_cost_chf=tc, cost_level="mittel", est_total_chf=1500 + i * 300)
         for i, (n, c, rg, lm, la, lo, mode, hrs, st, tc) in enumerate(base)])
