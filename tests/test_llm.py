@@ -126,6 +126,7 @@ class FreeLLMTest(unittest.TestCase):
         self.assertIn("Groq: Schlüssel abgelehnt", msg)
         self.assertIn("Gemini: überlastet (Fehler 503: high demand)", msg)
         self.assertIn("gerade überlastet (bei Google, nicht bei Kompass)", msg)
+        self.assertTrue(cm.exception.temporary)  # Auftrag versucht es später selbst nochmals
         models = [b["model"] for prov, b, _ in SEEN if prov == "gemini"]
         self.assertEqual(models, ["gemini-3.8-flash"] * 4 + ["gemini-3.5-flash-lite"] * 2)  # 3× warten, dann Ersatzmodell
         self.assertEqual([c.args[0] for c in sl.call_args_list], [8, 20, 40, 40])

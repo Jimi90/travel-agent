@@ -167,6 +167,33 @@ def job(job_id: str) -> dict | None:
         return dict(j) if j else None
 
 
+# KI überlastet (Gemini 503 «high demand», hielt bei James länger an): im Hintergrund selbst nochmals versuchen,
+# insgesamt rund 20 Minuten, statt gleich mit Fehler aufzuhören. Die Seite zeigt den nächsten Versuch an.
+RETRY_WAITS = (60, 120, 240, 360, 480)
+
+
+def _with_retries(jid: str, fn, *args):
+    for n, wait in enumerate((*RETRY_WAITS, None), start=1):
+        try:
+            return fn(*args)
+        except llm.LLMError as e:
+            if not getattr(e, "temporary", False) or wait is None:
+                raise
+            at = datetime.now() + timedelta(seconds=wait)
+            note = (f"Die KI (Gemini) ist gerade überlastet. Kompass versucht es um {at:%H:%M} automatisch wieder "
+                    f"(Versuch {n + 1} von {len(RETRY_WAITS) + 1}). Du kannst die App solange schliessen.")
+            print(f"[Auftrag] {jid}: KI überlastet, neuer Versuch um {at:%H:%M}", flush=True)
+            with _jobs_lock:
+                _jobs[jid]["note"] = note
+            _sleep(wait)
+            with _jobs_lock:
+                _jobs[jid].pop("note", None)
+
+
+def _sleep(seconds: float) -> None:  # eigene Funktion, damit Tests nicht warten müssen
+    _time.sleep(seconds)
+
+
 def _start_job(kind: str, fn, *args) -> str:
     jid = new_id()
     with _jobs_lock:
@@ -177,7 +204,7 @@ def _start_job(kind: str, fn, *args) -> str:
 
     def run():
         try:
-            result = fn(*args)
+            result = _with_retries(jid, fn, *args)
             upd = {"status": "fertig", "result": result}
         except (llm.LLMError, weather.WeatherError) as e:
             upd = {"status": "fehler", "error": str(e)}

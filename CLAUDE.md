@@ -117,13 +117,18 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (82 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (85 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.9.7)
+## Stand (05.11.2026, Version 1.9.8)
+- 1.9.8: Gemini blieb bei James länger überlastet (503 auch nach 1.9.6). Jetzt versucht der Hintergrund-Auftrag es selbst
+  nochmals: `LLMError(temporary=True)` bei Überlastung → `service._with_retries` wartet `RETRY_WAITS` (1/2/4/6/8 Min.,
+  ca. 20 Min. gesamt) und setzt `job["note"]` («… versucht es um HH:MM automatisch wieder (Versuch n von 6)»), das die
+  Seite statt des Ladetexts zeigt (Planen, Routen, Zielvorschläge). Andere Fehler sofort. Uhrzeit = Container-Zeit
+  (`TZ: Europe/Zurich`). Test `tests/test_jobs.py`; Playwright 390 px; echte Überlastung nur auf dem NAS.
 - 1.9.7: Wünsche James: Ladetext nur «Kompass sucht Ziele, die zu euch beiden passen …» (auch Routen ohne «prüft das
   Wetter»). Zielkarte wie im Reisebüro: KI liefert `pitch` (2–3 Sätze, was das Ziel auszeichnet) und `climate_note`
   (wie sich das Wetter zur Reisezeit anfühlt); Karte zeigt Pitch, Kacheln, «Wetter im <Monat>» + Wertung «x von 10»,
