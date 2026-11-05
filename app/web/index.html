@@ -231,7 +231,7 @@ details.vcost .costs{padding:0 16px 8px;margin-top:0}
 .hstrip{display:flex;gap:6px;overflow-x:auto;margin:8px 0 4px;scrollbar-width:none}
 .hstrip::-webkit-scrollbar{display:none}
 .hstrip img{width:96px;height:72px;border-radius:8px;object-fit:cover;flex:none;background:var(--card2);cursor:zoom-in}
-.live{font-size:14px;color:var(--accent);margin-top:2px}
+.live{font-size:14px;color:var(--text);margin-top:2px}
 #lightbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(env(safe-area-inset-top) + 16px) 12px calc(env(safe-area-inset-bottom) + 16px)}
 #lightbox img{max-width:100%;max-height:80vh;border-radius:10px;object-fit:contain}
 #lightbox .cap{color:#ddd;font-size:14px;margin-top:12px;text-align:center}
@@ -358,6 +358,10 @@ details.pdet .costs{margin:0 0 12px}
 .nextstep .btns{margin-top:10px}
 .mic{flex:none;width:34px;height:34px;border-radius:10px;background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center;align-self:flex-start;margin-top:2px}
 .mic svg{width:19px;height:19px}
+.more details>summary{color:var(--text);font-size:17px;align-items:center;justify-content:flex-start}
+.more details>summary::after{content:"";width:8px;height:8px;border:solid var(--muted);border-width:2px 2px 0 0;transform:rotate(45deg);opacity:.6;margin-left:0;transition:transform .2s}
+.more details[open]>summary::after{transform:rotate(135deg)}
+.more .cnt2{color:var(--muted);margin-left:auto;margin-right:12px;font-size:16px}
 .callout{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;font-size:14px;line-height:1.45;color:var(--warn)}
 /* Laden und Fehler (1.11.0) */
 .sk .b{background:linear-gradient(90deg,var(--card2) 0,color-mix(in srgb,var(--card2) 35%,var(--card)) 50%,var(--card2) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite;border-radius:6px}
@@ -584,7 +588,8 @@ details.errd .s{margin-top:4px}
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+// Schweizer Schreibweise auch für ältere gespeicherte KI-Texte («genießen» → «geniessen»)
+const esc = s => String(s ?? "").replace(/ß/g, "ss").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const EXP = {indoor: "drinnen", outdoor: "draussen", gemischt: "drinnen & draussen"};
 const MODE = {flug: "Flug", faehre: "Fähre", zug: "Zug", bus: "Bus", auto: "Auto"};
 // einheitliche Linien-Symbole statt Emojis (✈ ⛴ 🚆 …)
@@ -1114,7 +1119,7 @@ function renderTrip(outcome) {
         const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
         return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
           <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
-          <div class="s">${esc(CATS[a.category] || a.category)} · ${esc(EXP[a.exposure])} · ${esc(INT[a.intensity])} · ${esc(chf(a.cost))}</div>
+          <div class="s">${esc([CATS[a.category] || a.category, a.exposure === "outdoor" ? "draussen" : "", a.intensity === 3 ? "anstrengend" : "", Number(a.cost) ? chf(a.cost) : ""].filter(Boolean).join(" · "))}</div>
           ${a.note ? `<div class="${isNew ? "note" : "desc"}">${esc(a.note)}</div>` : ""}</div></div>`;
       }).join("") : `<div class="empty">Freier Tag</div>`) + `</details>`;
   }).join("");
@@ -1168,7 +1173,7 @@ function renderTrip(outcome) {
       <div class="t">${esc(x.origin.name)} → ${esc(x.destination.name)}</div><div class="s" style="margin-top:0">${esc(MODE[x.mode] || x.mode)}</div>
       ${o ? `<div class="s">${esc(fmtD(o.depart))} · <b>${esc(tm(o.depart))} – ${esc(tm(o.arrive))}${plus(o.depart, o.arrive)}</b></div>
         <div class="s">${mins} · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"} · ${esc(o.carrier)}${o.number ? " " + esc(o.number) : ""}</div>
-        ${ai >= 0 ? "" : `<div class="s fl-plan">Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${esc(chf(x.cost))} · antippen zum Übernehmen</div>`}`
+        ${ai >= 0 ? "" : `<div class="s fl-plan">Im Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${Number(x.cost) ? esc(chf(x.cost)) : "im Ticket enthalten"} · antippen zum Übernehmen</div>`}`
         : `<div class="s">${planned}</div>`}
       ${x.note && !redundant(x.note) ? `<div class="s">${esc(x.note)}</div>` : ""}
       ${waiting ? `<div class="s fl-wait"><span class="spin"></span>Hole aktuelle Flüge von Google Flights …</div>` : ""}
@@ -1262,12 +1267,13 @@ function renderTrip(outcome) {
     <h2>Verbindungen</h2><div class="card">${trans}</div>
     ${!INFO.prices.available && t.transports.some(x => x.mode === "flug" && x.estimated) ? `<p class="hint">Echte Flugzeiten und Preise: SerpApi-Schlüssel unter Profil → KI hinterlegen.</p>` : ""}
     <p class="hint">Zeile antippen für Optionen, z. B. «Fällt aus …».</p>
-    ${hotels ? `<div class="card" style="margin-top:12px"><details><summary>Weitere Hotels (${t.hotel_suggestions.length})</summary>${hotels}</details></div>` : ""}
-    ${alts ? `<div class="card" style="margin-top:12px"><details><summary>Schlechtwetter-Programm (${t.alternatives.length})</summary>${alts}</details></div>` : ""}
-    <div class="card" style="margin-top:12px"><details><summary>Verlauf (${d.history.length})</summary>${hist}</details>
+    <h2>Mehr</h2><div class="card more">
+    ${hotels ? `<details><summary>Weitere Hotels <span class="cnt2">${t.hotel_suggestions.length}</span></summary>${hotels}</details>` : ""}
+    ${alts ? `<details><summary>Ideen für Regentage <span class="cnt2">${t.alternatives.length}</span></summary>${alts}</details>` : ""}
+    <details><summary>Änderungen und Kosten <span class="cnt2">${d.history.length}</span></summary>
+      <div class="row"><div class="grow s" style="margin:0">Plan-Version ${t.version} · KI-Kosten dieser Reise ${esc(usd(d.ai_cost))}</div></div>${hist}</details>
       <details><summary>Status von Hand ändern</summary><div style="padding:0 16px 14px"><div class="seg" id="tStatus">${Object.entries(STATUS).map(([k, v]) => `<button data-st="${k}" class="${t.status === k ? "on" : ""}">${v}</button>`).join("")}</div>
         <p class="hint" style="margin:8px 0 0">${statusHint}</p></div></details></div>
-    <p class="hint">Version ${t.version} · KI-Kosten dieser Reise: ${esc(usd(d.ai_cost))}</p>
     <button class="btn danger" id="tDelete" style="margin-top:20px">Reise löschen</button></div></div>`;
 
   const tid = t.id;

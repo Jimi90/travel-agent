@@ -123,7 +123,14 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.11.1)
+## Stand (05.11.2026, Version 1.11.2)
+- 1.11.2: James (Fotos echte Agadir-Reise, «stümperhaft»): Überblick war zusammengeklebt («Strand & Ruhe in Agadir:
+  Entspannen Sie …» + Planer-Text) → `service.start_plan` nimmt den Varianten-Text nur noch, wenn der Planer keinen
+  schreibt; alle Prompts (Plan, Varianten, Ziele): «ihr/euch», nie «Sie»; `esc()` im Browser macht aus «ß» «ss» (auch alte
+  Texte). Programmpunkte: nur Kategorie · «draussen» · «anstrengend» · Preis (kein «drinnen · leicht · gratis»).
+  Verbindung mit 0 CHF: «im Ticket enthalten» statt «gratis». Echte Hotelpreise in Textfarbe (sahen aus wie Links).
+  Unten eine Liste «Mehr» wie in den iOS-Einstellungen (Weitere Hotels, Ideen für Regentage, Änderungen und Kosten mit
+  Version/KI-Kosten, Status von Hand) statt vier blauer Klappkarten. Test erwartet keinen zusammengeklebten Überblick.
 - 1.11.1: James (Foto PC, «soll das ein Witz sein?»): Ladekarte schmaler als die Willkommen-Karte, klebte daran, und
   «Erste Reise planen» stand da, während schon geplant wurde. Jetzt: Ladekarte `.jobcard` mit drehendem Kompass, volle
   Breite, Ladebalken wird nicht mehr alle 2 s neu gezeichnet (nur `#jobNote` ändert sich); Willkommen-Karte und doppelter

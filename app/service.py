@@ -249,8 +249,8 @@ def start_plan(destination: str, start: date, days: int, wishes: str, route: lis
         itin, notes = generator.generate(store.household(), destination, start, days, wishes, s["home_airport"],
                                          web_search=bool(s.get("web_search")), route=route,
                                          travel_budget=travel_budget)
-        if summary:  # gewählte Variante zuerst, dann der Überblick des Planers
-            itin = itin.model_copy(update={"summary": f"{summary} {itin.summary}".strip()})
+        if summary and not itin.summary.strip():  # Überblick der gewählten Variante nur, wenn der Planer keinen schreibt
+            itin = itin.model_copy(update={"summary": summary})
         sm().create(itin)
         store.put("plan_notes", itin.id, notes)
         photos.fill_trip(itin)
