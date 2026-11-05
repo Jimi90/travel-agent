@@ -123,7 +123,16 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.9.8)
+## Stand (05.11.2026, Version 1.10.0)
+- 1.10.0: Wunsch James: «mehr wie Apple». Nur `index.html` (CSS + wenig JS): iOS-Systemfarben (hell #f2f2f7/#fff,
+  dunkel #000/#1c1c1e, Separator/Label-Töne, `--press`, `--segon`, `--bar`), Haarlinien .5px, Typo wie iOS (Large Title 34,
+  Zeilen 17 px, Untertitel 14–15 px, Abschnittstitel 13 px), Karten 12 px Ecken, kleine Knöpfe «getönt» (Akzent 14 %),
+  Segment-Steuerung wie iOS, Chevrons als CSS-Winkel statt «›», Zurück-Knopf mit iOS-Pfeil (Texte ohne «‹»).
+  Formularfelder in Karten ohne graue Kästen (Listenzeilen mit Trennlinie), Auswahlfelder mit ⌃⌄ (data:-SVG, CSP erlaubt
+  data:). Titelleiste beim Scrollen: Hauptansichten `#navbar` (fixed), Blätter `.topbar` sticky mit Titel aus dem h1
+  (`navUpdate`, Scroll-Ereignisse in der Capture-Phase). Tab-Leiste und Aktionsblatt mit Blur-Material. Mit Playwright
+  390 px hell/dunkel geprüft (alle Reiter, Neue Reise, Vorschläge, Reiseblatt, Profil-Unterseite); auf dem iPhone selbst
+  (Safe Area, Blur, SF-Schrift) nur dort prüfbar.
 - 1.9.8: Gemini blieb bei James länger überlastet (503 auch nach 1.9.6). Jetzt versucht der Hintergrund-Auftrag es selbst
   nochmals: `LLMError(temporary=True)` bei Überlastung → `service._with_retries` wartet `RETRY_WAITS` (1/2/4/6/8 Min.,
   ca. 20 Min. gesamt) und setzt `job["note"]` («… versucht es um HH:MM automatisch wieder (Versuch n von 6)»), das die
