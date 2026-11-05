@@ -43,7 +43,10 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Varianten: höchstens `reach.max_bases` Orte (Rest wird gekürzt), Warnung «Weit für X Tage» per Luftlinie ab Heimatflughafen.
 - `variants.py` (1.5.0) Routen-Varianten: Ziel → KI liefert 3 Routen (Orte + Nächte, Stichpunkte, Wassertemperatur,
   Kosten Flüge/Unterkünfte/Programm/Transfers) → Code gleicht Nächte ab, ergänzt echtes Wetter (Archiv, grösster Ort),
-  Distanz (Haversine), Foto. Gemerkt in kv «variants»; `POST /api/trips {variant_set, index}` plant genau diese Route
+  Distanz (Haversine), Foto. Seit 1.9.5 Ortsprüfung (`variants.target`/`inside`, nach `_locate`): Ziel «Name, CC» → nur
+  Orte in CC (≤ 3000 km vom Zielort), freies Ziel → gleiches Land wie der Zielort oder ≤ 1500 km; fremde Orte fliegen raus
+  (`outside`, Hinweis «Weggelassen, weil nicht in …»); bleibt keine Route, einmal mit Hinweis nachfragen, sonst Fehler.
+  `varianten` ist HEAVY (Gemini zuerst, Groq nur Reserve). Gemerkt in kv «variants»; `POST /api/trips {variant_set, index}` plant genau diese Route
   (`generator.generate(route=…)`, Abweichung → Notiz). Ablauf in der App: Ziel (oder Zielvorschlag «Routen ansehen»)
   → Varianten → Plan → Hotel je Ort wählen (3 Preisklassen `guenstig|mittel|gehoben` in `HotelSuggestion.tags`,
   `choose-hotel` nimmt Index in `hotel_options`, exakter Ortsname vor ungefährem) → «Finaler Vorschlag» mit Kosten.
@@ -114,13 +117,17 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (75 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (80 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (04.11.2026, Version 1.9.4)
+## Stand (05.11.2026, Version 1.9.5)
+- 1.9.5: James klickte «Routen ansehen» für Malta und bekam «Malediven-Entspannung» (Valletta) und eine Route über
+  Griechenland/Türkei/Pakistan. Ursache vermutlich: Varianten gingen als «kleine Aufgabe» zuerst an Groq, und der Code prüfte
+  nicht, ob die Orte im Ziel liegen. Jetzt Gemini zuerst + Ortsprüfung (s. variants.py). Mit nachgebildeter Ortssuche getestet
+  (`DestinationCheckTest`), Anzeige bei 390 px; echte Gemini-Routen und Open-Meteo nur auf dem NAS.
 - 1.9.4: Wunsch James: im Formular «Neue Reise» Abreise- und Rückreisedatum statt Dauer −/+. Zeile «Rückreise» (`#nEnd`, Datumsfeld)
   mit «N Tage · N−1 Nächte» darunter; Dauer = Tage von Abreise bis Rückreise (beide zählen), 2–30. Abreise ändern: Dauer bleibt,
   Rückreise wandert mit; Rückreise ausserhalb 2–30 springt zurück + Hinweis. Server unverändert (`days` wie bisher). Im Testmodus
