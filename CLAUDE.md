@@ -123,7 +123,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.10.1)
+## Stand (05.11.2026, Version 1.10.2)
+- 1.10.2: Wunsch James: Schrift Helvetica (`--sans`/`--display` = "Helvetica Neue", Helvetica, Arial; auch Anmelde-/
+  Einrichtungsseite; keine Webfont – CSP und Lizenz; Windows zeigt Arial) und modernere Farbe statt Grün: Ozeanblau
+  (hell `--accent:#2459e0`, dunkel `#6e9bff`), Verläufe/Avatar/Heute-Karte blau, App-Symbol (`icon.svg`, `apple-touch-icon.png`
+  per Playwright neu gerendert) und Manifest. Testmodus 390 px + PC hell/dunkel geprüft. Neues Symbol auf dem
+  Home-Bildschirm erst nach erneutem «Zum Home-Bildschirm».
 - 1.10.1: James: am PC sah die App aus wie auf dem Handy. Ab 900 px Breite (`@media (min-width: 900px)` am Ende des
   CSS) Seitenleiste links wie eine Mac-/iPad-App (`#tabbar` wird senkrecht, `--side` 248 px, «Kompass» als Titel),
   Inhalt breiter (Reisen bis 1040 px, Helfer/Profil 720 px), Blätter rechts neben der Seitenleiste (920 px, Neue Reise
