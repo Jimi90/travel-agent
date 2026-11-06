@@ -225,8 +225,15 @@ class AppTest(unittest.TestCase):
         self.assertTrue(live[fl[0]["id"]]["options"][0]["price"] > 0)
         self.assertTrue(live[fl[0]["id"]]["token"])
         acts = d["photos"]["activities"]
-        self.assertFalse(acts["abendessen 1"])             # Essen bekommt kein Foto
-        self.assertTrue(d["hero"]["id"] != acts["abendessen 1"])
+        dinner = "abendessen im restaurant tasca 1"
+        self.assertFalse(acts[dinner])                     # Essen bekommt kein Foto
+        self.assertTrue(d["hero"]["id"] != acts[dinner])
+        # Restaurants: Link zu Google Maps immer, Bewertung (Testmodus: nachgebaute SerpApi-Antwort)
+        meal = next(a for day in d["trip"]["days"] for a in day["activities"] if a["title"].startswith("Abendessen"))
+        v = d["venues"][meal["id"]]
+        self.assertEqual(v["name"], "Tasca 1")
+        self.assertTrue(v["url"].startswith("https://www.google.com/maps/search/?api=1&query=Tasca+1"))
+        self.assertTrue(4.0 <= v["rating"] <= 5.0 and v["reviews"] > 0)
         self.assertTrue(acts["altstadt-museum 3"])         # Bild über den Wikipedia-Titel «Museu 3»
         self.assertTrue(acts["altstadt-museum 2"])
         req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})

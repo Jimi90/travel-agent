@@ -56,6 +56,7 @@ class Activity(Model):
     replaces: str | None = None  # ID der ersetzten Aktivität (für Nachvollziehbarkeit)
     note: str | None = None
     wiki: str | None = Field(default=None, max_length=200)  # Wikipedia-Artikel für das Foto (von der KI genannt)
+    venue: str | None = Field(default=None, max_length=120)  # Name des Restaurants/Cafés (für Google-Link + Bewertung)
 
     @model_validator(mode="after")
     def _times(self):

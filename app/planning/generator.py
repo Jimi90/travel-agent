@@ -39,6 +39,7 @@ class DraftActivity(BaseModel):
     tags: list[str]
     note: str
     wikipedia: str  # Titel des passenden Wikipedia-Artikels (Ort, Sehenswürdigkeit, Gericht), sonst ""
+    venue: str = ""  # genauer Name des Restaurants/Cafés/Bars bei Essen & Trinken, sonst ""
 
 
 class DraftDay(BaseModel):
@@ -123,6 +124,8 @@ Regeln:
 - wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels über genau den Ort, die Sehenswürdigkeit oder die
   Landschaft dieses Programmpunkts (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast», «Playa Delfines»,
   «Isla Mujeres». Bei Essen, Transfers, Hotel, Ruhe und Einkaufen immer "" (kein Gericht, keine Küche, kein Foto).
+- venue: bei Essen & Trinken der genaue Name eines echten, gut bewerteten Restaurants, Cafés oder einer Bar am Ort
+  (so wie bei Google Maps, z. B. «Tamarind», «Manda de Laos»), sonst "". Beim Frühstück im Hotel "".
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).
@@ -243,7 +246,8 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
             tags = {t.strip().lower() for t in a.tags if t.strip()}
             act = Activity(title=a.title[:160], category=ActivityCategory(a.category), exposure=Exposure(a.exposure),
                            intensity=_int(a.intensity), start=s, end=e, place=base, cost=_money(a.cost_chf),
-                           tags=tags, note=(a.note or None), wiki=(a.wikipedia or "").strip()[:200] or None)
+                           tags=tags, note=(a.note or None), wiki=(a.wikipedia or "").strip()[:200] or None,
+                           venue=(a.venue or "").strip()[:120] or None)
             if act.intensity > max_int or act.tags & avoid:
                 notes.append(f"Tag {i + 1}: «{a.title}» entfernt (Randbedingung: "
                              f"{'zu anstrengend' if act.intensity > max_int else ', '.join(sorted(act.tags & avoid))})")
@@ -374,9 +378,9 @@ def fake_draft(destination: str, days: int, home_airport: str, route: list[dict]
                               start="14:00", end="16:00", cost_chf=30, tags=[],
                               note="Kleines Museum in der Altstadt mit lokaler Geschichte. Eintritt ca. CHF 15 pro Person, "
                               "am Nachmittag ruhiger.", wikipedia=f"Museu {i}"),
-                DraftActivity(title=f"Abendessen {i}", category="kulinarik", exposure="indoor", intensity=1,
-                              start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="",
-                              wikipedia="Portugiesische Küche")]
+                DraftActivity(title=f"Abendessen im Restaurant Tasca {i}", category="kulinarik", exposure="indoor",
+                              intensity=1, start="19:00", end="21:00", cost_chf=120, tags=["reservierung"], note="",
+                              wikipedia="", venue=f"Tasca {i}")]
         if i == 1 or i == days:
             acts = acts[2:]
         if two and i == n1 + 1:  # Fähre am Wechseltag
