@@ -81,9 +81,12 @@ GEO = {  # nachgebildete Ortssuche (Open-Meteo), Schlüssel (Name, Ländercode)
     ("Malta", "MT"): Place(name="Malta", country="MT", lat=35.9, lon=14.4),
     ("Valletta", "MT"): Place(name="Valletta", country="MT", lat=35.899, lon=14.514),
     ("Gozo", "MT"): Place(name="Gozo", country="MT", lat=36.04, lon=14.24),
+    ("Cotonou", None): Place(name="Cotonou", country="BJ", lat=6.37, lon=2.42),
     ("Japan", None): Place(name="Japan", country="JP", lat=36.0, lon=138.0),
     ("Naha", "JP"): Place(name="Naha", country="JP", lat=26.21, lon=127.68),
     ("Lahore", "PK"): Place(name="Lahore", country="PK", lat=31.55, lon=74.34),
+    ("Cotonou", "BJ"): Place(name="Cotonou", country="BJ", lat=6.37, lon=2.42),
+    ("Ouidah", "BJ"): Place(name="Ouidah", country="BJ", lat=6.36, lon=2.09),
 }
 
 
@@ -129,6 +132,9 @@ class DestinationCheckTest(unittest.TestCase):
         self.assertFalse(variants.inside(_stop("Lahore", "PK", 31.5, 74.3, 3), cc, c))
 
     def run_suggest(self, answers):
+        return self.run_suggest_for("Malta, MT", answers)
+
+    def run_suggest_for(self, destination, answers):
         from datetime import date, timedelta
         from tests.test_replanning import household
         calls = []
@@ -141,7 +147,7 @@ class DestinationCheckTest(unittest.TestCase):
                 mock.patch.object(weather, "climate", return_value=clim), \
                 mock.patch.object(variants, "climate_score", return_value=(6, "")), \
                 mock.patch.object(variants.photos, "place_photo", return_value=None):
-            res = variants.suggest(household(), "Malta, MT", date.today() + timedelta(days=30), 8, "", "ZRH")
+            res = variants.suggest(household(), destination, date.today() + timedelta(days=30), 8, "", "ZRH")
         return res, calls
 
     def test_foreign_stops_are_dropped(self):
@@ -166,6 +172,16 @@ class DestinationCheckTest(unittest.TestCase):
         self.assertEqual(len(res["variants"]), 1)
         with self.assertRaises(variants.llm.LLMError):
             self.run_suggest([bad, bad])
+
+    def test_wrong_country_code_from_ai(self):  # James: «keine Route in Cotonou, BJ (vorgeschlagen: Cotonou, …)»
+        res, calls = self.run_suggest_for("Cotonou, BJ", [variants.VariantList(variants=[
+            _variant("Stadt am Meer", [_stop("Cotonou", "BEN", 0, 0, 7)]),            # 3 Buchstaben
+            _variant("Küste", [_stop("Cotonou", "BN", 4.9, 114.9, 4), _stop("Ouidah", "", 0, 0, 3)]),  # Brunei / leer
+        ])])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(res["variants"]), 2)
+        self.assertEqual(res["outside"], [])
+        self.assertEqual(res["variants"][1]["route"][0]["lon"], 2.42)  # echte Koordinaten statt Brunei
 
     def test_routes_go_to_gemini_first(self):  # nicht an das kleine Groq-Kontingent
         self.assertIn("varianten", variants.llm.HEAVY)

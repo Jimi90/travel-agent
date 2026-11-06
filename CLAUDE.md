@@ -123,7 +123,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (05.11.2026, Version 1.12.0)
+## Stand (06.11.2026, Version 1.12.1)
+- 1.12.1: James: «Die KI hat keine Route in Cotonou, BJ geliefert (vorgeschlagen: Cotonou, Cotonou, Cotonou)». Die
+  Ortsprüfung (1.9.5) glaubte dem Ländercode der KI (vermutlich «BEN»/«BN» statt «BJ») und warf Cotonou selbst raus.
+  Jetzt sucht `variants._locate(stop, cc)` zuerst im Land des Ziels; gefunden → Koordinaten und `country = cc`. Erst
+  danach der KI-Code (nur wenn 2 Buchstaben). Fehlermeldung nennt jeden Ort nur einmal. Test `test_wrong_country_code_from_ai`
+  (scheitert mit altem Code). Echte Ortssuche nur auf dem NAS prüfbar.
 - 1.12.0: Wunsch James: Ziele «cooler» – «hidden gems»: noch nicht überlaufen, aber gut ausgebaut, kurz vor dem Boom.
   Einstellung «Zielvorschläge» (Profil → Einstellungen, `settings.dest_style` = geheimtipps (Standard) | gemischt |
   klassiker, Aktionsblatt). `destinations.STYLE_TEXT` steht im Prompt: bei Geheimtipps mind. 6 von 8 `gem=true`, gut
