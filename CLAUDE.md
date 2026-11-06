@@ -117,13 +117,21 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (94 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (96 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.13.1)
+## Stand (07.11.2026, Version 1.13.2)
+- 1.13.2: James: «Es müssen ja nicht zwei angezeigt werden. Nur das gute.» Kein Vorschlag mit Knopf mehr: `venues.auto_improve`
+  ersetzt schwach bewertete Restaurants selbst (eine Änderung `actor=autonom`, Grund «Besser bewertete Restaurants gewählt:
+  …», rückgängig machbar) – nach dem Holen der Alternativen (`enrich`) und beim Öffnen der Reise (`trip_detail`, wenn
+  `improvable`). Nur im Entwurf, nie festgenagelte oder gebuchte Punkte, nie in gebuchten Reisen. Bewertung des neuen Lokals
+  wird gleich in «venue_live» gemerkt (keine weitere Suche). Titel neu «<Essen> im <Lokal>» (`swapped`), Namen in fremder
+  Schrift gekürzt (`clean_name`: «ຮ້ານ…1991 Wat Sene Alley Restaurant 1991» → «Wat Sene Alley Restaurant 1991»).
+  `swap-venue`-Schnittstelle und Knopf entfernt. Tests (clean_name, improvable, Ende-zu-Ende: getauscht, nie zwei Lokale,
+  Verlauf autonom + rückgängig); Playwright 390/1440 px.
 - 1.13.1: James (Foto Laos: Peeping Som's 4.1 ★, Organic Farm 4.3 ★): «Es sollen schon gut bewertete Restaurants sein».
   Prompt (`generator.SYSTEM`, venue): nur Lokale mit ≥ 4.5 ★ und vielen Bewertungen, keine Touristenfallen. Nachkontrolle
   in `venues.py`: `good` = ≥ `GOOD_RATING` 4.5 und ≥ `MIN_REVIEWS` 100; `weak` = schlechter oder bei Google nicht gefunden

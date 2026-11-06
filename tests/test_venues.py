@@ -66,6 +66,27 @@ class BetterTest(unittest.TestCase):
         self.assertTrue(venues.weak({"found": False}))                                   # Google kennt es nicht
         self.assertFalse(venues.weak({"found": False, "error": "x"}))                    # Fehler ≠ schlecht
 
+    def test_clean_foreign_script(self):
+        self.assertEqual(venues.clean_name("ຮ້ານອາຫານຮ່ອນວັດແສນ1991 Wat Sene Alley Restaurant 1991"),
+                         "Wat Sene Alley Restaurant 1991")
+        self.assertEqual(venues.clean_name("Café Ñandú"), "Café Ñandú")
+        self.assertEqual(venues.clean_name("ຮ້ານອາຫານ"), "ຮ້ານອາຫານ")  # nichts Lateinisches → so lassen
+
+    def test_only_replaced_when_allowed(self):
+        trip = self.trip()
+        trip.status = "entwurf"
+        for a in trip.days[0].activities:
+            a.fixed, a.booking = False, None
+        trip.days[0].activities[1].fixed = True                         # festgenagelt → nie anfassen
+        live = {"peeping som's restaurant|vang vieng": {"found": True, "rating": 4.1, "reviews": 939},
+                "organic farm restaurant|vang vieng": {"found": True, "rating": 4.3, "reviews": 279}}
+        alts = [{"title": "The Sunset Bar", "rating": 4.8, "reviews": 900}, {"title": "Viman", "rating": 4.6, "reviews": 650}]
+        with mock.patch.object(venues, "cached", lambda n, p: live.get(venues.key(n, p))), \
+                mock.patch.object(venues, "alternatives", lambda p: alts):
+            self.assertEqual(list(venues.improvable(trip)), ["a1"])
+            trip.status = "gebucht"                                    # gebuchte Reise: nichts ungefragt ändern
+            self.assertEqual(venues.improvable(trip), {})
+
     def test_swapped_activity(self):
         from datetime import time
         from app.models import Activity

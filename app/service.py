@@ -146,11 +146,11 @@ def report_closure(trip_id: str, activity_id: str, reason: str) -> dict:
     return {"status": out.status.value, "message": out.message(), "needs_user": out.needs_user}
 
 
-def change(trip_id: str, ops: list, reason: str, acknowledged: list[str] | None = None) -> dict:
+def change(trip_id: str, ops: list, reason: str, acknowledged: list[str] | None = None, actor: str = "nutzer") -> dict:
     """Änderung von Hand (Status, festnageln, bestätigen …) – ebenfalls über den StatusManager."""
     itin = sm().get(trip_id)
     res = sm().apply(ChangeSet(itinerary_id=trip_id, base_version=itin.version, operations=ops, reason=reason,
-                               actor="nutzer", acknowledged_locked=acknowledged or []),
+                               actor=actor, acknowledged_locked=acknowledged or []),
                      store.household().constraints.model_copy(update={"budget_total_max": None, "budget_per_day_max": None}), local_now(itin))
     return {"status": res.status.value, "problems": [p.message for p in res.problems]}
 
