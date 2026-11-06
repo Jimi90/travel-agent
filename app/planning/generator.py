@@ -124,8 +124,10 @@ Regeln:
 - wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels über genau den Ort, die Sehenswürdigkeit oder die
   Landschaft dieses Programmpunkts (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast», «Playa Delfines»,
   «Isla Mujeres». Bei Essen, Transfers, Hotel, Ruhe und Einkaufen immer "" (kein Gericht, keine Küche, kein Foto).
-- venue: bei Essen & Trinken der genaue Name eines echten, gut bewerteten Restaurants, Cafés oder einer Bar am Ort
-  (so wie bei Google Maps, z. B. «Tamarind», «Manda de Laos»), sonst "". Beim Frühstück im Hotel "".
+- venue: bei Essen & Trinken der genaue Name eines echten Restaurants, Cafés oder einer Bar am Ort, so wie bei Google
+  Maps (z. B. «Tamarind», «Manda de Laos»), sonst "". Beim Frühstück im Hotel "". NUR sehr gut bewertete Lokale: bei
+  Google mindestens 4.5 Sterne und viele Bewertungen (die bekannten Lieblinge von Einheimischen und Reisenden), keine
+  Touristenfallen. Im Zweifel ein bekanntes, sehr beliebtes Lokal statt eines unbekannten.
 - tags nur aus: {", ".join(TAGS)}. «hitze» für Sauna, Hammam, heisse Quellen; «hoehe» über 2500 m.
 - alternatives: pro Aufenthaltsort mindestens 5 wetterfeste Ersatz-Aktivitäten (60–240 Min.), passend zu den
   Vorlieben, für Regentage (z. B. Museum, Spa ohne Sauna, Kochkurs, Markthalle).

@@ -117,13 +117,22 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (91 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (94 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (06.11.2026, Version 1.13.0)
+## Stand (07.11.2026, Version 1.13.1)
+- 1.13.1: James (Foto Laos: Peeping Som's 4.1 ★, Organic Farm 4.3 ★): «Es sollen schon gut bewertete Restaurants sein».
+  Prompt (`generator.SYSTEM`, venue): nur Lokale mit ≥ 4.5 ★ und vielen Bewertungen, keine Touristenfallen. Nachkontrolle
+  in `venues.py`: `good` = ≥ `GOOD_RATING` 4.5 und ≥ `MIN_REVIEWS` 100; `weak` = schlechter oder bei Google nicht gefunden
+  (Fehler zählen nicht). Für schwache holt `fetch_alternatives` einmal je Ort «beste Restaurants <Ort>» (SerpApi
+  google_maps, nur gute, kv «venue_alts», gleiches Monatslimit); `for_trip` hängt `better` an (keins, das im Plan schon
+  vorkommt, keins doppelt). Anzeige: graue Sterne, «Nur 4.1 ★ – besser bewertet in der Nähe:», grün umrandete Karte mit
+  Link, Knopf «Stattdessen hier essen» → `POST /api/trips/<id>/swap-venue {activity_id}` (Vorschlag nur aus Server-Daten)
+  → `ReplaceActivity` mit `venues.swapped` (Titel, venue, Notiz «Sehr gut bewertet: ★ 4.8 (1'840 …)»), rückgängig machbar.
+  Tests `BetterTest` + Tausch im Ende-zu-Ende-Test; Playwright 390/1440 px. Echte Google-Maps-Ergebnisse nur auf dem NAS.
 - 1.13.0: Wunsch James: Restaurants im Tagesprogramm verlinken + Google-Bewertung. Neu `Activity.venue` (KI liefert
   `venue` = genauer Lokalname bei Essen & Trinken, «» beim Hotel-Frühstück) und `app/venues.py`: `venue_of` (venue oder
   aus dem Titel, z. B. «Mittagessen im Riverside Restaurant»; nichts bei «im Hotel», «am Nachtmarkt», «Abendessen 1»),

@@ -18,7 +18,7 @@ from pydantic import ValidationError
 
 from . import auth, bookings, config, drafting, flights, fx, hotels, llm, photos, prices, service, store, tiles, vision
 from . import venues, weather
-from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
+from .models import ChangeSet, Household, ReplaceActivity, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
 
@@ -528,6 +528,16 @@ class Handler(BaseHTTPRequestHandler):
             aid = str(body.get("activity_id") or "")
             out = service.change(trip_id, [SetFixed(activity_id=aid, fixed=bool(body.get("fixed")))],
                                  "Programmpunkt festgenagelt" if body.get("fixed") else "Programmpunkt freigegeben", [aid])
+            return self._send(200, {"outcome": out, **trip_detail(trip_id)})
+        if action == "swap-venue":  # schwach bewertetes Restaurant gegen das vorgeschlagene besser bewertete tauschen
+            aid = str(body.get("activity_id") or "")
+            it = sm.get(trip_id)
+            act = next((x for d in it.days for x in d.activities if x.id == aid), None)
+            better = (venues.for_trip(it).get(aid) or {}).get("better") if act else None  # nur Server-Daten, nie aus dem Browser
+            if not better:
+                raise BadRequest("Für diesen Programmpunkt gibt es keinen besser bewerteten Vorschlag.")
+            out = service.change(trip_id, [ReplaceActivity(activity_id=aid, new=venues.swapped(act, better))],
+                                 f"Restaurant getauscht: {better['name']} (★ {better['rating']:.1f})", [aid])
             return self._send(200, {"outcome": out, **trip_detail(trip_id)})
         if action == "confirm":
             op = SetConfirmed(target=body.get("target"), item_id=str(body.get("item_id") or ""),
