@@ -3,6 +3,8 @@ import unittest
 from datetime import time
 from types import SimpleNamespace as NS
 
+from unittest import mock
+
 from app import venues
 
 
@@ -31,6 +33,49 @@ class VenueTest(unittest.TestCase):
         u = venues.maps_url("Riverside Restaurant", "Luang Prabang", "abc")
         self.assertIn("query=Riverside+Restaurant%2C+Luang+Prabang", u)
         self.assertIn("query_place_id=abc", u)
+
+
+class BetterTest(unittest.TestCase):
+    """Wunsch James: «Es sollen schon gut bewertete Restaurants sein» – unter 4.5 ★ ein besseres vorschlagen."""
+
+    def trip(self):
+        acts = [NS(id="a1", title="Mittagessen im Peeping Som's Restaurant", category="kulinarik", venue=None, place=None),
+                NS(id="a2", title="Abendessen im Organic Farm Restaurant", category="kulinarik", venue=None, place=None),
+                NS(id="a3", title="Abendessen im Amigos", category="kulinarik", venue="Amigos", place=None)]
+        return NS(days=[NS(activities=acts, base=NS(name="Vang Vieng"))])
+
+    def test_weak_gets_better_alternative_not_used_twice(self):
+        live = {"peeping som's restaurant|vang vieng": {"found": True, "rating": 4.1, "reviews": 939},
+                "organic farm restaurant|vang vieng": {"found": True, "rating": 4.3, "reviews": 279},
+                "amigos|vang vieng": {"found": True, "rating": 4.7, "reviews": 1200}}
+        alts = [{"title": "Amigos", "rating": 4.7, "reviews": 1200},  # steht schon im Plan → nicht vorschlagen
+                {"title": "The Sunset Bar", "rating": 4.8, "reviews": 900, "address": "Riverside"},
+                {"title": "Viman Vang Vieng", "rating": 4.6, "reviews": 650}]
+        with mock.patch.object(venues, "cached", lambda n, p: live.get(venues.key(n, p))), \
+                mock.patch.object(venues, "alternatives", lambda p: alts):
+            out = venues.for_trip(self.trip())
+        self.assertTrue(out["a1"]["weak"] and out["a2"]["weak"])
+        self.assertFalse(out["a3"]["weak"])
+        self.assertEqual(out["a1"]["better"]["name"], "The Sunset Bar")
+        self.assertEqual(out["a2"]["better"]["name"], "Viman Vang Vieng")  # nicht zweimal dasselbe
+        self.assertIsNone(out["a3"]["better"])
+
+    def test_good_needs_rating_and_reviews(self):
+        self.assertTrue(venues.good({"found": True, "rating": 4.5, "reviews": 100}))
+        self.assertFalse(venues.good({"found": True, "rating": 4.9, "reviews": 12}))  # zu wenig Bewertungen
+        self.assertTrue(venues.weak({"found": False}))                                   # Google kennt es nicht
+        self.assertFalse(venues.weak({"found": False, "error": "x"}))                    # Fehler ≠ schlecht
+
+    def test_swapped_activity(self):
+        from datetime import time
+        from app.models import Activity
+        a = Activity(title="Mittagessen im Peeping Som's Restaurant", category="kulinarik", exposure="indoor",
+                     start=time(12, 30), end=time(13, 30), note="Lokales Restaurant mit BBQ.")
+        b = venues.swapped(a, {"name": "The Sunset Bar", "rating": 4.8, "reviews": 1234, "address": "Riverside"})
+        self.assertEqual(b.title, "Mittagessen im The Sunset Bar")
+        self.assertEqual(b.venue, "The Sunset Bar")
+        self.assertIn("★ 4.8 (1'234 Google-Bewertungen)", b.note)
+        self.assertEqual((b.id, b.start), (a.id, a.start))
 
 
 if __name__ == "__main__":
