@@ -196,6 +196,7 @@ def enrich(it) -> None:
                     return
                 fetch_alternatives(p, it.id)
                 n += 1
+            auto_improve(it.id)
         except Exception as e:  # nie die App stören
             print(f"[Restaurants] {it.id}: {type(e).__name__}: {e}", flush=True)
         finally:
@@ -218,7 +219,7 @@ def for_trip(it) -> dict:
     for a, v, p in items:
         c = cached(v, p) or {}
         found = c.get("found")
-        e = {"name": v, "url": maps_url(c.get("title") or v, p, c.get("place_id") if found else None),
+        e = {"name": clean_name(v), "url": maps_url(c.get("title") or v, p, c.get("place_id") if found else None),
              "rating": c.get("rating") if found else None, "reviews": c.get("reviews") if found else None,
              "weak": weak(c), "better": None}
         if e["weak"]:
@@ -226,17 +227,71 @@ def for_trip(it) -> dict:
                 n = alt["title"].casefold()
                 if n not in used and n not in taken and not any(same_hotel(u, alt["title"], p) for u in used):
                     taken.add(n)
-                    e["better"] = {"name": alt["title"], "rating": alt["rating"], "reviews": alt["reviews"],
-                                   "address": alt.get("address", ""), "url": maps_url(alt["title"], p, alt.get("place_id"))}
+                    name = clean_name(alt["title"])
+                    e["better"] = {"name": name, "rating": alt["rating"], "reviews": alt["reviews"],
+                                   "address": alt.get("address", ""), "place_id": alt.get("place_id"),
+                                   "url": maps_url(name, p, alt.get("place_id"))}
                     break
         out[a.id] = e
     return out
 
 
+def clean_name(t: str) -> str:
+    """«ຮ້ານອາຫານ…1991 Wat Sene Alley Restaurant 1991» → «Wat Sene Alley Restaurant 1991»: Teile in fremder Schrift
+    weglassen, wenn es einen lateinischen Namen gibt (sonst unverändert)."""
+    t = re.sub(r"\s+", " ", t or "").strip()
+    latin = re.sub(r"[^\x00-\u024F\u1E00-\u1EFF’]+", " ", t)
+    latin = re.sub(r"^[\W\d]+(?=[A-Za-zÀ-ÿ])", "", re.sub(r"\s+", " ", latin)).strip(" -–·|,")
+    return latin if len(re.findall(r"[A-Za-zÀ-ÿ]", latin)) >= 3 else t
+
+
+def improvable(it) -> dict:
+    """{activity_id: better} für Restaurants, die Kompass selbst durch ein gut bewertetes ersetzen darf: Plan noch im
+    Entwurf, Punkt nicht festgenagelt und nicht gebucht."""
+    if getattr(it, "status", "entwurf") != "entwurf":
+        return {}
+    info = for_trip(it)
+    out = {}
+    for d in it.days:
+        for a in d.activities:
+            e = info.get(a.id)
+            if e and e["weak"] and e["better"] and not a.fixed and not a.booking:
+                out[a.id] = (a, e["better"], a.place.name if a.place else d.base.name)
+    return out
+
+
+def auto_improve(trip_id: str) -> int:
+    """Wunsch James: «Es müssen ja nicht zwei angezeigt werden. Nur das gute.» – schwach bewertete Restaurants direkt im
+    Plan ersetzen (eine Änderung, rückgängig machbar). Gibt die Anzahl ersetzter Restaurants zurück."""
+    from . import service  # spät laden (service → server → venues)
+    from .models import ReplaceActivity
+    it = service.sm().get(trip_id)
+    todo = improvable(it)
+    if not todo:
+        return 0
+    ops = []
+    for aid, (a, b, place) in todo.items():
+        ops.append(ReplaceActivity(activity_id=aid, new=swapped(a, b)))
+        store.put("venue_live", key(b["name"], place), {"ts": datetime.now().isoformat(), "found": True,
+                  "title": b["name"], "rating": b["rating"], "reviews": b["reviews"], "address": b.get("address", ""),
+                  "place_id": b.get("place_id")})
+    names = ", ".join(b["name"] for _, b, _ in todo.values())
+    out = service.change(trip_id, ops, f"Besser bewertete Restaurants gewählt: {names}"[:300], actor="autonom")
+    if out["status"] != "angewendet":
+        print(f"[Restaurants] {trip_id}: Tausch nicht übernommen ({out['problems']})", flush=True)
+        return 0
+    return len(ops)
+
+
 def swapped(a, better: dict):
     """Programmpunkt mit dem besser bewerteten Lokal (Titel, Lokal, Notiz) – für ReplaceActivity."""
-    old = venue_of(a) or ""
-    title = a.title.replace(old, better["name"]) if old and old in a.title else f"{a.title} – {better['name']}"
+    m = _MEAL.match(a.title)
+    if m and m.group(0).strip():  # «Abendessen im Restaurant Tasca 4» → «Abendessen im <neues Lokal>»
+        meal = re.sub(r"(?i)\s+(im|in der|in|bei|beim|auf der|auf dem|am|an der)\s*$", "", m.group(0).strip())
+        title = f"{meal[:1].upper()}{meal[1:]} im {better['name']}"
+    else:
+        old = venue_of(a) or ""
+        title = a.title.replace(old, better["name"]) if old and old in a.title else f"{a.title} – {better['name']}"
     note = (f"Sehr gut bewertet: ★ {better['rating']:.1f} ({better['reviews']:,} Google-Bewertungen)".replace(",", "'")
             + (f", {better['address']}" if better.get("address") else "") + ". Reservation empfohlen.")
     return a.model_copy(update={"title": title[:160], "venue": better["name"][:120], "note": note, "wiki": None})

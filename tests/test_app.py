@@ -234,20 +234,19 @@ class AppTest(unittest.TestCase):
         self.assertEqual(v["name"], "Tasca 1")
         self.assertTrue(v["url"].startswith("https://www.google.com/maps/search/?api=1&query=Tasca+1"))
         self.assertTrue(4.0 <= v["rating"] <= 5.0 and v["reviews"] > 0)
-        # schwach bewertet → besseres Lokal vorschlagen und auf Wunsch tauschen (Testmodus: nachgebaute Antworten)
+        # schwach bewertet → Kompass ersetzt selbst durch ein gut bewertetes (Testmodus: nachgebaute Antworten)
         for _ in range(100):
-            if any(x["weak"] and x["better"] for x in d["venues"].values()):
+            swapped = [x for day in d["trip"]["days"] for x in day["activities"] if "Bistro Estrela" in (x.get("venue") or "")]
+            if swapped:
                 break
             time.sleep(0.05)
             code, d = self.call("GET", f"/api/trips/{tid}")
-        aid, w = next((k, x) for k, x in d["venues"].items() if x["weak"] and x["better"])
-        self.assertGreaterEqual(w["better"]["rating"], 4.5)
-        self.assertEqual(self.call("POST", f"/api/trips/{tid}/swap-venue", {"activity_id": "gibtsnicht"})[0], 400)
-        code, d = self.call("POST", f"/api/trips/{tid}/swap-venue", {"activity_id": aid})
-        self.assertEqual(code, 200)
-        act = next(x for day in d["trip"]["days"] for x in day["activities"] if x["id"] == aid)
-        self.assertEqual(act["venue"], w["better"]["name"])
-        self.assertFalse(d["venues"][aid]["weak"])
+        self.assertTrue(swapped)
+        self.assertIn("Sehr gut bewertet", swapped[0]["note"])
+        self.assertFalse(any(x["better"] for x in d["venues"].values()))   # nie zwei Lokale nebeneinander
+        h = next(x for x in d["history"] if x["reason"].startswith("Besser bewertete Restaurants"))
+        self.assertEqual(h["actor"], "autonom")
+        self.assertTrue(h["can_undo"])
         self.assertTrue(acts["altstadt-museum 3"])         # Bild über den Wikipedia-Titel «Museu 3»
         self.assertTrue(acts["altstadt-museum 2"])
         req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})
