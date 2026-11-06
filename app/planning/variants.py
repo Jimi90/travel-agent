@@ -73,21 +73,28 @@ def km(a: Stop, b: Stop) -> float:
     return 2 * r * math.asin(math.sqrt(h))
 
 
-def _locate(stop: Stop) -> None:
-    """Koordinaten der KI sind oft falsch (Orte vertauscht, gleichnamiger Ort im falschen Land): per Ortssuche im
-    angegebenen Land überschreiben. Findet die Suche nichts, bleiben die Werte der KI."""
+def _locate(stop: Stop, cc: str | None = None) -> None:
+    """Koordinaten der KI sind oft falsch (Orte vertauscht, gleichnamiger Ort im falschen Land): per Ortssuche
+    überschreiben. Mit `cc` (Land des Ziels) zuerst dort suchen – liegt der Ort dort, gilt auch der Ländercode `cc`.
+    Die KI schreibt den Code nämlich oft falsch (James: Cotonou mit «BEN»/«BN» statt «BJ» → als «nicht in Benin»
+    aussortiert). Findet die Suche nichts, bleiben die Werte der KI."""
     if config.FAKE_MODE:
         return
     base = re.sub(r"\s*\(.*?\)", "", stop.name).strip()
     tries = [base] + ([base.rsplit(" de ", 1)[1].strip()] if " de " in base else [])
-    for name in dict.fromkeys(t for t in tries if t):
-        try:
-            place = weather.geocode(name, stop.country)
-        except (weather.WeatherError, ValueError, KeyError):
-            continue
-        if place.lat is not None and place.lon is not None:
-            stop.lat, stop.lon = place.lat, place.lon
-            return
+    names = list(dict.fromkeys(t for t in tries if t))
+    own = stop.country.strip().upper()
+    countries = [c for c in dict.fromkeys([cc, own if re.fullmatch(r"[A-Z]{2}", own) else None]) if c]
+    for country in countries:
+        for name in names:
+            try:
+                place = weather.geocode(name, country)
+            except (weather.WeatherError, ValueError, KeyError):
+                continue
+            if place.lat is not None and place.lon is not None:
+                stop.lat, stop.lon = place.lat, place.lon
+                stop.country = (place.country or country).upper()
+                return
 
 
 def target(destination: str, geo=None):
@@ -131,7 +138,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
         for v in res.variants[:3]:
             route = [s for s in v.route if s.nights > 0] or v.route[:1]
             for s_ in route:
-                _locate(s_)
+                _locate(s_, cc)
             if check:
                 outside += [s_.name for s_ in route if not inside(s_, cc, center)]
                 route = [s_ for s_ in route if inside(s_, cc, center)]
@@ -143,7 +150,7 @@ def suggest(h: Household, destination: str, start: date, days: int, wishes: str,
                    f"({', '.join(outside[:6])}). Nur Orte in {destination}!")
     if not good:
         raise llm.LLMError(f"Die KI hat keine Route in {destination} geliefert (vorgeschlagen: "
-                           f"{', '.join(outside[:6]) or 'nichts'}). Bitte nochmals versuchen.")
+                           f"{', '.join(list(dict.fromkeys(outside))[:6]) or 'nichts'}). Bitte nochmals versuchen.")
     out = []
     home = HOME_COORDS.get(home_airport.upper())
     for v, route in good:
