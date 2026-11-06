@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from . import auth, bookings, config, drafting, flights, fx, hotels, llm, photos, prices, service, store, tiles, vision
-from . import weather
+from . import venues, weather
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -125,6 +125,9 @@ def trip_detail(trip_id: str) -> dict:
     if flights.missing(it):
         flights.enrich(it)  # echte Flugangebote (SerpApi Google Flights), ebenfalls im Hintergrund
         pending = True
+    if venues.missing(it):
+        venues.enrich(it)  # Google-Bewertungen der Restaurants (SerpApi Google Maps), ebenfalls im Hintergrund
+        pending = True
     tp = photos.trip_photos(it.id)
     # Titelbild: zuerst ein Programmpunkt-Foto (Strand, Wahrzeichen), erst dann das Foto des Ortsartikels
     hero = next((tp["activities"].get(photos.activity_key(a.title)) for d in it.days for a in d.activities
@@ -151,7 +154,7 @@ def trip_detail(trip_id: str) -> dict:
     budget = store.household().constraints.budget_for_trip(it)
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
             "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
-            "photos": tp, "photos_pending": pending, "flight_live": flights.for_trip(it), "live_day": live_day(it, today),
+            "photos": tp, "photos_pending": pending, "flight_live": flights.for_trip(it), "venues": venues.for_trip(it), "live_day": live_day(it, today),
             "hero": {"id": hero, "title": hero_meta.get("title", ""), "page": hero_meta.get("page", ""),
                      "source": hero_meta.get("source", "")} if hero else None,
             "today": today.date.isoformat() if today else None, "history": list(reversed(hist)),

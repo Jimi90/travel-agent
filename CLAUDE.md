@@ -117,13 +117,23 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (86 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (91 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (06.11.2026, Version 1.12.1)
+## Stand (06.11.2026, Version 1.13.0)
+- 1.13.0: Wunsch James: Restaurants im Tagesprogramm verlinken + Google-Bewertung. Neu `Activity.venue` (KI liefert
+  `venue` = genauer Lokalname bei Essen & Trinken, «» beim Hotel-Frühstück) und `app/venues.py`: `venue_of` (venue oder
+  aus dem Titel, z. B. «Mittagessen im Riverside Restaurant»; nichts bei «im Hotel», «am Nachtmarkt», «Abendessen 1»),
+  Link immer gratis (`maps_url` = Google-Maps-Suche «Name, Ort», mit `query_place_id` wenn bekannt), Bewertung über
+  SerpApi `engine=google_maps` im Hintergrund wie Hotels/Flüge (`enrich`, max. 10 pro Lauf, `MONTH_CAP` 60 im Monat,
+  Kosten-Zeile `preise_restaurant`, kv «venue_live» dauerhaft, auch «nicht gefunden»; Treffer nur bei passendem Namen,
+  `hotels.same_hotel`). `trip_detail.venues` = {activity_id: name, url, rating, reviews}. Anzeige: Zeile unter dem
+  Programmpunkt (Stecknadel, Name, ★ 4.6 (693 Bewertungen), «Google Maps ↗»); Antippen öffnet Google Maps, nicht das
+  Aktionsblatt. Ältere Pläne: Name aus dem Titel. Tests `tests/test_venues.py` + Ende-zu-Ende; Playwright 390/1440 px;
+  echte Google-Maps-Treffer/Feldnamen nur auf dem NAS prüfbar.
 - 1.12.1: James: «Die KI hat keine Route in Cotonou, BJ geliefert (vorgeschlagen: Cotonou, Cotonou, Cotonou)». Die
   Ortsprüfung (1.9.5) glaubte dem Ländercode der KI (vermutlich «BEN»/«BN» statt «BJ») und warf Cotonou selbst raus.
   Jetzt sucht `variants._locate(stop, cc)` zuerst im Land des Ziels; gefunden → Koordinaten und `country = cc`. Erst
