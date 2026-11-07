@@ -41,6 +41,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   `budget_for_trip(it)` für Plausibilität, Umplanung, Ausfall, finalen Vorschlag). Nicht in den Einstellungen (Wunsch James).
   Ideen mit `travel_cost_chf` > Anreisebudget × 1.2 fallen weg (mit Grund); Ideen im Budget zuerst.
   Varianten: höchstens `reach.max_bases` Orte (Rest wird gekürzt), Warnung «Weit für X Tage» per Luftlinie ab Heimatflughafen.
+- `daytrips.py` (1.17.0) Tagesausflüge ab dem aktuellen Standort, siehe «Stand».
 - `variants.py` (1.5.0) Routen-Varianten: Ziel → KI liefert 3 Routen (Orte + Nächte, Stichpunkte, Wassertemperatur,
   Kosten Flüge/Unterkünfte/Programm/Transfers) → Code gleicht Nächte ab, ergänzt echtes Wetter (Archiv, grösster Ort),
   Distanz (Haversine), Foto. Seit 1.9.5 Ortsprüfung (`variants.target`/`inside`, nach `_locate`): Ziel «Name, CC» → nur
@@ -119,13 +120,35 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (108 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (115 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.16.0)
+## Stand (07.11.2026, Version 1.17.0)
+- 1.17.0: Wunsch James: Tagesausflüge ohne Übernachtung, Ideen gern von TripAdvisor, Start = aktueller Standort.
+  Standort: GPS im Browser (`navigator.geolocation`, dafür `Permissions-Policy` `geolocation=(self)` statt `()` –
+  nur Kompass selbst, Kamera/Mikrofon bleiben gesperrt) → `POST /api/locate` → `weather.reverse` (OpenStreetMap
+  Nominatim, eigener Absender, auf 0.01° ≈ 1 km gerundet, 30 Tage zwischengespeichert; ohne Antwort «Standort 47.38,
+  8.54», Land «XX»). Browser merkt den Standort 6 Std. (`localStorage` «loc»). `app/planning/daytrips.py`: 1 TripAdvisor-
+  Suche «Ausflüge <Ort>» mit lat/lon (`sights.nearby`, 7 Tage gemerkt, kv «sight_nearby») als Anregung im Prompt →
+  KI `ausfluege` (6 Ideen: Ort, Koordinaten, travel_mode zug|auto|bus|faehre, travel_minutes pro Weg, pitch, 3
+  highlights, `tripadvisor` = Name der Hauptsehenswürdigkeit, wikipedia, cost_chf) → Code hart: Fahrzeit ≤ Grenze × 1.15
+  und Luftlinie ≤ Grenze × 90 km/h, nicht am Startort (< 3 km), «nur ÖV» wirft Auto-Ziele raus; TripAdvisor je Idee
+  (`sights.lookup`, gleiches Monatslimit), < 4.0 ★ fliegt raus; Tipps über `sights.tips_for` (aus `make_tips`
+  herausgelöst); Wetter genau für den Tag (`weather.lookup`, 16 Tage); Foto; Sortierung: trocken, dann Bewertung,
+  dann Fahrzeit. Gemerkt in kv «daytrips»; `POST /api/trips {daytrip_set, index}` → `generator.generate_daytrip`
+  (`DAYTRIP_RULES`: 1 Tag, keine Nacht, genau Hin- und Rückfahrt ab/zum Startort, 4–6 Punkte), `build(..., origin=)`
+  (Start statt Heimatflughafen), Titel «Tagesausflug <Ziel>». Oberfläche: dritter Weg «Tagesausflug» im Formular
+  (Start = Standort mit «Standort verwenden», Datum – ab 15 Uhr morgen –, Fahrzeit 45 Min.–3 Std., «Zug oder Auto / ÖV /
+  Auto»), Knopf «Tagesausflug ab hier» auf der Startseite und in der Willkommen-Karte; Ausflugskarten wie Zielkarten
+  (Subgrid 8 Kinder!: Kacheln Wetter am Tag / Fahrt / TripAdvisor, Tipp + Link, «Diesen Ausflug planen»). Reiseblatt für
+  1 Tag: Datum einfach, «Tagesausflug», keine Unterkünfte, nächste Schritte «Programm prüfen → Tickets besorgen», Symbol
+  nach Verkehrsmittel, Countdown «heute»; PDF: «Fahrten», Programm auf Seite 1. Tests `tests/test_daytrips.py` +
+  `DayTripAppTest`; Playwright 390/1440 px hell/dunkel mit vorgetäuschtem GPS. Nur auf dem iPhone/NAS prüfbar: echte
+  Standortfreigabe (iOS fragt beim ersten Mal; abgelehnt → Einstellungen → Datenschutz & Sicherheit → Ortungsdienste
+  → Safari-Websites), Nominatim-Antworten, SerpApi `tripadvisor` mit lat/lon, Qualität der KI-Fahrzeiten.
 - 1.16.0: Wunsch James: Reise als PDF exportieren. `app/export.py` baut das PDF auf dem Server (fpdf2 in requirements,
   Pillow kommt mit; Schrift DejaVu Sans aus `fonts-dejavu-core` im Dockerfile, sonst Helvetica mit ersetzten Zeichen,
   `TripPDF.t`). Inhalt: Titelbild (eigener Fotoordner, mittig zugeschnitten, als JPEG eingebettet – Rohpixel wären MB

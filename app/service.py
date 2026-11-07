@@ -16,7 +16,7 @@ from .models import (
     ChangeSet, ChangeStatus, ClosureDisruption, Itinerary, Place, SetTripStatus, TransportDisruption,
     WeatherDisruption, new_id,
 )
-from .planning import destinations, generator, variants
+from .planning import daytrips, destinations, generator, variants
 from .planning.alternatives import AlternativeActivitiesModule
 from .planning.disruption_ext import ExtendedDisruptionHandler
 from .planning.providers import PlanAlternatives
@@ -259,6 +259,42 @@ def start_plan(destination: str, start: date, days: int, wishes: str, route: lis
                            "AND ts >= ?", (itin.id, (datetime.now() - timedelta(minutes=30)).isoformat()))
         store.notify("plan", f"Neue Reise: {itin.title}", f"{len(itin.days)} Tage, ca. {itin.total_cost():.0f} CHF "
                      "(Schätzung).", itin.id)
+        return {"trip_id": itin.id, "notes": notes}
+
+    return _start_job("reiseplan", run)
+
+
+def start_daytrips(origin, day: date, max_minutes: int, mode: str, wish: str) -> str:
+    """Tagesausflug-Ideen ab dem aktuellen Standort (1.17.0)."""
+    s = store.settings()
+
+    def run():
+        res = daytrips.suggest(store.household(), origin, day, max_minutes, mode, wish, s["home_airport"])
+        store.put("daytrips", res["id"], res)
+        return res
+
+    return _start_job("ausfluege", run)
+
+
+def start_daytrip_plan(set_id: str, index: int) -> str:
+    """Gewählten Tagesausflug planen – Daten nur aus der gemerkten Liste, nie aus dem Browser."""
+    ds = store.get("daytrips", set_id)
+    if not ds:
+        raise KeyError(set_id)
+    idea = ds["ideas"][index]
+    origin = Place.model_validate(ds["origin"])
+    day = date.fromisoformat(ds["date"])
+    s = store.settings()
+
+    def run():
+        itin, notes = generator.generate_daytrip(store.household(), origin, idea, day, ds.get("wish", ""),
+                                                 s["home_airport"])
+        sm().create(itin)
+        store.put("plan_notes", itin.id, notes)
+        photos.fill_trip(itin)
+        store.db().execute("UPDATE costs SET trip_id = ? WHERE trip_id IS NULL AND purpose = 'reiseplan' "
+                           "AND ts >= ?", (itin.id, (datetime.now() - timedelta(minutes=30)).isoformat()))
+        store.notify("plan", f"Neuer Ausflug: {itin.title}", f"ca. {itin.total_cost():.0f} CHF (Schätzung).", itin.id)
         return {"trip_id": itin.id, "notes": notes}
 
     return _start_job("reiseplan", run)

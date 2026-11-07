@@ -171,6 +171,39 @@ def generate(h: Household, destination: str, start: date, days: int, wishes: str
     return itin, notes
 
 
+DAYTRIP_RULES = """
+TAGESAUSFLUG – diese Regeln gehen allen anderen vor:
+- Genau 1 Tag, KEINE Übernachtung: bases = genau ein Eintrag (das Ausflugsziel) mit nights 0; hotels = [].
+- transports: genau zwei, beide day 1 – Hinfahrt am Morgen vom Startort zum Ziel und Rückfahrt am Abend vom Ziel
+  zurück zum Startort (from_place/to_place = genau der Name des Startorts), mit dem genannten Verkehrsmittel,
+  from_code/to_code "". Preis für beide hin bzw. zurück.
+- Programm: 4–6 Punkte zwischen Ankunft und Rückfahrt (nie gleichzeitig mit einer Fahrt), mit Mittagessen und einer
+  Kaffee-/Zvieri-Pause; nicht zu dicht, es ist ein Ausflug.
+- alternatives: 3 wetterfeste Ersatz-Aktivitäten am Ziel.
+- Budget: ein Tag für beide."""
+
+
+def generate_daytrip(h: Household, origin: Place, idea: dict, day: date, wishes: str, home_airport: str,
+                     trip_id: str | None = None) -> tuple[Itinerary, list[str]]:
+    """Ein Tagesausflug ab dem aktuellen Standort: Hin- und Rückfahrt am selben Tag, keine Unterkunft."""
+    m = match(h, day, 1, home_airport)
+    mode = {"zug": "Zug", "bus": "Bus", "auto": "Auto", "faehre": "Schiff/Fähre"}.get(idea.get("travel_mode"), "Zug")
+    prompt = (f"Tagesausflug am {day:%d.%m.%Y} ab {origin.name} (Startort = aktueller Standort, Koordinaten "
+              f"{origin.lat:.3f}, {origin.lon:.3f}) nach {idea['name']}"
+              + (f" ({idea['region']})" if idea.get("region") else "") + ".\n"
+              f"Verkehrsmittel: {mode}, ca. {idea.get('travel_minutes', 60)} Minuten pro Weg.\n"
+              f"Ideen fürs Programm: {'; '.join(idea.get('highlights') or [])}. "
+              f"Wichtigste Sehenswürdigkeit: {idea.get('tripadvisor') or idea['name']}.\n"
+              f"{m.prompt_text()}\nWünsche: {wishes.strip() or 'keine'}")
+    draft = llm.ask("reiseplan", system=SYSTEM + DAYTRIP_RULES, content=prompt, schema=PlanDraft, trip_id=trip_id,
+                    fake=lambda: fake_daytrip(origin, idea), max_tokens=12000)
+    draft = draft.model_copy(update={"hotels": [], "bases": [b.model_copy(update={"nights": 0}) for b in draft.bases[:1]]})
+    itin, notes = build(draft, h, day, 1, home_airport, origin=origin)
+    if not itin.title.lower().startswith("tagesausflug"):
+        itin = itin.model_copy(update={"title": f"Tagesausflug {idea['name']}"[:160]})
+    return itin, notes
+
+
 # --- Entwurf → geprüfter Reiseplan ------------------------------------------------------------
 
 def _t(s: str) -> time | None:
@@ -206,7 +239,7 @@ def flights_url(frm: str, to: str, d: date) -> str:
 
 
 def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: str,
-          travel_budget: Decimal | None = None) -> tuple[Itinerary, list[str]]:
+          travel_budget: Decimal | None = None, origin: Place | None = None) -> tuple[Itinerary, list[str]]:
     notes: list[str] = []
     k = h.constraints
     avoid, max_int = k.effective_avoid_tags(), k.effective_max_intensity()
@@ -222,12 +255,14 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
     if not places:
         raise llm.LLMError("Der Plan enthält keinen Aufenthaltsort.")
     first = next(iter(places.values()))
-    home = Place(name=home_airport, country="CH")
+    home = origin or Place(name=home_airport, country="CH")  # Tagesausflug: Start/Ziel = aktueller Standort
 
     def place_of(name: str) -> Place:
         key = name.casefold()
         if key in places:
             return places[key]
+        if origin and (key == origin.name.casefold() or origin.name.casefold() in key):
+            return origin
         for k2, p in places.items():
             if k2 in key or key in k2:
                 return p
@@ -358,6 +393,38 @@ def build(draft: PlanDraft, h: Household, start: date, days: int, home_airport: 
 
 
 # --- Testmodus ------------------------------------------------------------------------------
+
+def fake_daytrip(origin: Place, idea: dict) -> PlanDraft:
+    n = idea["name"]
+    acts = [DraftActivity(title=f"Altstadt-Rundgang {n}", category="stadt", exposure="outdoor", intensity=1,
+                          start="09:30", end="11:30", cost_chf=0, tags=[], wikipedia=idea.get("tripadvisor") or n,
+                          note="Gemütlicher Rundgang durch die Gassen, am Morgen noch ruhig."),
+            DraftActivity(title=f"Mittagessen im Restaurant Seeblick {n}", category="kulinarik", exposure="indoor",
+                          intensity=1, start="12:00", end="13:30", cost_chf=90, tags=["reservierung"], note="",
+                          wikipedia="", venue=f"Seeblick {n}"),
+            DraftActivity(title=f"Schifffahrt ab {n}", category="natur", exposure="outdoor", intensity=1,
+                          start="14:00", end="16:00", cost_chf=60, tags=[], wikipedia="",
+                          note="Rundfahrt auf dem See mit Blick auf die Berge."),
+            DraftActivity(title="Zvieri im Café am Quai", category="kulinarik", exposure="indoor", intensity=1,
+                          start="16:15", end="17:00", cost_chf=20, tags=[], note="", wikipedia="", venue="")]
+    mode = idea.get("travel_mode") if idea.get("travel_mode") in ("zug", "bus", "auto", "faehre") else "zug"
+    h = max(0.25, int(idea.get("travel_minutes") or 60) / 60)
+    return PlanDraft(
+        title=f"Tagesausflug {n}", summary=f"Ein entspannter Tag in {n}: Altstadt, Mittagessen am See und eine Schifffahrt.",
+        bases=[DraftBase(name=n, country="CH", lat=idea.get("lat") or 47.0, lon=idea.get("lon") or 8.3,
+                         timezone="Europe/Zurich", nights=0)],
+        days=[DraftDay(day=1, base=n, theme=f"Ein Tag in {n}", activities=acts)],
+        alternatives=[DraftAlternative(base=n, title=f"Museum {n}", category="museum", exposure="indoor", intensity=1,
+                                       duration_min=120, cost_chf=30, tags=[], opens="10:00", closes="17:00")],
+        hotels=[],
+        transports=[DraftTransport(day=1, mode=mode, from_place=origin.name, to_place=n, from_code="", to_code="",
+                                   depart=f"{max(5, int(9.25 - h)):02d}:{0:02d}", duration_h=h, via=[], carrier="SBB" if mode == "zug" else "",
+                                   est_price_chf=40, note="Zeit geschätzt"),
+                    DraftTransport(day=1, mode=mode, from_place=n, to_place=origin.name, from_code="", to_code="",
+                                   depart="17:30", duration_h=h, via=[], carrier="SBB" if mode == "zug" else "",
+                                   est_price_chf=40, note="Zeit geschätzt")],
+        cost_note="Alle Preise sind Schätzungen.")
+
 
 def fake_draft(destination: str, days: int, home_airport: str, route: list[dict] | None = None) -> PlanDraft:
     """Ab 5 Tagen zwei Orte mit Fähre dazwischen – so lässt sich ein Fähr-Ausfall testen. Mit Route: deren Orte."""

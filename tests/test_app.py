@@ -410,3 +410,44 @@ class AppTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DayTripAppTest(AppTest):
+    """Tagesausflug (1.17.0): Standort → Ortsname, Ideen, Plan ohne Übernachtung – über die API im Testmodus."""
+    test_full_flow = None  # nur den eigenen Ablauf (eigener Server, eigene Daten)
+
+    def test_day_trip(self):
+        self.assertEqual(self.call("POST", "/api/login", {"password": PW})[0], 200)
+        with urllib.request.urlopen(self.base + "/health") as r:  # Standort nur für Kompass selbst, sonst nichts
+            self.assertIn("geolocation=(self)", r.headers["Permissions-Policy"])
+            self.assertIn("camera=()", r.headers["Permissions-Policy"])
+        code, d = self.call("POST", "/api/locate", {"lat": 47.3769, "lon": 8.5417})
+        self.assertEqual((code, d["place"]["name"]), (200, "Zürich"))
+        self.assertEqual(self.call("POST", "/api/locate", {"lat": "x"})[0], 400)
+        self.assertEqual(self.call("POST", "/api/locate", {"lat": 95, "lon": 8})[0], 400)
+        day = (date.today() + timedelta(days=2)).isoformat()
+        code, d = self.call("POST", "/api/daytrips", {"lat": 47.3769, "lon": 8.5417, "date": day, "max_minutes": 90,
+                                                      "mode": "egal", "wish": "See"})
+        self.assertEqual(code, 200, d)
+        j = self.wait_job(d["job"])
+        self.assertEqual(j["status"], "fertig", j)
+        res = j["result"]
+        self.assertEqual(res["origin"]["name"], "Zürich")
+        self.assertTrue(res["ideas"])
+        first = res["ideas"][0]
+        self.assertTrue(first["ta"]["rating"] >= 4.0 and first["ta"]["tip"])  # TripAdvisor + Tipp (nachgebildet)
+        self.assertTrue(first["weather"]["summary"])                          # Prognose für genau diesen Tag
+        self.assertEqual(self.call("POST", "/api/daytrips", {"lat": 47.3, "lon": 8.5, "date": day, "max_minutes": 999})[0], 400)
+        # Plan: nur aus der gemerkten Liste
+        code, d = self.call("POST", "/api/trips", {"daytrip_set": res["id"], "index": 0})
+        self.assertEqual(code, 200, d)
+        out = self.wait_job(d["job"])
+        self.assertEqual(out["status"], "fertig", out)
+        code, t = self.call("GET", f"/api/trips/{out['result']['trip_id']}")
+        trip = t["trip"]
+        self.assertEqual((trip["start_date"], trip["end_date"], len(trip["days"])), (day, day, 1))
+        self.assertEqual(trip["stays"], [])
+        self.assertEqual(trip["transports"][0]["origin"]["name"], "Zürich")
+        self.assertEqual(trip["transports"][-1]["destination"]["name"], "Zürich")
+        self.assertTrue(trip["title"].startswith("Tagesausflug"))
+        self.assertEqual(self.call("POST", "/api/trips", {"daytrip_set": "nichtda", "index": 0})[0], 404)

@@ -64,6 +64,16 @@ def _travel(body: dict):
     return Decimal(_int(v, 0, 50_000, "Hin- und Rückreise"))
 
 
+def _coord(body: dict) -> tuple[float, float]:
+    try:
+        lat, lon = float(body.get("lat")), float(body.get("lon"))
+    except (TypeError, ValueError):
+        raise BadRequest("Standort fehlt – bitte «Standort verwenden» antippen.")
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        raise BadRequest("Ungültiger Standort.")
+    return lat, lon
+
+
 def _text(v, maxlen: int) -> str:
     s = re.sub(r"[\x00-\x08\x0b-\x1f\x7f]", "", str(v or "")).strip()
     return s[:maxlen]
@@ -451,7 +461,24 @@ class Handler(BaseHTTPRequestHandler):
                 raise BadRequest("Das Startdatum liegt in der Vergangenheit.")
             return self._send(200, {"job": service.start_variants(dest, start, days, _text(body.get("wishes"), 800),
                                                                  _travel(body))})
+        if p == "/api/locate":  # aktueller Standort (GPS im Browser) → Ortsname (1.17.0)
+            place = weather.reverse(*_coord(body))
+            return self._send(200, {"place": place.model_dump()})
+        if p == "/api/daytrips":  # Tagesausflug-Ideen ab dem aktuellen Standort
+            day = _date(body.get("date"))
+            if day < date.today():
+                raise BadRequest("Das Datum liegt in der Vergangenheit.")
+            mode = body.get("mode") if body.get("mode") in ("egal", "oev", "auto") else "egal"
+            origin = weather.reverse(*_coord(body))
+            return self._send(200, {"job": service.start_daytrips(
+                origin, day, _int(body.get("max_minutes"), 30, 240, "Fahrzeit"), mode, _text(body.get("wish"), 400))})
         if p == "/api/trips":
+            if body.get("daytrip_set"):  # gewählter Tagesausflug: Daten nur aus der gemerkten Liste
+                ds = store.get("daytrips", str(body["daytrip_set"]))
+                if not ds:
+                    raise KeyError(body["daytrip_set"])
+                idx = _int(body.get("index"), 0, len(ds["ideas"]) - 1, "Ausflug")
+                return self._send(200, {"job": service.start_daytrip_plan(str(body["daytrip_set"]), idx)})
             if body.get("variant_set"):  # gewählte Routen-Variante: Daten nur aus der gemerkten Liste
                 vs = store.get("variants", str(body["variant_set"]))
                 if not vs:

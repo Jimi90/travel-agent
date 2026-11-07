@@ -56,6 +56,8 @@ def d_short(d: date) -> str:
 
 
 def span(a: date, b: date) -> str:
+    if a == b:  # Tagesausflug
+        return f"{d_long(a)} {a.year}"
     if a.year == b.year and a.month == b.month:
         return f"{a.day}.–{b.day}. {MONTHS[a.month - 1]} {a.year}"
     if a.year == b.year:
@@ -209,7 +211,7 @@ def build(trip_id: str) -> tuple[bytes, str]:
     pdf.para(it.title, 22, True, h=10)
     route = _route(it)
     days = len(it.days)
-    pdf.para(f"{span(it.start_date, it.end_date)} · {days} Tage · {len(route)} {'Ort' if len(route) == 1 else 'Orte'}"
+    pdf.para(f"{span(it.start_date, it.end_date)} · {'Tagesausflug' if days == 1 else f'{days} Tage'} · {len(route)} {'Ort' if len(route) == 1 else 'Orte'}"
              " · für 2 Personen", 11, color=MUTED, h=6)
     pdf.ln(2)
     pdf.para(" → ".join(f"{n} ({k} {'Nacht' if k == 1 else 'Nächte'})" if k else n for n, k in route), 11, True, h=6)
@@ -218,9 +220,10 @@ def build(trip_id: str) -> tuple[bytes, str]:
         pdf.para(it.summary, 10.5, h=5.4)
 
     # --- Preis -------------------------------------------------------------------------------------
-    costs = [("Flüge & Verbindungen", sum(t.cost for t in it.transports)),
-             ("Unterkünfte", sum(s.cost for s in it.stays)),
-             ("Programm", sum(a.cost for d in it.days for a in d.activities))]
+    flights = any(t.mode == "flug" for t in it.transports)
+    costs = [("Flüge & Verbindungen" if flights else "Fahrten", sum(t.cost for t in it.transports))] \
+        + ([("Unterkünfte", sum(s.cost for s in it.stays))] if it.stays else []) \
+        + [("Programm", sum(a.cost for d in it.days for a in d.activities))]
     budget = store.household().constraints.budget_for_trip(it)
     pdf.ln(4)
     box_h = 14 + 6 * len(costs) + (6 if budget else 0)
@@ -267,7 +270,7 @@ def build(trip_id: str) -> tuple[bytes, str]:
 
     # --- Verbindungen ------------------------------------------------------------------------------
     if it.transports:
-        pdf.section("Hin- und Rückreise und Verbindungen")
+        pdf.section("Hin- und Rückreise und Verbindungen" if days > 1 else "Hin- und Rückfahrt")
         for t in sorted(it.transports, key=lambda x: x.depart):
             pdf.need(14)
             y = pdf.get_y()
@@ -290,9 +293,13 @@ def build(trip_id: str) -> tuple[bytes, str]:
             pdf.ln(2.5)
 
     # --- Tagesplan ---------------------------------------------------------------------------------
-    pdf.add_page()
+    if days > 1:  # Tagesausflug: Programm gleich auf der ersten Seite
+        pdf.add_page()
+    else:
+        pdf.ln(6)
+        pdf.need(60)
     pdf.font(18, True)
-    pdf.cell(0, 9, pdf.t("Tag für Tag"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(0, 9, pdf.t("Tag für Tag" if days > 1 else "Programm"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(1)
     TIME_W, THUMB_W, THUMB_H = 24, 30, 22
     for i, d in enumerate(it.days, 1):
