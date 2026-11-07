@@ -302,6 +302,44 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
 .desc{font-size:14px;line-height:1.45;margin-top:4px;color:var(--text);opacity:.82}
 .fl-plan{font-size:12px}
 .fl-wait{display:flex;align-items:center}
+/* Tagesplan (1.14.0): Tagesleiste, Tageskopf, Zeitstrahl */
+.dpick{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 10px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none;scroll-behavior:smooth}
+.dpick::-webkit-scrollbar{display:none}
+.dp{flex:none;width:56px;border:0;border-radius:14px;background:var(--card);color:var(--text);font:inherit;cursor:pointer;padding:8px 0 7px;
+  display:flex;flex-direction:column;align-items:center;gap:1px;position:relative}
+.dp .dw{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.2px}
+.dp .dn{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.dp .dpl{font-size:10px;color:var(--muted);max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dp.today .dn{color:var(--accent)}
+.dp.on{background:var(--accent);color:var(--onaccent)}
+.dp.on .dw,.dp.on .dpl,.dp.on.today .dn{color:var(--onaccent);opacity:.9}
+.dayc{padding:0}
+.dhead{position:relative;height:150px;background:linear-gradient(135deg,var(--accent),#0b1a3a);overflow:hidden}
+.dhead .dimg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.dhead .shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),rgba(0,0,0,.15) 65%,rgba(0,0,0,0))}
+.dhead .cap{position:absolute;left:16px;right:16px;bottom:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.4)}
+.dk2{font-size:13px;opacity:.9}
+.dplace{font-family:var(--display);font-size:24px;font-weight:700;line-height:1.2;margin-top:2px}
+.dtheme{font-size:15px;opacity:.95;margin-top:2px}
+.tl{padding:6px 0 4px}
+.ti{display:grid;grid-template-columns:44px 30px minmax(0,1fr) auto;gap:0 10px;padding:12px 16px 12px 14px;position:relative;align-items:start}
+.ti.new{background:var(--new)}
+.tt{text-align:right;font-variant-numeric:tabular-nums;line-height:1.2;padding-top:5px}
+.tt b{display:block;font-size:15px;font-weight:600}
+.tt small{font-size:12px;color:var(--muted)}
+.tr{position:relative;display:flex;justify-content:center;align-self:stretch}
+.tr::before{content:"";position:absolute;top:-12px;bottom:-12px;left:50%;width:2px;margin-left:-1px;background:var(--line)}
+.ti:first-child .tr::before{top:15px}
+.ti:last-child .tr::before{bottom:calc(100% - 15px)}
+.tic{position:relative;width:30px;height:30px;border-radius:50%;background:var(--c);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 3px var(--card)}
+.tic svg{width:16px;height:16px}
+.tc{min-width:0}
+.tc .t{font-weight:600;font-size:16px;line-height:1.3}
+.tthumb{width:64px;height:64px;border-radius:10px;object-fit:cover;background:var(--card2);margin-top:2px}
+.desc.clamp,.note.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+button.more{border:0;background:none;color:var(--accent);font:inherit;font-size:14px;font-weight:600;padding:2px 0 0;cursor:pointer}
+.dnav{display:flex;justify-content:space-between;padding:4px 16px 14px}
+
 /* Startseite (1.11.0): Reisekarten, gemerkte Ziele, leerer Zustand */
 .tcard{position:relative;display:block;border-radius:16px;overflow:hidden;aspect-ratio:16/9;background:linear-gradient(135deg,var(--accent),#0b1a3a);cursor:pointer;margin-top:12px}
 .tcard .timg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
@@ -668,6 +706,24 @@ function venueHtml(v, aid) {
   return `<a class="venue" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer"><span class="vpin">${ICO.pin}</span>
     <span class="vnm">${esc(v.name)}</span>${stars}<span class="vgo">Google Maps ↗</span></a>`;
 }
+// Tagesplan: Symbol und Farbe je Kategorie (Linien-Symbole, keine Emojis)
+const _sv = p => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+const CAT_ICO = {
+  kulinarik: _sv('<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M17 21V3c-2 1-3 4-3 7h3"/>'),
+  kultur: _sv('<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>'),
+  museum: _sv('<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M2 10l10-6 10 6z"/>'),
+  stadt: _sv('<path d="M3 21h18M5 21V8l6-3v16M11 21V9l8 3v9M8 10v.01M8 14v.01M15 14v.01M15 17v.01"/>'),
+  natur: _sv('<path d="M12 22V12M5 12a7 7 0 0 1 14 0c0 4-3 6-7 6s-7-2-7-6z"/>'),
+  wandern: _sv('<path d="M3 20l6-12 4 7 3-4 5 9z"/>'),
+  strand: _sv('<path d="M4 18c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M12 4a7 7 0 0 1 7 7H5a7 7 0 0 1 7-7zM12 11v6"/>'),
+  wassersport: _sv('<path d="M2 15c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M2 19c2 1.5 4 1.5 6 0s4-1.5 6 0 4 1.5 6 0M15 4l-6 8h7"/>'),
+  wellness: _sv('<path d="M12 21c-4 0-7-3-7-7 0-5 7-11 7-11s7 6 7 11c0 4-3 7-7 7z"/>'),
+  entspannung: _sv('<path d="M20 15a8 8 0 1 1-9-11 6 6 0 0 0 9 11z"/>'),
+  shopping: _sv('<path d="M5 8h14l-1 13H6zM9 8V6a3 3 0 0 1 6 0v2"/>'),
+  nachtleben: _sv('<path d="M8 3h8l-1 8a3 3 0 0 1-6 0zM12 14v7M8 21h8"/>'),
+};
+const CAT_COL = {kulinarik: "#f08c2e", kultur: "#8b5cf6", museum: "#8b5cf6", stadt: "#3b82f6", natur: "#22a35a", wandern: "#22a35a",
+  strand: "#0ea5c6", wassersport: "#0ea5c6", wellness: "#e0559a", entspannung: "#e0559a", shopping: "#12a594", nachtleben: "#6366f1"};
 // Fehlermeldung: kurze Überschrift, technische Einzelheiten zum Aufklappen
 function errHtml(m) {
   m = String(m || "Unbekannter Fehler.");
@@ -1137,27 +1193,41 @@ function renderTrip(outcome) {
   const P = d.photos || {places: {}, activities: {}, stays: {}};
   if (!OPEN_DAYS || OPEN_DAYS.tid !== t.id) OPEN_DAYS = {tid: t.id, set: new Set([d.today || (t.days[0] && t.days[0].date)])};
   const nightsOf = (a, b) => Math.max(1, Math.round((new Date(b.slice(0, 10)) - new Date(a.slice(0, 10))) / 86400000));
-  const days = t.days.map((day, di) => {
-    const isToday = day.date === d.today;
-    // Fotos nur zu Programmpunkten, die man sieht – nie zu Essen (ein Teller sagt nichts über den Tag)
-    const seen = new Set(), pics = day.activities.filter(a => a.category !== "kulinarik").map(a => [P.activities[actKey(a.title)], a.title])
-      .filter(([id]) => id && !seen.has(id) && seen.add(id));
-    const strip = pics.length ? `<div class="strip">${pics.map(([id, title]) => `<figure>${photo(id, "", title)}<figcaption>${esc(title)}</figcaption></figure>`).join("")}</div>` : "";
-    const n = day.activities.length;
-    return `<details class="day" data-d="${esc(day.date)}" ${OPEN_DAYS.set.has(day.date) ? "open" : ""}>
-      <summary>${pics.length ? photo(pics[0][0], "dthumb", pics[0][1]) : P.places[day.base.name] ? photo(P.places[day.base.name], "dthumb", day.base.name) : `<span class="dthumb"></span>`}
-        <div class="grow"><div class="t">${esc(fmtD(day.date, {weekday: "short", day: "numeric", month: "long"}))}${isToday ? ` <span class="badge acc">heute</span>` : ""}</div>
-        <div class="s">Tag ${di + 1} · ${esc(day.base.name)} · ${n ? n + (n === 1 ? " Punkt" : " Punkte") : "frei"}</div></div></summary>` +
-      (day.theme ? `<div class="theme">${esc(day.theme)}</div>` : "") + strip +
-      (n ? day.activities.map(a => {
-        const isNew = a.origin === "umplanung";
-        const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
-        return `<div class="row act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}"><div class="time">${hm(a.start)}<small>${hm(a.end)}</small></div>
-          <div class="grow"><div class="t">${esc(a.title)}${badge}</div>
-          <div class="s">${esc([CATS[a.category] || a.category, a.exposure === "outdoor" ? "draussen" : "", a.intensity === 3 ? "anstrengend" : "", Number(a.cost) ? chf(a.cost) : ""].filter(Boolean).join(" · "))}</div>
-          ${a.note ? `<div class="${isNew ? "note" : "desc"}">${esc(a.note)}</div>` : ""}${venueHtml((d.venues || {})[a.id], a.id)}</div></div>`;
-      }).join("") : `<div class="empty">Freier Tag</div>`) + `</details>`;
-  }).join("");
+  // Tagesplan (1.14.0): Tagesleiste zum Antippen, darunter genau ein Tag als Zeitstrahl
+  const selDate = (OPEN_DAYS.sel && t.days.some(x => x.date === OPEN_DAYS.sel)) ? OPEN_DAYS.sel : (d.today && t.days.some(x => x.date === d.today) ? d.today : (t.days[0] || {}).date);
+  OPEN_DAYS.sel = selDate;
+  const dpick = `<div class="dpick" id="dpick">${t.days.map((day, di) => {
+    const dt = new Date(day.date + "T12:00"), newPlace = di === 0 || t.days[di - 1].base.name !== day.base.name;
+    return `<button class="dp ${day.date === selDate ? "on" : ""} ${day.date === d.today ? "today" : ""}" data-day="${esc(day.date)}" aria-label="Tag ${di + 1}">
+      <span class="dw">${esc(dt.toLocaleDateString("de-CH", {weekday: "short"}).replace(".", ""))}</span><span class="dn">${dt.getDate()}</span>
+      <span class="dpl">${newPlace ? esc(day.base.name.split(",")[0]) : "&nbsp;"}</span></button>`;
+  }).join("")}</div>`;
+  const di = Math.max(0, t.days.findIndex(x => x.date === selDate)), day = t.days[di];
+  let days = "";
+  if (day) {
+    const pics = day.activities.filter(a => a.category !== "kulinarik").map(a => P.activities[actKey(a.title)]).filter(Boolean);
+    const band = P.places[day.base.name] || pics[0];
+    const head = `<div class="dhead">${band ? photo(band, "dimg", day.base.name) : ""}<div class="shade"></div>
+      <div class="cap"><div class="dk2">Tag ${di + 1} von ${t.days.length} · ${esc(fmtD(day.date, {weekday: "long", day: "numeric", month: "long"}))}${day.date === d.today ? " · heute" : ""}</div>
+      <div class="dplace">${esc(day.base.name)}</div>${day.theme ? `<div class="dtheme">${esc(day.theme)}</div>` : ""}</div></div>`;
+    const items = day.activities.map(a => {
+      const isNew = a.origin === "umplanung";
+      const badge = isNew ? `<span class="badge acc">neu</span>` : a.fixed ? `<span class="badge">fest</span>` : a.locked ? `<span class="badge">gebucht</span>` : "";
+      const pic = a.category !== "kulinarik" ? P.activities[actKey(a.title)] : null;
+      const meta = [CATS[a.category] || a.category, a.exposure === "outdoor" ? "draussen" : "", a.intensity === 3 ? "anstrengend" : "", Number(a.cost) ? chf(a.cost) : ""].filter(Boolean).join(" · ");
+      const long = !!a.note;  // alle Beschreibungen 2 Zeilen; «Mehr» verschwindet, wenn alles Platz hat
+      return `<div class="ti act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}">
+        <div class="tt"><b>${hm(a.start)}</b><small>${hm(a.end)}</small></div>
+        <div class="tr"><span class="tic" style="--c:${CAT_COL[a.category] || "var(--accent)"}">${CAT_ICO[a.category] || CAT_ICO.kultur}</span></div>
+        <div class="tc"><div class="t">${esc(a.title)}${badge}</div><div class="s">${esc(meta)}</div>
+          ${a.note ? `<div class="${isNew ? "note" : "desc"} ${long ? "clamp" : ""}">${esc(a.note)}</div>${long ? `<button class="more" data-more>Mehr</button>` : ""}` : ""}
+          ${venueHtml((d.venues || {})[a.id], a.id)}</div>
+        ${pic ? photo(pic, "tthumb", a.title) : ""}</div>`;
+    }).join("");
+    days = head + (items ? `<div class="tl">${items}</div>` : `<div class="empty">Freier Tag – nichts geplant.</div>`)
+      + `<div class="dnav">${di > 0 ? `<button class="small" data-day="${esc(t.days[di - 1].date)}">‹ Tag ${di}</button>` : "<span></span>"}
+          ${di < t.days.length - 1 ? `<button class="small" data-day="${esc(t.days[di + 1].date)}">Tag ${di + 2} ›</button>` : ""}</div>`;
+  }
 
   const route = []; t.days.forEach(day => { const last = route[route.length - 1];
     if (last && last.name === day.base.name) last.nights++; else route.push({name: day.base.name, lat: day.base.lat, lon: day.base.lon, nights: 1}); });
@@ -1296,7 +1366,7 @@ function renderTrip(outcome) {
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
     ${d.notes.length ? `<div class="card" style="margin-top:12px"><div class="callout"><div>${d.notes.map(esc).join("<br>")}</div></div></div>` : ""}
     ${routeHtml}
-    <h2>Tagesplan</h2><div class="card">${days}</div>
+    <h2 id="tDays">Tagesplan</h2>${dpick}<div class="card dayc">${days}</div>
     <p class="hint">Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
     <h2 id="tStays">Unterkünfte</h2><div class="card">${stays}</div>
     <h2>Verbindungen</h2><div class="card">${trans}</div>
@@ -1373,9 +1443,15 @@ function renderTrip(outcome) {
       {label: "Fällt aus …", red: true, fn: () => cancelSeg(x)},
     ]);
   });
-  q("details.day").forEach(x => x.addEventListener("toggle", () => x.open ? OPEN_DAYS.set.add(x.dataset.d) : OPEN_DAYS.set.delete(x.dataset.d)));
+  q("[data-day]").forEach(b => b.onclick = () => {  // anderen Tag zeigen, Tagesleiste und Tag bleiben im Blick
+    OPEN_DAYS.sel = b.dataset.day; const top = $("tDays").getBoundingClientRect().top; renderTrip();
+    const sh = $("tripSheet"), nt = $("tDays").getBoundingClientRect().top; if (top < 0 || nt < 0) sh.scrollTop += nt - 70;
+  });
+  { const pk = $("dpick"), on = pk && pk.querySelector(".dp.on"); if (on) pk.scrollLeft = on.offsetLeft - pk.clientWidth / 2 + on.offsetWidth / 2; }
+  q("[data-more]").forEach(b => { const n = b.previousElementSibling; if (n.scrollHeight <= n.clientHeight + 2) b.hidden = true; });  // passt schon ganz
+  q("[data-more]").forEach(b => b.onclick = e => { e.stopPropagation(); const n = b.previousElementSibling; n.classList.toggle("clamp"); b.textContent = n.classList.contains("clamp") ? "Mehr" : "Weniger"; });
   q("[data-act]").forEach(r => r.onclick = e => {
-    if (e.target.closest("a")) return;  // Link zum Restaurant öffnet Google Maps, nicht das Aktionsblatt
+    if (e.target.closest("a,button")) return;  // Link zum Restaurant / «Mehr» – nicht das Aktionsblatt
     const a = t.days.flatMap(x => x.activities).find(x => x.id === r.dataset.act);
     actionSheet(a.title, [
       {label: a.fixed ? "Wieder freigeben" : "Festnageln", fn: async () => reTrip(await api(`/api/trips/${tid}/fixed`, {activity_id: a.id, fixed: !a.fixed}))},

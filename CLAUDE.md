@@ -123,7 +123,15 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.13.2)
+## Stand (07.11.2026, Version 1.14.0)
+- 1.14.0: Wunsch James: Tagesplanung «besser und übersichtlicher». Statt Klappliste aller Tage (`details.day`): Tagesleiste
+  (`.dpick`, Kacheln Wochentag + Datum, Ortsname beim Ortswechsel, heute blau, gewählter Tag gefüllt, scrollt mittig) und
+  genau ein Tag (`OPEN_DAYS.sel`, Standard heute bzw. Tag 1): Tageskopf (`.dhead`, Ortsfoto mit «Tag N von M · Datum», Ort,
+  Motto) und Zeitstrahl (`.tl`/`.ti`: Zeit, farbiges Kategorie-Symbol `CAT_ICO`/`CAT_COL` an einer Linie, Titel, Angaben,
+  Beschreibung 2 Zeilen mit «Mehr» – nur wenn sie nicht ganz Platz hat –, Restaurant-Zeile, Foto rechts), unten «‹ Tag N /
+  Tag N ›». Tag wechseln rendert das Blatt neu und hält den Tagesplan im Blick; Antippen des Punkts öffnet weiter das
+  Aktionsblatt (nicht bei Link/«Mehr»). Fotoleiste je Tag entfällt (Fotos jetzt beim Programmpunkt). Playwright 390/1440 px
+  hell/dunkel; 96 Tests.
 - 1.13.2: James: «Es müssen ja nicht zwei angezeigt werden. Nur das gute.» Kein Vorschlag mit Knopf mehr: `venues.auto_improve`
   ersetzt schwach bewertete Restaurants selbst (eine Änderung `actor=autonom`, Grund «Besser bewertete Restaurants gewählt:
   …», rückgängig machbar) – nach dem Holen der Alternativen (`enrich`) und beim Öffnen der Reise (`trip_detail`, wenn
