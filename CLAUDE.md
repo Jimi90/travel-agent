@@ -103,6 +103,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   je Tag (`.strip`), Foto antippen = Grossansicht (`#lightbox`, Klick-Abfang in der Capture-Phase, damit kein Hotel gewählt wird).
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise; seit 1.7.3 nicht mehr in der Oberfläche), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/flights.py` (1.8.0) automatische echte Flugangebote (SerpApi), siehe «Stand».
+- `app/sights.py` (1.15.0) TripAdvisor-Bewertung + Tipp für Sehenswürdigkeiten (SerpApi `engine=tripadvisor`), siehe «Stand».
 - `app/fx.py` (1.7.3) Währungskurse für den Helfer-Rechner, siehe «Stand».
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -117,13 +118,28 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (96 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (103 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.14.1)
+## Stand (07.11.2026, Version 1.15.0)
+- 1.15.0: James: «Berücksichtigen wir Tipps von TripAdvisor?» → ja, für Sehenswürdigkeiten/Ausflüge (Restaurants bleiben
+  Google). `app/sights.py` wie `venues.py`: Suchbegriff nur der Wikipedia-Titel der KI (`subject`; am Titel ist «Eigenname»
+  nicht erkennbar, deutsche Nomen sind gross), SerpApi `engine=tripadvisor`, `ssrc=A` (nur «Things to Do»), Felder `places[]`
+  title/rating/reviews/link/description/`highlighted_review.text` (Doku, aus der Cloud nicht prüfbar; Zahlen auch als Text
+  gelesen), Treffer nur bei passendem Namen (`hotels.same_hotel`), kv «sight_live» dauerhaft, `MONTH_CAP` 60,
+  `MAX_SEARCHES_PER_RUN` 10, Kosten-Zeile `preise_tripadvisor`. Tipp: eine kleine KI-Aufgabe `tipps` (Groq → Gemini) macht
+  aus allen neuen Bewertungsauszügen deutsche Tipps (≤ 16 Wörter, nichts erfinden, sonst leer); KI-Fehler → 6 Std. Pause
+  (kv «sight_tipfail», sonst Dauerschleife über `pending`). `weak` = < 4.0 bei ≥ 50 Bewertungen (nicht gefunden = kein
+  Urteil) → `auto_improve` ersetzt im Entwurf (nie fest/gebucht) durch die beste Sehenswürdigkeit am Ort (≥ 4.5, ≥ 200
+  Bewertungen, Suche «Sehenswürdigkeiten <Ort>», kv «sight_alts», nichts doppelt), Zeit/Kategorie/drinnen-draussen bleiben,
+  `wiki` = neuer Titel; eine Änderung `actor=autonom` «Besser bewertet bei TripAdvisor: …», rückgängig machbar. Prompt:
+  Sehenswürdigkeiten nur ≥ 4.5. Anzeige: Kasten unter dem Programmpunkt (TripAdvisor ★ 4.5 (n Bewertungen) · Ansehen ↗,
+  darunter «Tipp …»); Restaurant-/TripAdvisor-Kasten jetzt in `.tx` über die volle Breite unter dem Foto (Zeitstrahl-Raster
+  mit festen Bereichen, `.tr` über 2 Zeilen). Tests `tests/test_sights.py` + Ende-zu-Ende; Playwright 390/1440 px
+  hell/dunkel. Echte TripAdvisor-Treffer, Feldnamen und Tipp-Qualität nur auf dem NAS prüfbar.
 - 1.14.1: James: «Die ganze App hat teilweise sehr klein geschriebene Texte». Schriftgrössen im CSS angehoben
   (10→12, 11→13, 12→14, 13→15, 14→15, 15→16 px): Untertitel, Hinweise, Notizen, Abzeichen, Kacheln. Bewusst klein
   bleiben (iOS-Standard bzw. Pflichtangabe): Beschriftung der Tab-Leiste 11 px, «© OpenStreetMap» 11 px, Ortsname in der

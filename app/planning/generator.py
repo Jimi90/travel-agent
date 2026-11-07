@@ -124,6 +124,8 @@ Regeln:
 - wikipedia: genauer Titel eines bestehenden Wikipedia-Artikels über genau den Ort, die Sehenswürdigkeit oder die
   Landschaft dieses Programmpunkts (deutsch, sonst englisch), z. B. «Wiedervereinigungspalast», «Playa Delfines»,
   «Isla Mujeres». Bei Essen, Transfers, Hotel, Ruhe und Einkaufen immer "" (kein Gericht, keine Küche, kein Foto).
+- Sehenswürdigkeiten, Museen, Touren und Ausflüge: nur solche, die bei Reisenden (z. B. TripAdvisor) sehr gut bewertet
+  sind (mindestens 4.5 von 5), keine Touristenfallen. Kompass prüft das nach und ersetzt schwach bewertete Punkte.
 - venue: bei Essen & Trinken der genaue Name eines echten Restaurants, Cafés oder einer Bar am Ort, so wie bei Google
   Maps (z. B. «Tamarind», «Manda de Laos»), sonst "". Beim Frühstück im Hotel "". NUR sehr gut bewertete Lokale: bei
   Google mindestens 4.5 Sterne und viele Bewertungen (die bekannten Lieblinge von Einheimischen und Reisenden), keine

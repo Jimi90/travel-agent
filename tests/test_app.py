@@ -246,7 +246,27 @@ class AppTest(unittest.TestCase):
         self.assertFalse(any(x["better"] for x in d["venues"].values()))   # nie zwei Lokale nebeneinander
         h = next(x for x in d["history"] if x["reason"].startswith("Besser bewertete Restaurants"))
         self.assertEqual(h["actor"], "autonom")
-        self.assertTrue(h["can_undo"])
+        # Sehenswürdigkeiten: TripAdvisor-Bewertung + Tipp (Testmodus: nachgebaute SerpApi- und KI-Antworten)
+        for _ in range(100):
+            sw = [x for day in d["trip"]["days"] for x in day["activities"] if x["title"].startswith("Castelo de")]
+            if sw and any(s["tip"] for s in d["sights"].values()):
+                break
+            time.sleep(0.05)
+            code, d = self.call("GET", f"/api/trips/{tid}")
+        museum = next(a for a in d["trip"]["days"][2]["activities"] if a["title"] == "Altstadt-Museum 3")
+        s1 = d["sights"][museum["id"]]
+        self.assertTrue(s1["url"].startswith("https://www.tripadvisor.com/"))
+        self.assertTrue(s1["rating"] >= 4.0 and s1["reviews"] > 0 and not s1["weak"])
+        self.assertIn("Früh", s1["tip"])
+        kueste = next(a for a in d["trip"]["days"][1]["activities"] if a["title"].startswith("Küstenwanderung"))
+        self.assertNotIn(kueste["id"], d["sights"])        # ohne Wikipedia-Titel keine Suche (allgemeiner Punkt)
+        self.assertEqual(len(sw), 1)                       # «Museu 2» (3.5 ★) → beste Sehenswürdigkeit am Ort
+        self.assertEqual(sw[0]["category"], "museum")      # Zeit und Kategorie bleiben
+        self.assertIn("TripAdvisor", sw[0]["note"])
+        self.assertFalse(any(x["weak"] for x in d["sights"].values()))
+        h2 = next(x for x in d["history"] if x["reason"].startswith("Besser bewertet bei TripAdvisor"))
+        self.assertEqual(h2["actor"], "autonom")
+        self.assertTrue(h["can_undo"] or h2["can_undo"])   # der jüngere der beiden Täusche ist rückgängig machbar
         self.assertTrue(acts["altstadt-museum 3"])         # Bild über den Wikipedia-Titel «Museu 3»
         self.assertTrue(acts["altstadt-museum 2"])
         req = urllib.request.Request(f"{self.base}/api/photo/{d['hero']['id']}", headers={"Cookie": AppTest.cookie})
@@ -278,7 +298,7 @@ class AppTest(unittest.TestCase):
 
             # --- Programmpunkt fällt aus → Ersatz
             act = next(a for day in d["trip"]["days"] if day["date"] == day2.isoformat()
-                       for a in day["activities"] if a["title"].startswith("Altstadt-Museum"))
+                       for a in day["activities"] if a["category"] == "museum")  # an Tag 2 schon «Castelo de …»
             code, d = self.call("POST", f"/api/trips/{tid}/closure", {"activity_id": act["id"], "reason": "geschlossen"})
             self.assertEqual(d["outcome"]["status"], "angewendet", d["outcome"])
 
