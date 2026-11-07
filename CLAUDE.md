@@ -126,7 +126,13 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.17.0)
+## Stand (07.11.2026, Version 1.17.1)
+- 1.17.1: James (Foto PDF Laos): Titelseite so, dass Unterkünfte und Flüge drauf sind, App-Logo oben rechts. `export.build`:
+  Kopfzeile «Kompass» + «REISEPLAN · STATUS» links, `LOGO` (`app/web/apple-touch-icon.png`, 11 mm) rechts; Höhe aller
+  Inhalte von Seite 1 wird vorab geschätzt (`height_of`) und das Titelbild bekommt nur den Rest (höchstens 66 mm, unter
+  30 mm kein Bild); Preisbox mit Einzelposten in zwei Spalten; Unterkünfte/Verbindungen als kompakte Zeilen (`rows_out`,
+  Status rechts: gebucht/Vorschlag bzw. gebucht/bestätigt/geschätzt). Mit Laos-ähnlichem Plan (3 Hotels, 4 Verbindungen,
+  Foto) geprüft: alles auf Seite 1. 115 Tests.
 - 1.17.0: Wunsch James: Tagesausflüge ohne Übernachtung, Ideen gern von TripAdvisor, Start = aktueller Standort.
   Standort: GPS im Browser (`navigator.geolocation`, dafür `Permissions-Policy` `geolocation=(self)` statt `()` –
   nur Kompass selbst, Kamera/Mikrofon bleiben gesperrt) → `POST /api/locate` → `weather.reverse` (OpenStreetMap

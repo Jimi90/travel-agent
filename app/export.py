@@ -18,6 +18,7 @@ from fpdf.enums import MethodReturnValue, XPos, YPos
 
 from . import photos, sights, store, venues
 
+LOGO = Path(__file__).parent / "web" / "apple-touch-icon.png"  # App-Symbol (180 px) oben rechts auf Seite 1
 FONT_DIRS = ["/usr/share/fonts/truetype/dejavu", "/usr/share/fonts/dejavu", "/usr/local/share/fonts"]
 ACCENT = (36, 89, 224)
 TEXT = (28, 28, 30)
@@ -162,8 +163,8 @@ class TripPDF(FPDF):
             self.add_page()
 
     def section(self, title: str) -> None:
-        self.need(22)
-        self.ln(5)
+        self.need(20)
+        self.ln(3)
         self.font(9, True, MUTED)
         self.cell(0, 6, self.t(title.upper()), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         self.set_draw_color(*LINE)
@@ -201,32 +202,77 @@ def build(trip_id: str) -> tuple[bytes, str]:
     pdf = TripPDF(it.title)
     pdf.add_page()
 
-    # --- Titel -------------------------------------------------------------------------------------
-    hero = _image(_hero(it, tp), pdf.width / 78)
-    if hero:
-        pdf.image(hero, x=pdf.l_margin, y=pdf.get_y(), w=pdf.width, h=78)
-        pdf.set_y(pdf.get_y() + 82)
-    pdf.font(9, True, ACCENT)
-    pdf.cell(0, 5, pdf.t(f"REISEPLAN · {STATUS.get(it.status, it.status).upper()}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.para(it.title, 22, True, h=10)
+    # --- Titelseite: alles Wichtige auf einen Blick (Wunsch James: Unterkünfte und Flüge auf Seite 1, Logo oben rechts)
     route = _route(it)
     days = len(it.days)
-    pdf.para(f"{span(it.start_date, it.end_date)} · {'Tagesausflug' if days == 1 else f'{days} Tage'} · {len(route)} {'Ort' if len(route) == 1 else 'Orte'}"
-             " · für 2 Personen", 11, color=MUTED, h=6)
-    pdf.ln(2)
-    pdf.para(" → ".join(f"{n} ({k} {'Nacht' if k == 1 else 'Nächte'})" if k else n for n, k in route), 11, True, h=6)
-    if it.summary:
-        pdf.ln(2)
-        pdf.para(it.summary, 10.5, h=5.4)
-
-    # --- Preis -------------------------------------------------------------------------------------
     flights = any(t.mode == "flug" for t in it.transports)
     costs = [("Flüge & Verbindungen" if flights else "Fahrten", sum(t.cost for t in it.transports))] \
         + ([("Unterkünfte", sum(s.cost for s in it.stays))] if it.stays else []) \
         + [("Programm", sum(a.cost for d in it.days for a in d.activities))]
     budget = store.household().constraints.budget_for_trip(it)
+    if budget:
+        costs.append(("Budget", budget))
+    trans = sorted(it.transports, key=lambda x: x.depart)
+    route_txt = " → ".join(f"{n} ({k} {'Nacht' if k == 1 else 'Nächte'})" if k else n for n, k in route)
+    sub_txt = (f"{span(it.start_date, it.end_date)} · {'Tagesausflug' if days == 1 else f'{days} Tage'} · "
+               f"{len(route)} {'Ort' if len(route) == 1 else 'Orte'} · für 2 Personen")
+    ROW_W = pdf.width - 44  # Platz links neben Preis/Status
+
+    def row_h(title: str, meta: str) -> float:
+        return pdf.height_of(title, 10.5, ROW_W, True) + pdf.height_of(meta, 9, ROW_W) + 2.2
+
+    stay_rows = [(s.name, f"{s.place.name} · {d_short(s.check_in)} – {d_short(s.check_out)} · "
+                  f"{(s.check_out - s.check_in).days} {'Nacht' if (s.check_out - s.check_in).days == 1 else 'Nächte'}"
+                  + (f" · Buchung {s.booking.reference}" if s.booking and s.booking.reference else ""),
+                  chf(s.cost), ("gebucht", True) if (s.confirmed or s.booking) else ("Vorschlag", False),
+                  s.search_url or "") for s in it.stays]
+    trans_rows = []
+    for t in trans:
+        head = (f"{MODES.get(t.mode, t.mode)} {t.origin.name}{f' ({t.origin_code})' if t.origin_code else ''} → "
+                f"{t.destination.name}{f' ({t.destination_code})' if t.destination_code else ''}")
+        bits = [f"{d_short(t.depart.date())} {t.depart:%H:%M} – {t.arrive:%H:%M}"
+                + (f" (+{(t.arrive.date() - t.depart.date()).days})" if t.arrive.date() > t.depart.date() else "")]
+        if t.carrier or t.number:
+            bits.append(" ".join(x for x in (t.carrier, t.number) if x))
+        if t.via:
+            bits.append("via " + ", ".join(t.via))
+        trans_rows.append((head, " · ".join(bits), chf(t.cost) if t.cost else "im Ticket enthalten",
+                           ("gebucht", True) if t.booking else ("bestätigt", True) if not t.estimated else ("geschätzt", False),
+                           t.search_url or ""))
+
+    # Höhe von allem ausser dem Titelbild schätzen → Bild so gross, dass alles auf Seite 1 passt
+    need = (14 + pdf.height_of(it.title, 20, pdf.width, True) + 7 + pdf.height_of(route_txt, 10.5, pdf.width, True) + 2
+            + (pdf.height_of(it.summary, 10, pdf.width) + 2 if it.summary else 0)
+            + 4 + 13 + 6 * ((len(costs) + 1) // 2) + 6
+            + sum(9 + sum(row_h(r[0], r[1]) for r in rows) for rows in (stay_rows, trans_rows) if rows))
+    room = pdf.h - pdf.t_margin - pdf.b_margin - need - 6
+    hero_h = min(66, room)
+
+    # Kopfzeile: Kompass + Status links, App-Logo rechts
+    top = pdf.get_y()
+    if LOGO.exists():
+        pdf.image(str(LOGO), x=pdf.w - pdf.r_margin - 11, y=top - 1, w=11, h=11)
+    pdf.font(13, True, ACCENT)
+    pdf.cell(0, 6, "Kompass", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.font(8.5, True, MUTED)
+    pdf.cell(0, 4.5, pdf.t(f"REISEPLAN · {STATUS.get(it.status, it.status).upper()}"), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_y(top + 14)
+    hero = _image(_hero(it, tp), pdf.width / hero_h) if hero_h >= 30 else None
+    if hero:
+        pdf.image(hero, x=pdf.l_margin, y=pdf.get_y(), w=pdf.width, h=hero_h)
+        pdf.set_y(pdf.get_y() + hero_h + 4)
+    pdf.para(it.title, 20, True, h=9)
+    pdf.para(sub_txt, 10.5, color=MUTED, h=6)
+    pdf.ln(1)
+    pdf.para(route_txt, 10.5, True, h=5.5)
+    if it.summary:
+        pdf.ln(2)
+        pdf.para(it.summary, 10, h=5)
+
+    # Preis: Gesamt gross, Einzelposten in zwei Spalten
     pdf.ln(4)
-    box_h = 14 + 6 * len(costs) + (6 if budget else 0)
+    rows = (len(costs) + 1) // 2
+    box_h = 13 + 6 * rows
     pdf.need(box_h + 2)
     y0 = pdf.get_y()
     pdf.set_fill_color(*SOFT)
@@ -235,62 +281,40 @@ def build(trip_id: str) -> tuple[bytes, str]:
     pdf.font(9, True, MUTED)
     pdf.cell(80, 5, pdf.t("GESAMTPREIS (SCHÄTZUNG)"))
     pdf.font(16, True)
-    pdf.cell(pdf.width - 90, 5, pdf.t(chf(it.total_cost())), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(3)
-    for label, v in costs + ([("Budget", budget)] if budget else []):
-        pdf.set_x(pdf.l_margin + 5)
-        pdf.font(10, color=MUTED if label == "Budget" else TEXT)
-        pdf.cell(80, 6, pdf.t(label))
-        pdf.cell(pdf.width - 90, 6, pdf.t(chf(v)), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.cell(pdf.width - 90, 5, pdf.t(chf(it.total_cost())), align="R")
+    col_w = (pdf.width - 10 - 8) / 2
+    for i, (label, v) in enumerate(costs):
+        x = pdf.l_margin + 5 + (i % 2) * (col_w + 8)
+        pdf.set_xy(x, y0 + 11 + 6 * (i // 2))
+        pdf.font(9.5, color=MUTED if label == "Budget" else TEXT)
+        pdf.cell(col_w * 0.6, 6, pdf.t(label))
+        pdf.cell(col_w * 0.4, 6, pdf.t(chf(v)), align="R")
     pdf.set_y(y0 + box_h + 1)
     pdf.para("Preise sind Vorschläge bzw. Schätzungen, solange nichts als gebucht markiert ist. "
-             "Kompass bucht nie selbst.", 8.5, color=MUTED, h=4.5)
+             "Kompass bucht nie selbst.", 8, color=MUTED, h=4.5)
 
-    # --- Unterkünfte -------------------------------------------------------------------------------
-    if it.stays:
-        pdf.section("Unterkünfte")
-        for s in it.stays:
-            n = (s.check_out - s.check_in).days
-            pdf.need(16)
+    def rows_out(rows):
+        for title, meta, price, (state, ok), link in rows:
+            pdf.need(row_h(title, meta))
             y = pdf.get_y()
-            pdf.para(s.name, 11, True, w=pdf.width - 40, h=5.5, link=s.search_url or "")
+            pdf.para(title, 10.5, True, w=ROW_W, h=5.2, link=link)
             y2 = pdf.get_y()
-            pdf.set_xy(pdf.w - pdf.r_margin - 40, y)
-            pdf.font(11, True)
-            pdf.cell(40, 5.5, pdf.t(chf(s.cost)), align="R")
-            pdf.set_xy(pdf.w - pdf.r_margin - 40, y + 5.5)
-            booked = bool(s.confirmed or s.booking)
-            pdf.font(9, color=(36, 140, 70) if booked else (200, 110, 0))
-            pdf.cell(40, 5, pdf.t("gebucht" if booked else "Vorschlag"), align="R")
-            pdf.set_y(y2)
-            ref = f" · Buchung {s.booking.reference}" if s.booking and s.booking.reference else ""
-            pdf.para(f"{s.place.name} · {d_short(s.check_in)} – {d_short(s.check_out)} · {n} {'Nacht' if n == 1 else 'Nächte'}{ref}",
-                     9.5, color=MUTED, w=pdf.width - 42, h=5)
-            pdf.ln(2.5)
-
-    # --- Verbindungen ------------------------------------------------------------------------------
-    if it.transports:
-        pdf.section("Hin- und Rückreise und Verbindungen" if days > 1 else "Hin- und Rückfahrt")
-        for t in sorted(it.transports, key=lambda x: x.depart):
-            pdf.need(14)
-            y = pdf.get_y()
-            head = f"{MODES.get(t.mode, t.mode)} {t.origin.name}{f' ({t.origin_code})' if t.origin_code else ''} → " \
-                   f"{t.destination.name}{f' ({t.destination_code})' if t.destination_code else ''}"
-            pdf.para(head, 10.5, True, w=pdf.width - 40, h=5.5, link=t.search_url or "")
-            y2 = pdf.get_y()
-            pdf.set_xy(pdf.w - pdf.r_margin - 40, y)
+            pdf.set_xy(pdf.w - pdf.r_margin - 42, y)
             pdf.font(10.5, True)
-            pdf.cell(40, 5.5, pdf.t(chf(t.cost) if t.cost else "im Ticket enthalten"), align="R")
+            pdf.cell(42, 5.2, pdf.t(price), align="R")
+            pdf.set_xy(pdf.w - pdf.r_margin - 42, y + 5.2)
+            pdf.font(8.5, color=(36, 140, 70) if ok else (200, 110, 0))
+            pdf.cell(42, 4.6, pdf.t(state), align="R")
             pdf.set_y(y2)
-            bits = [f"{d_short(t.depart.date())} {t.depart:%H:%M} – {t.arrive:%H:%M}"
-                    + (f" (+{(t.arrive.date() - t.depart.date()).days})" if t.arrive.date() > t.depart.date() else "")]
-            if t.carrier or t.number:
-                bits.append(" ".join(x for x in (t.carrier, t.number) if x))
-            if t.via:
-                bits.append("via " + ", ".join(t.via))
-            bits.append("gebucht" if t.booking else ("Zeiten geschätzt" if t.estimated else "bestätigt"))
-            pdf.para(" · ".join(bits), 9.5, color=MUTED, w=pdf.width - 42, h=5)
-            pdf.ln(2.5)
+            pdf.para(meta, 9, color=MUTED, w=ROW_W, h=4.6)
+            pdf.ln(2.2)
+
+    if stay_rows:
+        pdf.section("Unterkünfte")
+        rows_out(stay_rows)
+    if trans_rows:
+        pdf.section(("Flüge und Verbindungen" if flights else "Verbindungen") if days > 1 else "Hin- und Rückfahrt")
+        rows_out(trans_rows)
 
     # --- Tagesplan ---------------------------------------------------------------------------------
     if days > 1:  # Tagesausflug: Programm gleich auf der ersten Seite
