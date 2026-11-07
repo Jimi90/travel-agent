@@ -120,13 +120,18 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (115 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (116 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.17.1)
+## Stand (07.11.2026, Version 1.17.2)
+- 1.17.2: Wunsch James: bei Tagesausflügen 5–6 Vorschläge (vorher blieben nach dem Aussortieren oft nur 3).
+  `daytrips.suggest`: KI wird nach `ASK` 9 Ideen gefragt, gezeigt werden höchstens `SHOW` 6 (TripAdvisor-Suchen nur für
+  die, die gezeigt werden – `check()` hört bei 6 auf); bleiben weniger als `MIN_SHOW` 5, einmal nachfragen mit «Bereits
+  vorgeschlagen (nicht wiederholen)», «Nicht gepasst: …» und «deutlich näher» (Fehler dabei → erste Liste bleibt);
+  gleiche Namen nur einmal. Test `test_five_to_six_suggestions`; 116 Tests.
 - 1.17.1: James (Foto PDF Laos): Titelseite so, dass Unterkünfte und Flüge drauf sind, App-Logo oben rechts. `export.build`:
   Kopfzeile «Kompass» + «REISEPLAN · STATUS» links, `LOGO` (`app/web/apple-touch-icon.png`, 11 mm) rechts; Höhe aller
   Inhalte von Seite 1 wird vorab geschätzt (`height_of`) und das Titelbild bekommt nur den Rest (höchstens 66 mm, unter

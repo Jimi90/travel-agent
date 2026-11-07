@@ -22,6 +22,7 @@ MODES = {"egal": "Zug, Bus oder Auto – was besser passt", "oev": "nur öffentl
          "auto": "mit dem Auto"}
 MAX_KMH = 90  # keine Fahrt am Boden schafft mehr Luftlinie pro Stunde (auch Schnellzug mit Umsteigen nicht)
 WEAK = 4.0
+ASK, SHOW, MIN_SHOW = 9, 6, 5  # KI fragt nach 9 (einige fallen weg), gezeigt werden 5–6
 
 
 class DayTripIdea(BaseModel):
@@ -80,27 +81,29 @@ def suggest(h: Household, origin: Place, day: date, max_minutes: int, mode: str,
         prompt += ("TripAdvisor-Lieblinge in der Umgebung: "
                    + "; ".join(f"{f['title']} ★ {f['rating']:.1f}" + (f" ({f['location']})" if f.get("location") else "")
                                for f in fans[:10]) + "\n")
-    prompt += "Schlage 6 unterschiedliche Tagesausflüge vor, die innerhalb der Fahrzeit liegen."
-    res = llm.ask("ausfluege", system=SYSTEM, content=prompt, schema=DayTripList, max_tokens=6000,
-                  fake=lambda: _fake(origin))
-    out, dropped = [], []
-    for idea in res.ideas:
+    prompt += f"Schlage {ASK} unterschiedliche Tagesausflüge vor, die sicher innerhalb der Fahrzeit liegen."
+    out, dropped, seen = [], [], set()
+
+    def check(idea):
+        if len(out) >= SHOW or idea.name.casefold() in seen:
+            return
+        seen.add(idea.name.casefold())
         dist = km(origin.lat, origin.lon, idea.lat, idea.lon)
         if mode == "oev" and idea.travel_mode == "auto":
             dropped.append(f"{idea.name}: nur mit dem Auto")
-            continue
+            return
         if idea.travel_minutes > max_minutes * 1.15 or dist > max_minutes / 60 * MAX_KMH:
             dropped.append(f"{idea.name}: zu weit ({idea.travel_minutes} Min., {dist:.0f} km Luftlinie)")
-            continue
+            return
         if dist < 3:
             dropped.append(f"{idea.name}: liegt am Startort")
-            continue
+            return
         item = {**idea.model_dump(), "id": new_id(), "km": round(dist)}
         ta = sights.lookup(idea.tripadvisor or idea.name, idea.name)
         if ta and ta.get("found"):
             if ta.get("rating") is not None and ta["rating"] < WEAK and (ta.get("reviews") or 0) >= sights.WEAK_MIN_REVIEWS:
                 dropped.append(f"{idea.name}: {ta.get('title')} bei TripAdvisor nur ★ {ta['rating']:.1f}")
-                continue
+                return
             item["ta"] = {"name": ta.get("title"), "rating": ta.get("rating"), "reviews": ta.get("reviews"),
                           "url": ta.get("link") or sights.search_url(ta.get("title") or idea.name, idea.name),
                           "key": [idea.tripadvisor or idea.name, idea.name]}
@@ -116,6 +119,22 @@ def suggest(h: Household, origin: Place, day: date, max_minutes: int, mode: str,
                                "p": f.precip_probability, "mm": f.precip_mm, "storm": f.thunderstorm}
         item["photo"] = photos.destination_photo(idea.wikipedia, idea.name, idea.region, idea.highlights)
         out.append(item)
+
+    res = llm.ask("ausfluege", system=SYSTEM, content=prompt, schema=DayTripList, max_tokens=8000,
+                  fake=lambda: _fake(origin))
+    for idea in res.ideas:
+        check(idea)
+    if len(out) < MIN_SHOW:  # Wunsch James: 5–6 Vorschläge – einmal nachfragen, mit dem, was nicht passte
+        more = (prompt + f"\nBereits vorgeschlagen (nicht wiederholen): {', '.join(i.name for i in res.ideas)}."
+                + (f"\nNicht gepasst: {'; '.join(dropped)}." if dropped else "")
+                + f"\nSchlage {ASK} WEITERE Tagesausflüge vor, deutlich näher, sicher unter {max_minutes} Minuten pro Weg.")
+        try:
+            res2 = llm.ask("ausfluege", system=SYSTEM, content=more, schema=DayTripList, max_tokens=8000,
+                           fake=lambda: _fake(origin, more=True))
+            for idea in res2.ideas:
+                check(idea)
+        except llm.LLMError as e:  # die ersten Vorschläge bleiben gültig
+            print(f"[Ausflüge] Nachfrage: {e}", flush=True)
     # Tipps aus den TripAdvisor-Bewertungen (eine kleine KI-Aufgabe für alle)
     todo = []
     for it in out:
@@ -140,8 +159,13 @@ def suggest(h: Household, origin: Place, day: date, max_minutes: int, mode: str,
             "tripadvisor": [f["title"] for f in fans[:6]]}
 
 
-def _fake(origin: Place) -> DayTripList:
-    base = [("Luzern", 47.05, 8.31, "zug", 50, "Kapellbrücke"), ("Rheinfall", 47.68, 8.62, "zug", 45, "Rheinfall"),
+def _fake(origin: Place, more: bool = False) -> DayTripList:
+    if more:
+        base = [("Einsiedeln", 47.13, 8.75, "zug", 55, "Kloster Einsiedeln"), ("Zug", 47.17, 8.52, "zug", 30, "Zugersee"),
+                ("Stein am Rhein", 47.66, 8.86, "zug", 70, "Altstadt Stein am Rhein"),
+                ("Baden", 47.47, 8.31, "zug", 25, "Bäder Baden")]
+    else:
+        base = [("Luzern", 47.05, 8.31, "zug", 50, "Kapellbrücke"), ("Rheinfall", 47.68, 8.62, "zug", 45, "Rheinfall"),
             ("Rigi", 47.06, 8.49, "zug", 75, "Rigi Kulm"), ("Bern", 46.95, 7.45, "zug", 60, "Historisches Museum 2"),
             ("Mailand", 45.46, 9.19, "zug", 200, "Mailänder Dom"), ("Altstadt Museum 2", 47.37, 8.54, "auto", 10, "Museu 2")]
     return DayTripList(ideas=[DayTripIdea(

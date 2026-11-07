@@ -14,10 +14,11 @@ ZH = Place(name="Zürich", country="CH", lat=47.3769, lon=8.5417)
 
 class SuggestTest(unittest.TestCase):
     def run_suggest(self, max_minutes=120, mode="egal", ta=None):
-        seen = {}
+        seen = {"prompts": []}
 
         def ask(purpose, **kw):
             seen["prompt"], seen["purpose"] = kw["content"], purpose
+            seen["prompts"].append(kw["content"])
             return kw["fake"]()
 
         def lookup(name, place, trip_id=None):
@@ -47,6 +48,18 @@ class SuggestTest(unittest.TestCase):
         self.assertTrue(all(i["km"] <= 60 / 60 * DT.MAX_KMH for i in res["ideas"]))
         self.assertTrue(any("zu weit" in d for d in res["dropped"]))
 
+    def test_five_to_six_suggestions(self):
+        # Wunsch James: 5–6 Vorschläge. KI fragt nach 9; bleiben weniger als 5, fragt Kompass einmal nach
+        res, seen = self.run_suggest(max_minutes=60)
+        self.assertIn("Schlage 9 unterschiedliche", seen["prompts"][0])
+        self.assertEqual(len(seen["prompts"]), 2)
+        self.assertIn("Bereits vorgeschlagen (nicht wiederholen): Luzern, Rheinfall", seen["prompts"][1])
+        self.assertIn("Nicht gepasst: ", seen["prompts"][1])
+        self.assertTrue(5 <= len(res["ideas"]) <= 6, [i["name"] for i in res["ideas"]])
+        self.assertEqual(len({i["name"] for i in res["ideas"]}), len(res["ideas"]))  # nichts doppelt
+        res, seen = self.run_suggest(max_minutes=180)
+        self.assertLessEqual(len(res["ideas"]), 6)
+
     def test_weak_tripadvisor_dropped_good_shown(self):
         ta = {"Kapellbrücke": {"found": True, "title": "Kapellbrücke", "rating": 4.5, "reviews": 12000, "link": None},
               "Rheinfall": {"found": True, "title": "Rheinfall", "rating": 3.5, "reviews": 900}}
@@ -60,7 +73,7 @@ class SuggestTest(unittest.TestCase):
 
     def test_public_transport_only(self):
         orig = DT._fake
-        with mock.patch.object(DT, "_fake", lambda o: DT.DayTripList(ideas=[
+        with mock.patch.object(DT, "_fake", lambda o, more=False: DT.DayTripList(ideas=[] if more else [
                 orig(o).ideas[0].model_copy(update={"travel_mode": "auto"})])):
             res, _ = self.run_suggest(mode="oev")
         self.assertEqual(res["ideas"], [])
