@@ -218,6 +218,28 @@ TIP_SYSTEM = ("Du bist Kompass, ein Reiseplaner. Deutsch, Schweizer Rechtschreib
               "keine Bewertung wiederholen («toll», «schön»). Steckt kein praktischer Tipp drin: tip leer lassen.")
 
 
+def tips_for(todo: list[tuple[str, str, dict]], trip_id: str | None = None) -> bool:
+    """[(Suchname, Ort, Eintrag)] mit Bewertungsauszug → in einem KI-Aufruf deutsche Tipps, im Eintrag unter «tip»
+    gemerkt. False, wenn die KI nicht erreichbar war (dann bleibt alles ohne Tipp)."""
+    todo = todo[:20]
+    if not todo:
+        return True
+    lines = "\n".join(f"{i}. {c.get('title') or s} ({p}): «{c['quote']}»" for i, (s, p, c) in enumerate(todo, 1))
+    try:
+        res = llm.ask("tipps", system=TIP_SYSTEM, trip_id=trip_id, max_tokens=2000, schema=TipList,
+                      content=f"Bewertungsauszüge:\n{lines}\n\nGib für jede Nummer n einen Tipp zurück.",
+                      fake=lambda: TipList(tips=[Tip(n=i, tip="Früh am Morgen hingehen, ab 11 Uhr wird es voll.")
+                                                 for i in range(1, len(todo) + 1)]))
+    except llm.LLMError as e:
+        print(f"[TripAdvisor] Tipps: {e}", flush=True)
+        return False
+    got = {t.n: re.sub(r"\s+", " ", t.tip).strip().strip("«»\"")[:160] for t in res.tips}
+    for i, (s, p, c) in enumerate(todo, 1):
+        c["tip"] = got.get(i, "")
+        store.put("sight_live", key(s, p), c)
+    return True
+
+
 def make_tips(it) -> int:
     """Alle Bewertungsauszüge ohne Tipp in einem KI-Aufruf zu deutschen Tipps machen. Gibt die Anzahl zurück."""
     todo = []
@@ -227,22 +249,40 @@ def make_tips(it) -> int:
             todo.append((s, p, c))
     if not todo or not _tips_due(it):
         return 0
-    todo = todo[:20]
-    lines = "\n".join(f"{i}. {c.get('title') or s} ({p}): «{c['quote']}»" for i, (s, p, c) in enumerate(todo, 1))
-    try:
-        res = llm.ask("tipps", system=TIP_SYSTEM, trip_id=it.id, max_tokens=2000, schema=TipList,
-                      content=f"Bewertungsauszüge:\n{lines}\n\nGib für jede Nummer n einen Tipp zurück.",
-                      fake=lambda: TipList(tips=[Tip(n=i, tip="Früh am Morgen hingehen, ab 11 Uhr wird es voll.")
-                                                 for i in range(1, len(todo) + 1)]))
-    except llm.LLMError as e:
-        print(f"[TripAdvisor] Tipps {it.id}: {e}", flush=True)
+    if not tips_for(todo, it.id):
         store.put("sight_tipfail", it.id, {"ts": datetime.now().isoformat()})
         return 0  # kein Tipp gemerkt – in 6 Std. nochmals
-    got = {t.n: re.sub(r"\s+", " ", t.tip).strip().strip("«»\"")[:160] for t in res.tips}
-    for i, (s, p, c) in enumerate(todo, 1):
-        c["tip"] = got.get(i, "")
-        store.put("sight_live", key(s, p), c)
-    return len(todo)
+    return len(todo[:20])
+
+
+def lookup(name: str, place: str, trip_id: str | None = None) -> dict | None:
+    """Eine Sehenswürdigkeit bei TripAdvisor nachschlagen (gemerkt oder neu, im Monatslimit) – für Ausflugsideen."""
+    if not prices.available():
+        return None
+    if _due(name, place):
+        if month_usage() >= MONTH_CAP:
+            return None
+        return fetch(name, place, trip_id)
+    return cached(name, place)
+
+
+def nearby(query: str, lat: float, lon: float, trip_id: str | None = None) -> list[dict]:
+    """Beliebte Orte/Touren bei TripAdvisor rund um eine Position (Ideen für Tagesausflüge), 1 Suche, 7 Tage gemerkt."""
+    k = f"{query.strip().lower()}|{lat:.2f},{lon:.2f}"
+    hit = store.get("sight_nearby", k)
+    if hit and datetime.now() - datetime.fromisoformat(hit["ts"]) < timedelta(days=7):
+        return hit["items"]
+    if not prices.available() or month_usage() >= MONTH_CAP:
+        return []
+    try:
+        data = _fake_nearby() if config.FAKE_MODE else prices._search(
+            {"engine": "tripadvisor", "q": query, "lat": f"{lat:.4f}", "lon": f"{lon:.4f}", "ssrc": "A"}, PURPOSE, trip_id)
+    except prices.PriceError as e:
+        print(f"[TripAdvisor] Umgebung: {e}", flush=True)
+        return []
+    items = [e for e in (_entry(r) for r in _results(data)) if (e.get("rating") or 0) >= 4.0][:12]
+    store.put("sight_nearby", k, {"ts": datetime.now().isoformat(), "items": items})
+    return items
 
 
 # --- Hintergrund ---------------------------------------------------------------------------------
@@ -359,6 +399,12 @@ def _fake(name: str, place: str) -> dict:
                         "link": f"https://www.tripadvisor.com/Attraction_Review-test{h}",
                         "description": "Testbeschreibung.",
                         "highlighted_review": {"text": "Go early in the morning, the queue gets long after 11."}}]}
+
+
+def _fake_nearby() -> dict:
+    return {"places": [{"title": "Rigi Kulm", "rating": 4.8, "reviews": 3120, "location": "Rigi, Schweiz"},
+                       {"title": "Rheinfall", "rating": 4.6, "reviews": 8800, "location": "Neuhausen, Schweiz"},
+                       {"title": "Kapellbrücke", "rating": 4.5, "reviews": 12500, "location": "Luzern, Schweiz"}]}
 
 
 def _fake_alts(place: str) -> dict:

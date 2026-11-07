@@ -19,6 +19,7 @@ UA = "Kompass/1.0 (privater Reiseplaner)"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 GEO_URL = "https://geocoding-api.open-meteo.com/v1/search"
+REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"  # Open-Meteo kann keine Umkehr-Suche
 THUNDER = {95, 96, 99}
 CODES = {0: "klar", 1: "meist klar", 2: "teils bewölkt", 3: "bedeckt", 45: "Nebel", 48: "Nebel",
          51: "Niesel", 53: "Niesel", 55: "Niesel", 61: "leichter Regen", 63: "Regen", 65: "starker Regen",
@@ -68,6 +69,26 @@ def geocode(name: str, country: str | None = None) -> Place:
     r = res[0]
     return Place(name=r.get("name") or name, country=(r.get("country_code") or "XX")[:2],
                  lat=r["latitude"], lon=r["longitude"], tz=r.get("timezone"))
+
+
+def reverse(lat: float, lon: float) -> Place:
+    """Aktueller Standort (Koordinaten aus dem Browser) → Ortsname. OpenStreetMap Nominatim: Nutzungsrichtlinie =
+    eigener Absender, höchstens 1 Anfrage/Sekunde, Ergebnisse zwischenspeichern → auf ~1 km gerundet, 30 Tage gemerkt.
+    Ohne Antwort: Ort «Standort» mit den Koordinaten (die KI kommt auch damit zurecht)."""
+    lat, lon = round(float(lat), 2), round(float(lon), 2)
+    if config.FAKE_MODE:
+        return Place(name="Zürich", country="CH", lat=lat, lon=lon, tz="Europe/Zurich")
+    try:
+        data = _get(REVERSE_URL, {"lat": lat, "lon": lon, "format": "jsonv2", "zoom": 10, "accept-language": "de"},
+                    30 * 86400)
+        a = data.get("address") or {}
+        name = next((a[k] for k in ("city", "town", "village", "municipality", "county", "state") if a.get(k)), "")
+        cc = str(a.get("country_code") or "").upper()
+        if name and len(cc) == 2:
+            return Place(name=str(name)[:120], country=cc, lat=lat, lon=lon)
+    except WeatherError as e:
+        print(f"[Standort] Ortsname nicht gefunden: {e}", flush=True)
+    return Place(name=f"Standort {lat:.2f}, {lon:.2f}", country="XX", lat=lat, lon=lon)
 
 
 # --- Prognose -------------------------------------------------------------------------------

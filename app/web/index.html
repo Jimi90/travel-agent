@@ -100,6 +100,10 @@ details{position:relative}
 .pre{white-space:pre-wrap;font-size:16px;line-height:1.5;background:var(--card2);border-radius:10px;padding:12px;margin-top:8px;user-select:text;-webkit-user-select:text}
 .star{border:0;background:none;font-size:22px;color:var(--warn);cursor:pointer;padding:4px}
 .tbr{display:flex;align-items:center;gap:6px}
+.newbtns{display:flex;flex-direction:column;gap:10px}
+.btn.tint{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.locrow .s.ok{color:var(--text)}
+.locrow .s.err{color:var(--err)}
 .tbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:4px;display:flex}.tbtn svg{width:23px;height:23px}
 .more .mrow{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;font:inherit;font-size:17px;color:var(--accent);
   padding:13px 16px;text-align:left;cursor:pointer;border-bottom:.5px solid var(--line)}
@@ -495,7 +499,8 @@ details.errd .s{margin-top:4px}
   .topbar::before{content:"";position:absolute;top:0;bottom:0;left:-100vw;right:-100vw;background:var(--bg);z-index:-1;transition:background .2s}
   .topbar.solid::before{background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
     box-shadow:0 .5px 0 var(--line)}
-  #newTrip{display:inline-block;width:auto;padding:11px 24px;font-size:16px;margin-top:6px}
+  #newTrip,#newDay{display:inline-block;width:auto;padding:11px 24px;font-size:16px;margin-top:6px}
+  .newbtns{flex-direction:row;gap:10px}
   .welcome .ws{max-width:520px;margin-left:auto;margin-right:auto}
   #toast{left:calc(var(--side) + 24px);bottom:24px}
   #asheet{left:var(--side);align-items:center}
@@ -554,7 +559,8 @@ details.errd .s{margin-top:4px}
 <main id="v-trips" class="view">
   <h1>Reisen</h1>
   <p class="sub">Plant Reisen für euch beide und passt sie unterwegs selbständig an.</p>
-  <button class="btn" id="newTrip">Neue Reise planen</button>
+  <div class="newbtns"><button class="btn" id="newTrip">Neue Reise planen</button>
+    <button class="btn tint" id="newDay">Tagesausflug ab hier</button></div>
   <div id="jobBox" class="card jobcard" hidden></div>
   <h2 id="tripsHead">Eure Reisen</h2>
   <div id="tripList"></div>
@@ -637,10 +643,20 @@ details.errd .s{margin-top:4px}
   <div class="topbar"><button class="back" data-close="newSheet">Reisen</button></div>
   <h1>Neue Reise</h1>
   <div class="seg" id="nMode" style="margin-top:14px">
-    <button data-mode="vorschlag" class="on">Ziele vorschlagen</button><button data-mode="ziel">Ich weiss das Ziel</button>
+    <button data-mode="vorschlag" class="on">Ziele vorschlagen</button><button data-mode="ziel">Ich weiss das Ziel</button><button data-mode="ausflug">Tagesausflug</button>
   </div>
   <p class="hint" id="nModeHint"></p>
-  <div class="card" style="margin-top:14px">
+  <div class="card" id="nDayCard" style="margin-top:14px" hidden>
+    <div class="row locrow"><div class="grow"><div class="t">Start</div><div class="s" id="nLocTxt">Aktueller Standort</div></div>
+      <button class="small" id="nLoc">Standort verwenden</button></div>
+    <label class="row"><div class="grow t">Datum</div><input class="inl" type="date" id="nDay" style="max-width:170px"></label>
+    <label class="row"><div class="grow"><div class="t">Fahrzeit</div><div class="s">höchstens, pro Weg</div></div>
+      <select class="inl" id="nMax" style="max-width:150px"><option value="45">45 Minuten</option><option value="60">1 Stunde</option>
+        <option value="90" selected>1½ Stunden</option><option value="120">2 Stunden</option><option value="180">3 Stunden</option></select></label>
+    <label class="row"><div class="grow t">Unterwegs mit</div>
+      <select class="inl" id="nHow" style="max-width:170px"><option value="egal">Zug oder Auto</option><option value="oev">ÖV (Zug, Bus, Schiff)</option><option value="auto">Auto</option></select></label>
+  </div>
+  <div class="card" id="nTripCard" style="margin-top:14px">
     <label class="row" id="nDestRow" hidden><div class="grow t">Ziel</div>
       <input class="inl" id="nDest" maxlength="200" placeholder="z. B. Madeira" autocomplete="off"></label>
     <label class="row"><div class="grow t">Abreise</div><input class="inl" type="date" id="nStart" style="max-width:170px"></label>
@@ -790,7 +806,7 @@ function countdown(start, end) {
   const days = Math.round((s - d0) / 864e5);
   if (days > 1) return `in ${days} Tagen`;
   if (days === 1) return "morgen";
-  if (d0 <= e) return `Tag ${Math.round((d0 - s) / 864e5) + 1} von ${Math.round((e - s) / 864e5) + 1}`;
+  if (d0 <= e) return +s === +e ? "heute" : `Tag ${Math.round((d0 - s) / 864e5) + 1} von ${Math.round((e - s) / 864e5) + 1}`;
   return "vorbei";
 }
 
@@ -983,13 +999,15 @@ async function loadTrips() {
   $("tripList").innerHTML = (coming.length ? coming.map(tcard).join("") : (t.trips.length || planning) ? "" :
       `<div class="card welcome"><div class="wic">${ICO.compass}</div><div class="wt">Wohin geht's als Nächstes?</div>
         <div class="ws">Kompass schlägt Ziele vor, die zu euch beiden passen, plant Route, Hotels und Programm – und passt alles unterwegs an.</div>
-        <button class="btn" id="welcomeGo" style="max-width:280px;margin:18px auto 0">Erste Reise planen</button></div>`) +
+        <button class="btn" id="welcomeGo" style="max-width:280px;margin:18px auto 0">Erste Reise planen</button>
+        <button class="btn tint" id="welcomeDay" style="max-width:280px;margin:10px auto 0">Tagesausflug ab hier</button></div>`) +
     (past.length ? `<h2>Vergangene Reisen</h2><div class="card past">${past.map(x => `<div class="row tap chev" data-trip="${esc(x.id)}">
       ${photo(x.photo, "thumb s")}<div class="grow"><div class="t">${esc(x.title)}</div>
       <div class="s">${esc(fmtD(x.start))} – ${esc(fmtD(x.end))} · ${esc(chf(x.total))}</div></div></div>`).join("")}</div>` : "");
   $("tripsHead").hidden = !coming.length;
-  $("newTrip").hidden = !t.trips.length && !planning;  // leere Seite hat ihren eigenen Knopf
+  $("newTrip").hidden = $("newDay").hidden = !t.trips.length && !planning;  // leere Seite hat ihren eigenen Knopf
   if ($("welcomeGo")) $("welcomeGo").onclick = () => $("newTrip").click();
+  if ($("welcomeDay")) $("welcomeDay").onclick = () => openNew(null, "ausflug");
   $("tripList").querySelectorAll("[data-trip]").forEach(r => r.onclick = () => openTrip(r.dataset.trip));
   $("favDestWrap").hidden = !ideas.saved.length;
   $("favDest").innerHTML = ideas.saved.map(i => `<div class="fcard"><div class="fph">${photo(i.photo, "", i.name)}
@@ -1011,6 +1029,8 @@ const NEW_TXT = {
     wish: "z. B. Meer, warm, gutes Essen, nicht zu weit", go: "Ziele vorschlagen"},
   ziel: {hint: "Kompass plant Tage, Unterkünfte, Verbindungen und ein Schlechtwetter-Programm.",
     wish: "z. B. ruhig, kein Mietauto, ein Tag Spa", go: "Plan erstellen"},
+  ausflug: {hint: "Ein Tag ohne Übernachtung ab eurem aktuellen Standort – Ideen mit TripAdvisor-Bewertung und Wetter für genau diesen Tag.",
+    wish: "z. B. See, Wandern, gutes Essen, mit Kinderwagen", go: "Ausflüge vorschlagen"},
 };
 function setNewMode(m) {
   NEW_MODE = m;
@@ -1020,8 +1040,11 @@ function setNewMode(m) {
   $("nWish").placeholder = NEW_TXT[m].wish;
   $("nGo").textContent = NEW_TXT[m].go;
   $("nDestRow").hidden = m !== "ziel";
+  $("nTripCard").hidden = m === "ausflug"; $("nDayCard").hidden = m !== "ausflug";
   msg($("nMsg"), "");
+  $("ideas").innerHTML = "";
   setDays(NEW_DAYS);
+  if (m === "ausflug") { if (!$("nDay").value) $("nDay").value = isoDay(new Date(Date.now() + (new Date().getHours() >= 15 ? 864e5 : 0))); locate(); }
 }
 const REACH = [[3, "Kurztrip", "höchstens 2 Std. Flug direkt oder 5 Std. Zug/Auto, 1 Ort"],
   [6, "Kurzurlaub", "höchstens 4 Std. Flug oder 7 Std. Zug/Auto, bis 2 Orte"],
@@ -1040,7 +1063,7 @@ function setDays(n) { NEW_DAYS = Math.min(30, Math.max(2, n));
   $("nDaysTxt").textContent = `${NEW_DAYS} Tage · ${NEW_DAYS - 1} ${NEW_DAYS - 1 === 1 ? "Nacht" : "Nächte"}`;
   if (!TRAVEL_TOUCHED) $("nTravel").value = travelDefault(NEW_DAYS);
   const r = REACH.find(x => NEW_DAYS <= x[0]);
-  $("nModeHint").textContent = NEW_MODE === "vorschlag" ? `${r[1]}: ${r[2]}. ${NEW_TXT.vorschlag.hint}` : NEW_TXT.ziel.hint; }
+  $("nModeHint").textContent = NEW_MODE === "vorschlag" ? `${r[1]}: ${r[2]}. ${NEW_TXT.vorschlag.hint}` : NEW_TXT[NEW_MODE].hint; }
 $("nStart").onchange = () => setDays(NEW_DAYS);  // Abreise ändern: Dauer bleibt, Rückreise wandert mit
 $("nEnd").onchange = () => {
   const st = $("nStart").value, en = $("nEnd").value;
@@ -1054,18 +1077,107 @@ $("nDest").oninput = () => msg($("nMsg"), "");
 $("nTravel").oninput = () => { TRAVEL_TOUCHED = $("nTravel").value !== ""; };
 const travelValue = () => $("nTravel").value === "" ? null : Number($("nTravel").value);
 
-function openNew(dest) {
+// Tagesausflug (1.17.0): Start = aktueller Standort (GPS des Geräts → Ortsname über den Server)
+let LOC = null;
+try { LOC = JSON.parse(localStorage.getItem("loc") || "null"); } catch {}
+function showLoc(txt, kind) { const e = $("nLocTxt"); e.textContent = txt; e.className = "s " + (kind || ""); }
+function locate() {
+  if (LOC && Date.now() - LOC.ts < 30 * 60000) showLoc(LOC.name + " · eben ermittelt", "ok");
+  if (!navigator.geolocation) { showLoc("Dieses Gerät gibt keinen Standort an.", "err"); return; }
+  showLoc("Standort wird ermittelt …");
+  $("nLoc").disabled = true;
+  navigator.geolocation.getCurrentPosition(async pos => {
+    try {
+      const r = await api("/api/locate", {lat: pos.coords.latitude, lon: pos.coords.longitude});
+      LOC = {lat: pos.coords.latitude, lon: pos.coords.longitude, name: r.place.name + (r.place.country !== "XX" && r.place.country !== "CH" ? `, ${cname(r.place.country)}` : ""), ts: Date.now()};
+      try { localStorage.setItem("loc", JSON.stringify(LOC)); } catch {}
+      showLoc(LOC.name, "ok");
+    } catch (e) { showLoc(e.message, "err"); }
+    $("nLoc").disabled = false;
+  }, err => {
+    $("nLoc").disabled = false;
+    showLoc(err.code === 1 ? "Standort nicht freigegeben – iPhone: Einstellungen → Datenschutz & Sicherheit → Ortungsdienste → Safari-Websites → «Beim Verwenden der App»."
+      : "Standort nicht gefunden – bitte nochmals «Standort verwenden» antippen.", "err");
+  }, {enableHighAccuracy: false, timeout: 15000, maximumAge: 10 * 60000});
+}
+$("nLoc").onclick = locate;
+
+async function suggestDayTrips() {
+  if (!LOC || Date.now() - LOC.ts > 6 * 3600e3) { msg($("nMsg"), "Bitte zuerst «Standort verwenden» antippen.", "err"); return; }
+  if (!$("nDay").value) { msg($("nMsg"), "Bitte das Datum wählen.", "err"); return; }
+  const b = $("nGo"); b.disabled = true;
+  msg($("nMsg"), `<span class="spin"></span>Kompass sucht Ausflüge ab ${esc(LOC.name)} …`);
+  $("ideas").innerHTML = skeleton(3, "Ausflüge werden gesucht");
+  try {
+    const base0 = $("nMsg").innerHTML;
+    const r = await api("/api/daytrips", {lat: LOC.lat, lon: LOC.lon, date: $("nDay").value, max_minutes: +$("nMax").value, mode: $("nHow").value, wish: $("nWish").value});
+    const poll = async () => {
+      const j = await api("/api/jobs/" + r.job);
+      if (j.status === "laeuft") { $("nMsg").innerHTML = j.note ? `<span class="spin"></span>${esc(j.note)}` : base0; return setTimeout(poll, 2000); }
+      b.disabled = false;
+      if (j.status === "fehler") { $("ideas").innerHTML = ""; msg($("nMsg"), errHtml(j.error)); return; }
+      msg($("nMsg"), ""); renderDayTrips(j.result);
+      $("ideas").scrollIntoView({behavior: "smooth", block: "start"});
+    };
+    poll();
+  } catch (e) { b.disabled = false; msg($("nMsg"), esc(e.message), "err"); }
+}
+
+function renderDayTrips(res) {
+  const tile = (k, v, u) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="u">${esc(u)}</div></div>`;
+  const cnt = r => Number(r || 0).toLocaleString("de-CH");
+  const when = new Date(res.date + "T12:00").toLocaleDateString("de-CH", {weekday: "long", day: "numeric", month: "long"});
+  $("ideas").innerHTML = `<h2>Ausflüge ab ${esc(res.origin.name)}</h2>
+    <p class="hint" style="margin:0 16px 10px">${esc(when)} · höchstens ${esc(res.max_minutes >= 60 ? (res.max_minutes / 60).toLocaleString("de-CH") + " Std." : res.max_minutes + " Min.")} pro Weg${(res.tripadvisor || []).length ? ` · TripAdvisor-Lieblinge in der Nähe: ${esc(res.tripadvisor.slice(0, 4).join(", "))}` : ""}</p>` +
+    (res.ideas.length ? "" : `<div class="card"><div class="empty">Kein Ausflug passt in die Fahrzeit – mehr Zeit wählen oder Wünsche anpassen.</div></div>`) +
+    res.ideas.map((i, n) => {
+      const w = i.weather, ta = i.ta;
+      const where = [`${cflag(i.country)} ${esc(i.country ? cname(i.country) : "")}`.trim(), i.region && actKey(i.region) !== actKey(i.name) ? esc(i.region) : ""].filter(Boolean).join(" · ");
+      return `<div class="card dcard"><div class="ph">${photo(i.photo, "dimg", i.name)}<div class="shade"></div>
+        <div class="price"><b>ca. ${esc(chf(i.cost_chf))}</b><small>ganzer Tag · 2 Personen</small></div>
+        <div class="cap"><div class="nm">${esc(i.name)}</div><div class="where">${where}</div></div></div>
+        <div class="dbody">
+          <div class="hl">${(i.highlights || []).slice(0, 3).map(h => `<span class="chip">${esc(h)}</span>`).join("")}</div>
+          <div>${i.pitch ? `<p class="pitch">${esc(i.pitch)}</p>` : ""}</div>
+          <div class="tiles four">${[
+            w ? tile("Wetter", `${Math.round(w.tmax)}° / ${Math.round(w.tmin)}°`, `${w.summary} · Regen ${w.p} %`) : tile("Wetter", "–", "Prognose erst 16 Tage vorher"),
+            tile("Fahrt", i.travel_minutes >= 60 ? `${(Math.round(i.travel_minutes / 6) / 10).toLocaleString("de-CH")} Std.` : `${i.travel_minutes} Min.`, `${MODE[i.travel_mode] || "Zug"} · ${i.km} km Luftlinie`),
+            ta && ta.rating ? tile("TripAdvisor", `★ ${Number(ta.rating).toFixed(1)}`, `${cnt(ta.reviews)} Bewertungen`) : tile("TripAdvisor", "–", "nicht geprüft")].join("")}</div>
+          ${ta ? `<div class="dsec"><div class="dk">${ta.tip ? "Tipp aus den Bewertungen" : "Bei TripAdvisor"}</div>${ta.tip ? `<p>${esc(ta.tip)}</p>` : ""}
+            <a class="sight" href="${esc(ta.url)}" target="_blank" rel="noopener noreferrer"><span class="srow"><span class="vpin">${ICO.chat}</span><span class="ssrc">${esc(ta.name || i.tripadvisor)}</span><span class="vgo">Ansehen ↗︎</span></span></a></div>` : `<div></div>`}
+          ${i.why ? `<div class="dsec"><div class="dk">Warum es zu euch passt</div><p>${esc(i.why)}</p></div>` : `<div></div>`}
+          ${w && (w.p >= 60 || w.storm) ? `<div class="s warnt">Regen wahrscheinlich – lieber einen trockenen Ausflug wählen oder ein anderes Datum.</div>` : `<div></div>`}
+          <div class="btns"><button class="small" data-dt="${n}">Diesen Ausflug planen</button></div>
+        </div></div>`;
+    }).join("") +
+    ((res.dropped || []).length ? `<p class="hint">Aussortiert: ${esc(res.dropped.join(" · "))}</p>` : "") +
+    `<p class="hint">Fahrzeiten und Kosten sind Schätzungen der KI, Wetter = Prognose für diesen Tag, Bewertungen von TripAdvisor.</p>`;
+  $("ideas").querySelectorAll("[data-dt]").forEach(btn => btn.onclick = async () => {
+    const i = res.ideas[+btn.dataset.dt];
+    try {
+      const body = {daytrip_set: res.id, index: +btn.dataset.dt};
+      const r = await api("/api/trips", body);
+      closeSheet("newSheet"); show("v-trips");
+      watchJob(r.job, `Kompass plant den Ausflug nach ${i.name} …`, out => { loadTrips(); openTrip(out.trip_id); }, body);
+    } catch (e) { toast(e.message); }
+  });
+}
+
+function openNew(dest, mode) {
   const d = new Date(); d.setDate(d.getDate() + 30);
   if (!$("nStart").value) $("nStart").value = d.toISOString().slice(0, 10);
   let m = "vorschlag"; try { m = localStorage.getItem("newMode") || m; } catch {}
   if (dest) { m = "ziel"; $("nDest").value = dest; }
+  if (mode) m = mode;
   TRAVEL_TOUCHED = false;
   setNewMode(m); setDays(NEW_DAYS);
   openSheet("newSheet");
 }
 $("newTrip").onclick = () => openNew();
+$("newDay").onclick = () => openNew(null, "ausflug");
 
 $("nGo").onclick = async () => {
+  if (NEW_MODE === "ausflug") return suggestDayTrips();
   if (!$("nStart").value) { msg($("nMsg"), "Bitte das Abreisedatum wählen.", "err"); return; }
   if (NEW_MODE === "ziel") {
     const dest = $("nDest").value.trim();
@@ -1375,7 +1487,8 @@ function renderTrip(outcome) {
       <div class="s">${h.actor === "autonom" ? "automatisch" : "von dir"} · ${esc(new Date(h.created_at).toLocaleString("de-CH", {dateStyle: "short", timeStyle: "short"}))} · Version ${h.from_version} → ${h.to_version}${h.undone_by ? " · rückgängig gemacht" : ""}</div></div>
       ${h.can_undo ? `<button class="small" data-undo="${esc(h.id)}">Rückgängig</button>` : ""}</div>`).join("") : `<div class="empty">Noch keine Änderungen</div>`;
 
-  const dateRange = `${fmtD(t.start_date, {day: "numeric", month: "long"})} – ${fmtD(t.end_date, {day: "numeric", month: "long", year: "numeric"})}`;
+  const dateRange = t.start_date === t.end_date ? fmtD(t.start_date, {weekday: "long", day: "numeric", month: "long", year: "numeric"})
+    : `${fmtD(t.start_date, {day: "numeric", month: "long"})} – ${fmtD(t.end_date, {day: "numeric", month: "long", year: "numeric"})}`;
   const heroHtml = d.hero ? `<div class="tphero">${photo(d.hero.id, "timg", t.title)}<div class="shade"></div>
       <div class="cap"><h1>${esc(t.title)}</h1><div class="when">${esc(dateRange)}</div></div></div>
     <div class="credit">Foto: ${d.hero.page ? `<a href="${esc(d.hero.page)}" target="_blank" rel="noopener noreferrer">${esc(d.hero.source)} – ${esc(d.hero.title)}</a>` : esc(d.hero.source)}</div>`
@@ -1386,11 +1499,11 @@ function renderTrip(outcome) {
   const tBooked = t.transports.filter(x => !x.estimated).length, sBooked = t.stays.filter(s => s.confirmed).length;
   const transTxt = t.transports.length ? t.transports.map(x => `${x.origin.name} → ${x.destination.name}`).slice(0, 3).join(" · ") : "";
   const incl = [
-    t.transports.length ? [ICO.plane, `Hin- und Rückreise${t.transports.length > 2 ? " und Verbindungen" : ""}`,
+    t.transports.length ? [t.transports.some(x => x.mode === "flug") ? ICO.plane : (MODE_ICO[t.transports[0].mode] || ICO.plane), `Hin- und Rückreise${t.transports.length > 2 ? " und Verbindungen" : ""}`,
       `${transTxt}${tBooked ? ` · ${tBooked} von ${t.transports.length} gebucht` : " · Preise geschätzt"}`] : null,
     t.stays.length ? [ICO.bed, `${nightsAll} ${nightsAll === 1 ? "Nacht" : "Nächte"} in ${t.stays.length === 1 ? "einem Hotel" : t.stays.length + " Hotels"}`,
       `${t.stays.map(s => s.name).join(" · ")}${sBooked ? ` · ${sBooked} gebucht` : ""}`] : null,
-    [ICO.map, `${nActs} Programmpunkte an ${t.days.length} Tagen`, t.alternatives.length ? `dazu ${t.alternatives.length} Ideen für Regentage` : "Tag für Tag geplant"],
+    [ICO.map, `${nActs} Programmpunkte${t.days.length === 1 ? "" : ` an ${t.days.length} Tagen`}`, t.alternatives.length ? `dazu ${t.alternatives.length} ${t.alternatives.length === 1 ? "Idee" : "Ideen"} für Regentage` : "Tag für Tag geplant"],
     [ICO.sun, "Begleitung unterwegs", `Wetter-Check jeden Morgen um ${INFO.settings.check_time} Uhr, Umplanung bei Regen oder Ausfällen`],
   ].filter(Boolean);
   const over = d.budget && d.total > d.budget;
@@ -1399,7 +1512,7 @@ function renderTrip(outcome) {
   const offerHtml = `<div class="card" style="margin-top:14px"><div class="offer">
       <div class="ok">Euer Angebot</div>
       <div class="big">${esc(chf(d.total))}</div>
-      <div class="meta">für 2 Personen · ${t.days.length} Tage · ${route.length === 1 ? "1 Ort" : route.length + " Orte"}</div>
+      <div class="meta">für 2 Personen · ${t.days.length === 1 ? "Tagesausflug" : t.days.length + " Tage"} · ${route.length === 1 ? "1 Ort" : route.length + " Orte"}</div>
       ${budgetHtml}
       <div class="routeline">${esc(route.map(r => r.name).join(" → "))}</div>
       ${t.summary ? `<div class="desc2">${esc(t.summary)}</div>` : ""}
@@ -1414,9 +1527,12 @@ function renderTrip(outcome) {
   const STEPS = ["Plan", "Auswählen", "Buchen", "Unterwegs"];
   const stepsHtml = `<div class="steps">${STEPS.map((x, i) => `<div class="st ${i < stage ? "done" : i === stage ? "cur" : ""}"><span class="dot">${i < stage ? ICO.check : i + 1}</span>${x}</div>`).join("")}</div>`;
   const NEXT = {
-    1: ["Hotel je Ort wählen und Verbindungen prüfen", "Unter «Unterkünfte» stehen je Ort drei Hotels in verschiedenen Preisklassen.",
-        `<button class="small" data-next="hotels">Zu den Hotels</button><button class="small" data-next="picked">Auswahl passt</button>`],
-    2: ["Hotels und Verbindungen buchen", "Über die Links bei Booking.com bzw. Google Flights buchen, Bestätigung mit «Buchung importieren» eintragen.",
+    1: t.stays.length ? ["Hotel je Ort wählen und Verbindungen prüfen", "Unter «Unterkünfte» stehen je Ort drei Hotels in verschiedenen Preisklassen.",
+        `<button class="small" data-next="hotels">Zu den Hotels</button><button class="small" data-next="picked">Auswahl passt</button>`]
+       : ["Programm und Fahrten prüfen", "Tagesplan durchsehen; Programmpunkte lassen sich antippen und festnageln.",
+        `<button class="small" data-next="picked">Auswahl passt</button>`],
+    2: !t.stays.length ? ["Tickets besorgen", "Zug- oder Bus-Tickets und Eintritte kaufen; Kompass bucht nichts selbst.",
+        `<button class="small" data-next="booked">Alles bereit</button>`] : ["Hotels und Verbindungen buchen", "Über die Links bei Booking.com bzw. Google Flights buchen, Bestätigung mit «Buchung importieren» eintragen.",
         `<button class="small" data-next="import">Buchung importieren</button><button class="small" data-next="booked">Alles gebucht</button>`],
     3: t.status === "unterwegs" ? ["Gute Reise!", "Kompass prüft jeden Morgen das Wetter und passt den Tag bei Bedarf an.", ""]
        : ["Alles bereit – gute Vorfreude!", `Ab ${fmtD(t.start_date, {day: "numeric", month: "long"})} prüft Kompass jeden Morgen um ${INFO.settings.check_time} Uhr (Ortszeit) das Wetter und passt den Tag bei Bedarf an.`, ""],
@@ -1447,7 +1563,7 @@ function renderTrip(outcome) {
     ${routeHtml}
     <h2 id="tDays">Tagesplan</h2>${dpick}<div class="card dayc">${days}</div>
     <p class="hint">Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
-    <h2 id="tStays">Unterkünfte</h2><div class="card">${stays}</div>
+    ${t.stays.length || t.days.length > 1 ? `<h2 id="tStays">Unterkünfte</h2><div class="card">${stays}</div>` : ""}
     <h2>Verbindungen</h2><div class="card">${trans}</div>
     ${!INFO.prices.available && t.transports.some(x => x.mode === "flug" && x.estimated) ? `<p class="hint">Echte Flugzeiten und Preise: SerpApi-Schlüssel unter Profil → KI hinterlegen.</p>` : ""}
     <p class="hint">Zeile antippen für Optionen, z. B. «Fällt aus …».</p>
@@ -1487,7 +1603,7 @@ function renderTrip(outcome) {
   $("tImport").onclick = () => openImport(tid);
   q("[data-next]").forEach(b => b.onclick = async () => {
     const k = b.dataset.next;
-    if (k === "hotels") $("tStays").scrollIntoView({behavior: "smooth", block: "start"});
+    if (k === "hotels" && $("tStays")) $("tStays").scrollIntoView({behavior: "smooth", block: "start"});
     else if (k === "picked") { try { localStorage.setItem("picked:" + tid, "1"); } catch {} renderTrip(); }
     else if (k === "import") openImport(tid);
     else if (k === "booked") actionSheet("Alles gebucht? Ab Reisebeginn passt Kompass den Plan dann jeden Morgen ans Wetter an.",
