@@ -274,6 +274,13 @@ class AppTest(unittest.TestCase):
             self.assertEqual(r.headers["Content-Type"], "image/svg+xml")
             self.assertEqual(r.headers.get_all("Cache-Control"), ["private, max-age=2592000"])
         self.assertEqual(self.call("GET", "/api/photo/" + "0" * 24)[0], 404)
+        # --- Reise als PDF (1.16.0): echte PDF-Datei mit Dateiname
+        req = urllib.request.Request(f"{self.base}/api/trips/{tid}/pdf", headers={"Cookie": AppTest.cookie})
+        with urllib.request.urlopen(req) as r:
+            pdf = r.read()
+            self.assertEqual(r.headers["Content-Type"], "application/pdf")
+            self.assertIn("filename*=UTF-8''Kompass%20-%20", r.headers["Content-Disposition"])
+        self.assertTrue(pdf.startswith(b"%PDF-") and len(pdf) > 5000)
         code, tl = self.call("GET", "/api/trips")
         self.assertTrue(tl["trips"][0]["photo"])
 

@@ -104,6 +104,7 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - `app/vision.py` Foto → Übersetzung (bei Schwangerschaft Hinweise; seit 1.7.3 nicht mehr in der Oberfläche), `app/drafting.py` Entwürfe (Vorlagen DE/EN ohne KI).
 - `app/flights.py` (1.8.0) automatische echte Flugangebote (SerpApi), siehe «Stand».
 - `app/sights.py` (1.15.0) TripAdvisor-Bewertung + Tipp für Sehenswürdigkeiten (SerpApi `engine=tripadvisor`), siehe «Stand».
+- `app/export.py` (1.16.0) Reise als PDF (fpdf2), siehe «Stand».
 - `app/fx.py` (1.7.3) Währungskurse für den Helfer-Rechner, siehe «Stand».
 - `app/service.py` Steuerzentrale: Ortszeit über Zeitzone des Tagesorts, Wettercheck, Ausfälle, Hintergrund-Aufträge
   (Planen/Ziele, im Speicher), Zeitplan (jede Minute; Reise «gebucht»/«unterwegs» → ab `check_time` Ortszeit einmal pro
@@ -118,13 +119,27 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (104 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (108 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.15.1)
+## Stand (07.11.2026, Version 1.16.0)
+- 1.16.0: Wunsch James: Reise als PDF exportieren. `app/export.py` baut das PDF auf dem Server (fpdf2 in requirements,
+  Pillow kommt mit; Schrift DejaVu Sans aus `fonts-dejavu-core` im Dockerfile, sonst Helvetica mit ersetzten Zeichen,
+  `TripPDF.t`). Inhalt: Titelbild (eigener Fotoordner, mittig zugeschnitten, als JPEG eingebettet – Rohpixel wären MB
+  gross; SVG/fremde Typen ohne Foto), Status, Titel, Datum/Tage/Orte, Route mit Nächten, Überblick, Preisbox (Flüge,
+  Unterkünfte, Programm, Budget), Unterkünfte und Verbindungen (Preis, gebucht/Vorschlag, Suchlink), «Tag für Tag»
+  ab neuer Seite (blaue Tageskopfzeile, Motto, Zeit, Titel, Angaben, Beschreibung, Restaurant-/TripAdvisor-Zeile als
+  Link, «**Tipp:**», kleines Foto rechts, kein Umbruch mitten im Punkt), Hinweise, Fusszeile «Seite n von N». Text
+  linksbündig (Blocksatz riss Lücken). `GET /api/trips/<id>/pdf` mit `Content-Disposition` (ASCII + `filename*`);
+  Dateiname «Kompass - <Titel>.pdf» mit Bindestrich (mit «–» verwarf Chrome den Namen → «download»). Oberfläche:
+  Teilen-Symbol oben rechts neben ★ (`#tPdf`) und «Als PDF exportieren» zuoberst in «Mehr» (`#tPdf2`) → `exportPdf`:
+  Touch-Gerät mit Web Share (Dateien) → Teilen-Menü (Dateien sichern, Mail, Drucken), sonst Download per Blob; läuft
+  das frische Antippen beim Laden ab (`NotAllowedError`), Aktionsblatt «PDF ist bereit → Teilen oder sichern».
+  Tests `tests/test_export.py` + Ende-zu-Ende; PDF mit nachgebildeten JPEG-Fotos angesehen; Playwright 390/1440 px
+  hell/dunkel (Download-Name geprüft). Teilen-Menü auf dem iPhone und Docker-Schrift nur dort prüfbar.
 - 1.15.1: James (Foto iPhone, Laos): Text im Tagesplan zu schmal, Platz links ungenutzt. Unter 600 px keine Zeitspalte
   mehr: Zeit «09:30 – 14:00» über dem Titel (`.tm`), Raster `30px 1fr auto`; Beschreibung (`.td`, 16 px, 3 Zeilen bis
   «Mehr») und Bewertungen (`.tx`) über die volle Breite unter Titel und Foto. Breit (≥ 600 px): Zeitspalte bleibt,
