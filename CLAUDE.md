@@ -123,7 +123,12 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.14.0)
+## Stand (07.11.2026, Version 1.14.1)
+- 1.14.1: James: «Die ganze App hat teilweise sehr klein geschriebene Texte». Schriftgrössen im CSS angehoben
+  (10→12, 11→13, 12→14, 13→15, 14→15, 15→16 px): Untertitel, Hinweise, Notizen, Abzeichen, Kacheln. Bewusst klein
+  bleiben (iOS-Standard bzw. Pflichtangabe): Beschriftung der Tab-Leiste 11 px, «© OpenStreetMap» 11 px, Ortsname in der
+  Tagesleiste 11 px, Zähler-Abzeichen 12 px; Abschnittstitel (h2) 14 px. Kleinste Schrift sonst 13 px. Playwright
+  390/1440 px hell/dunkel (alle Reiter, Reiseblatt, Tagesplan, Neue Reise, Vorschläge, Routen) ohne Überlauf; 96 Tests.
 - 1.14.0: Wunsch James: Tagesplanung «besser und übersichtlicher». Statt Klappliste aller Tage (`details.day`): Tagesleiste
   (`.dpick`, Kacheln Wochentag + Datum, Ortsname beim Ortswechsel, heute blau, gewählter Tag gefüllt, scrollt mittig) und
   genau ein Tag (`OPEN_DAYS.sel`, Standard heute bzw. Tag 1): Tageskopf (`.dhead`, Ortsfoto mit «Tag N von M · Datum», Ort,
