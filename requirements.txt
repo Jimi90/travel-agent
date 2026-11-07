@@ -1,2 +1,3 @@
 pydantic>=2.7,<3
 anthropic>=2.4,<3
+fpdf2>=2.8,<3

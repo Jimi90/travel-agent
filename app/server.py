@@ -12,12 +12,12 @@ from decimal import Decimal
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from pydantic import ValidationError
 
 from . import auth, bookings, config, drafting, flights, fx, hotels, llm, photos, prices, service, store, tiles, vision
-from . import sights, venues, weather
+from . import export, sights, venues, weather
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -301,6 +301,12 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"trips": [trip_summary(t) for t in service.sm().list()]})
         if m := re.fullmatch(rf"/api/trips/({ID})", p):
             return self._send(200, trip_detail(m.group(1)))
+        if m := re.fullmatch(rf"/api/trips/({ID})/pdf", p):  # Reise als PDF (1.16.0)
+            data, name = export.build(m.group(1))
+            ascii_name = re.sub(r"[^A-Za-z0-9 ._()-]", "_", name)
+            return self._send(200, data, "application/pdf", {
+                "Content-Disposition": f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(name)}",
+                "Cache-Control": "no-store"})
         if p == "/api/household":
             h = store.household()
             return self._send(200, {"household": h.model_dump(mode="json"),

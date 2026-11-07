@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1 \
     PORT=8000
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tzdata \
+ && apt-get install -y --no-install-recommends tzdata fonts-dejavu-core \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /srv
