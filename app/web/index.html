@@ -327,9 +327,21 @@ details.day>summary::after{margin-left:auto;color:var(--muted);font-size:22px}
 .tt{text-align:right;font-variant-numeric:tabular-nums;line-height:1.2;padding-top:5px}
 .tt b{display:block;font-size:16px;font-weight:600}
 .tt small{font-size:14px;color:var(--muted)}
-.tr{position:relative;display:flex;justify-content:center;align-self:stretch;grid-row:1/span 2}
+.tr{position:relative;display:flex;justify-content:center;align-self:stretch;grid-row:1/span 3}
+/* Raster: Kopf (Titel/Angaben) neben dem Foto, Beschreibung (.td) und Bewertungen (.tx) darunter über die volle Breite */
 .ti>.tt{grid-area:1/1}.ti>.tr{grid-column:2}.ti>.tc{grid-area:1/3}.ti>.tthumb{grid-area:1/4}
-.tx{grid-area:2/3/3/5;min-width:0}
+.td{grid-area:2/3/3/4;min-width:0}.tx{grid-area:3/3/4/5;min-width:0}
+.ti>.tthumb{grid-row:1/span 2}  /* breit: Beschreibung neben dem Foto, keine Lücke */
+.tc .tm{display:none}
+.td .desc,.td .note{font-size:16px;line-height:1.45;opacity:1;color:var(--text)}
+.td .desc.clamp,.td .note.clamp{-webkit-line-clamp:3}
+@media (max-width:599px){  /* iPhone: Zeit über den Titel statt eigener Spalte → Text bekommt die Breite */
+  .ti{grid-template-columns:30px minmax(0,1fr) auto;padding-left:12px}
+  .ti>.tt{display:none}.ti>.tr{grid-column:1}.ti>.tc{grid-area:1/2}.ti>.tthumb{grid-area:1/3/2/4}
+  .td{grid-area:2/2/3/4}.tx{grid-area:3/2/4/4}
+  .tc .tm{display:block;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);margin:5px 0 1px}
+  .tc .tm b{color:var(--text)}
+}
 .tr::before{content:"";position:absolute;top:-12px;bottom:-12px;left:50%;width:2px;margin-left:-1px;background:var(--line)}
 .ti:first-child .tr::before{top:15px}
 .ti:last-child .tr::before{bottom:calc(100% - 15px)}
@@ -715,7 +727,7 @@ function venueHtml(v, aid) {
   const cnt = r => Number(r || 0).toLocaleString("de-CH");
   const stars = v.rating ? `<span class="vstar ${v.weak ? "low" : ""}">★ ${Number(v.rating).toFixed(1)}</span>${v.reviews ? `<span class="vrev">(${esc(cnt(v.reviews))} Bewertungen)</span>` : ""}` : `<span class="vrev">Bewertungen ansehen</span>`;
   return `<a class="venue" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer"><span class="vpin">${ICO.pin}</span>
-    <span class="vnm">${esc(v.name)}</span>${stars}<span class="vgo">Google Maps ↗</span></a>`;
+    <span class="vnm">${esc(v.name)}</span>${stars}<span class="vgo">Google Maps ↗︎</span></a>`;
 }
 // Sehenswürdigkeit im Tagesplan (1.15.0): TripAdvisor-Bewertung, Link und ein Tipp aus den Bewertungen
 function sightHtml(v) {
@@ -723,7 +735,7 @@ function sightHtml(v) {
   const cnt = r => Number(r || 0).toLocaleString("de-CH");
   const stars = v.rating ? `<span class="vstar ${v.weak ? "low" : ""}">★ ${Number(v.rating).toFixed(1)}</span>${v.reviews ? `<span class="vrev">(${esc(cnt(v.reviews))} Bewertungen)</span>` : ""}` : `<span class="vrev">Bewertungen ansehen</span>`;
   return `<a class="sight" href="${esc(v.url)}" target="_blank" rel="noopener noreferrer"><span class="srow"><span class="vpin">${ICO.chat}</span>
-    <span class="ssrc">TripAdvisor</span>${stars}<span class="vgo">Ansehen ↗</span></span>
+    <span class="ssrc">TripAdvisor</span>${stars}<span class="vgo">Ansehen ↗︎</span></span>
     ${v.tip ? `<span class="stip"><b>Tipp</b><span>${esc(v.tip)}</span></span>` : ""}</a>`;
 }
 // Tagesplan: Symbol und Farbe je Kategorie (Linien-Symbole, keine Emojis)
@@ -1236,14 +1248,15 @@ function renderTrip(outcome) {
       const pic = a.category !== "kulinarik" ? P.activities[actKey(a.title)] : null;
       const meta = [CATS[a.category] || a.category, a.exposure === "outdoor" ? "draussen" : "", a.intensity === 3 ? "anstrengend" : "", Number(a.cost) ? chf(a.cost) : ""].filter(Boolean).join(" · ");
       const extra = venueHtml((d.venues || {})[a.id], a.id) + sightHtml((d.sights || {})[a.id]);  // volle Breite unter dem Foto
+      if (a.note && a.note.startsWith("Sehr gut bewertet")) a.note = a.note.replace(/, [23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3}[^.]*\./, ".");  // ältere Pläne: Plus Code statt Adresse
       const long = !!a.note;  // alle Beschreibungen 2 Zeilen; «Mehr» verschwindet, wenn alles Platz hat
       return `<div class="ti act tap ${isNew ? "new" : ""}" data-act="${esc(a.id)}">
         <div class="tt"><b>${hm(a.start)}</b><small>${hm(a.end)}</small></div>
         <div class="tr"><span class="tic" style="--c:${CAT_COL[a.category] || "var(--accent)"}">${CAT_ICO[a.category] || CAT_ICO.kultur}</span></div>
-        <div class="tc"><div class="t">${esc(a.title)}${badge}</div><div class="s">${esc(meta)}</div>
-          ${a.note ? `<div class="${isNew ? "note" : "desc"} ${long ? "clamp" : ""}">${esc(a.note)}</div>${long ? `<button class="more" data-more>Mehr</button>` : ""}` : ""}
-          </div>
-        ${pic ? photo(pic, "tthumb", a.title) : ""}${extra ? `<div class="tx">${extra}</div>` : ""}</div>`;
+        <div class="tc"><div class="tm"><b>${hm(a.start)}</b> – ${hm(a.end)}</div><div class="t">${esc(a.title)}${badge}</div><div class="s">${esc(meta)}</div></div>
+        ${pic ? photo(pic, "tthumb", a.title) : ""}
+        ${a.note ? `<div class="td"><div class="${isNew ? "note" : "desc"} ${long ? "clamp" : ""}">${esc(a.note)}</div>${long ? `<button class="more" data-more>Mehr</button>` : ""}</div>` : ""}
+        ${extra ? `<div class="tx">${extra}</div>` : ""}</div>`;
     }).join("");
     days = head + (items ? `<div class="tl">${items}</div>` : `<div class="empty">Freier Tag – nichts geplant.</div>`)
       + `<div class="dnav">${di > 0 ? `<button class="small" data-day="${esc(t.days[di - 1].date)}">‹ Tag ${di}</button>` : "<span></span>"}
@@ -1271,7 +1284,7 @@ function renderTrip(outcome) {
       <span class="dotsel"></span><div class="grow"><div class="t" style="font-size:16px">${esc(o.name)}${o.tier ? `<span class="badge">${esc(TIER[o.tier] || o.tier)}</span>` : ""}</div>
       <div class="${o.live ? "live" : "s"}">${o.live ? "" : "ca. "}CHF ${Math.round(night)}/Nacht · CHF ${Math.round(total).toLocaleString("de-CH")}${rate}${o.area ? ` · ${esc(o.area)}` : ""}</div>
       ${o.photos && o.photos.length ? `<div class="hstrip">${o.photos.slice(0, 3).map(id => photo(id, "", o.name)).join("")}</div>`
-        : `<div class="s nophoto">${o.searched ? "Keine Fotos gefunden · " : "Fotos werden gesucht … "}<a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(o.name + " " + s.place.name)}" target="_blank" rel="noopener noreferrer">Bilder ansehen ↗</a></div>`}
+        : `<div class="s nophoto">${o.searched ? "Keine Fotos gefunden · " : "Fotos werden gesucht … "}<a href="https://www.google.com/search?tbm=isch&q=${encodeURIComponent(o.name + " " + s.place.name)}" target="_blank" rel="noopener noreferrer">Bilder ansehen ↗︎</a></div>`}
       ${o.chosen && o.why ? `<div class="s">${esc(o.why)}</div>` : ""}</div></div>`;
     }).join("");
   };
@@ -1279,7 +1292,7 @@ function renderTrip(outcome) {
       <div class="t">${esc(s.name)}</div>
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in, {day: "numeric", month: "short"}))} – ${esc(fmtD(s.check_out, {day: "numeric", month: "short"}))} · ${nightsOf(s.check_in, s.check_out)} Nächte${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div></div>
       <span class="pr"><b>${esc(chf(s.cost))}</b><small class="${s.confirmed ? "okc" : "warnt"}">${s.confirmed ? "gebucht" : "Vorschlag"}</small></span></div>${hotelChoice(s)}
-      <div class="foot">${s.search_url ? `<a href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Booking.com ↗</a>` : ""}
+      <div class="foot">${s.search_url ? `<a href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Booking.com ↗︎</a>` : ""}
         ${!s.confirmed && INFO.prices.available ? `<button data-price="unterkunft:${esc(s.id)}">Andere Hotels</button>` : ""}
         <button data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
 

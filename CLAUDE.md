@@ -118,13 +118,19 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
   Filter «Alle/Ausgewählt»; Namen per `Intl.DisplayNames` (kein Länder-Wörterbuch im Code nötig).
 
 ## Testen
-- `python -m unittest -v` (103 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
+- `python -m unittest -v` (104 Tests inkl. Varianten/Hotelwahl/Kacheln im Ende-zu-Ende-Test, ohne Netz/Kosten; `tests/test_app.py` = ganzer Ablauf über die API im Testmodus).
 - App: `APP_PASSWORD=<≥16> FAKE_MODE=1 DATA_DIR=<Ordner> PORT=8000 python -m app.server`. Testwetter:
   `<DATA_DIR>/fake_weather.json` = `{"YYYY-MM-DD": "regen|nachmittag|gewitter|sonne"}`. Testplan ab 5 Tagen mit Fähre.
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.15.0)
+## Stand (07.11.2026, Version 1.15.1)
+- 1.15.1: James (Foto iPhone, Laos): Text im Tagesplan zu schmal, Platz links ungenutzt. Unter 600 px keine Zeitspalte
+  mehr: Zeit «09:30 – 14:00» über dem Titel (`.tm`), Raster `30px 1fr auto`; Beschreibung (`.td`, 16 px, 3 Zeilen bis
+  «Mehr») und Bewertungen (`.tx`) über die volle Breite unter Titel und Foto. Breit (≥ 600 px): Zeitspalte bleibt,
+  Beschreibung neben dem Foto (Foto über 2 Zeilen, keine Lücke). «↗» mit Text-Variante (U+FE0E), iOS zeigte ein blaues
+  Emoji. Notiz getauschter Restaurants ohne Google-«Plus Code» als Adresse («V4WR+6Q …», `venues._PLUS_CODE`; ältere Notizen
+  im Browser bereinigt). Playwright 390/1440 px hell/dunkel; 104 Tests.
 - 1.15.0: James: «Berücksichtigen wir Tipps von TripAdvisor?» → ja, für Sehenswürdigkeiten/Ausflüge (Restaurants bleiben
   Google). `app/sights.py` wie `venues.py`: Suchbegriff nur der Wikipedia-Titel der KI (`subject`; am Titel ist «Eigenname»
   nicht erkennbar, deutsche Nomen sind gross), SerpApi `engine=tripadvisor`, `ssrc=A` (nur «Things to Do»), Felder `places[]`
