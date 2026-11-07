@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from . import auth, bookings, config, drafting, flights, fx, hotels, llm, photos, prices, service, store, tiles, vision
-from . import venues, weather
+from . import sights, venues, weather
 from .models import ChangeSet, Household, SetConfirmed, SetFixed, SetTripStatus, UpdateStay, UpdateTransport
 from .models.common import CATEGORY_LABELS
 from .planning.matching import match
@@ -110,6 +110,8 @@ def trip_detail(trip_id: str) -> dict:
     it = sm.get(trip_id)
     if venues.improvable(it) and venues.auto_improve(trip_id):  # schwach bewertete Restaurants gleich ersetzen
         it = sm.get(trip_id)
+    if sights.improvable(it) and sights.auto_improve(trip_id):  # schwach bewertete Sehenswürdigkeiten ebenso
+        it = sm.get(trip_id)
     now, today = service.current_day(it)
     data = it.model_dump(mode="json")
     for day, raw in zip(it.days, data["days"]):
@@ -129,6 +131,9 @@ def trip_detail(trip_id: str) -> dict:
         pending = True
     if venues.missing(it):
         venues.enrich(it)  # Google-Bewertungen der Restaurants (SerpApi Google Maps), ebenfalls im Hintergrund
+        pending = True
+    if sights.missing(it):
+        sights.enrich(it)  # TripAdvisor-Bewertungen + Tipps der Sehenswürdigkeiten, ebenfalls im Hintergrund
         pending = True
     tp = photos.trip_photos(it.id)
     # Titelbild: zuerst ein Programmpunkt-Foto (Strand, Wahrzeichen), erst dann das Foto des Ortsartikels
@@ -156,7 +161,7 @@ def trip_detail(trip_id: str) -> dict:
     budget = store.household().constraints.budget_for_trip(it)
     return {"trip": data, "total": str(it.total_cost()), "now": now.isoformat(),
             "hotel_options": hotel_opts, "costs": costs, "budget": float(budget) if budget else None,
-            "photos": tp, "photos_pending": pending, "flight_live": flights.for_trip(it), "venues": venues.for_trip(it), "live_day": live_day(it, today),
+            "photos": tp, "photos_pending": pending, "flight_live": flights.for_trip(it), "venues": venues.for_trip(it), "sights": sights.for_trip(it), "live_day": live_day(it, today),
             "hero": {"id": hero, "title": hero_meta.get("title", ""), "page": hero_meta.get("page", ""),
                      "source": hero_meta.get("source", "")} if hero else None,
             "today": today.date.isoformat() if today else None, "history": list(reversed(hist)),
