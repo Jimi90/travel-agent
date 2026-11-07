@@ -24,6 +24,7 @@ class SuggestTest(unittest.TestCase):
             return (ta or {}).get(name)
         with mock.patch.object(config, "FAKE_MODE", True), mock.patch.object(DT.llm, "ask", ask), \
                 mock.patch.object(DT.sights, "lookup", lookup), mock.patch.object(DT.sights, "tips_for", lambda *a: True), \
+                mock.patch.object(DT.sights, "cached", lambda n, p: (ta or {}).get(n)), \
                 mock.patch.object(DT.sights, "nearby", return_value=[{"title": "Rheinfall", "rating": 4.6, "location": "Neuhausen"}]), \
                 mock.patch.object(DT.photos, "destination_photo", return_value=None):
             res = DT.suggest(household(), ZH, date.today() + timedelta(days=2), max_minutes, mode, "See")
