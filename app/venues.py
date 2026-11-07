@@ -30,6 +30,9 @@ _MEAL = re.compile(r"^\s*(?:gemeinsames\s+)?(?:frühstück|brunch|mittagessen|lu
 _GENERIC = {"hotel", "unterkunft", "resort", "zimmer", "restaurant", "café", "cafe", "bar", "markt", "nachtmarkt",
             "altstadt", "strand", "hafen", "lokal", "lokalen", "einheimischen", "guesthouse", "riad"}
 
+# Google liefert in Laos & Co. oft nur einen «Plus Code» als Adresse («V4WR+6Q Luang Prabang») – sagt niemandem etwas
+_PLUS_CODE = re.compile(r"^\s*[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3}\b")
+
 _lock = threading.Lock()
 _running: set[str] = set()
 
@@ -293,7 +296,8 @@ def swapped(a, better: dict):
         old = venue_of(a) or ""
         title = a.title.replace(old, better["name"]) if old and old in a.title else f"{a.title} – {better['name']}"
     note = (f"Sehr gut bewertet: ★ {better['rating']:.1f} ({better['reviews']:,} Google-Bewertungen)".replace(",", "'")
-            + (f", {better['address']}" if better.get("address") else "") + ". Reservation empfohlen.")
+            + (f", {better['address']}" if better.get("address") and not _PLUS_CODE.match(better["address"]) else "")
+            + ". Reservation empfohlen.")
     return a.model_copy(update={"title": title[:160], "venue": better["name"][:120], "note": note, "wiki": None})
 
 

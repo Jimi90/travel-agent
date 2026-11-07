@@ -35,6 +35,16 @@ class VenueTest(unittest.TestCase):
         self.assertIn("query_place_id=abc", u)
 
 
+class PlusCodeTest(unittest.TestCase):
+    def test_no_plus_code_in_note(self):
+        a = NS(title="Mittagessen im Riverside", category="kulinarik", venue="Riverside",
+               model_copy=lambda update: NS(**update))
+        n = venues.swapped(a, {"name": "Wat Sene Alley", "rating": 4.8, "reviews": 290, "address": "V4WR+6Q Luang Prabang"})
+        self.assertEqual(n.note, "Sehr gut bewertet: ★ 4.8 (290 Google-Bewertungen). Reservation empfohlen.")
+        n = venues.swapped(a, {"name": "X Bar", "rating": 4.8, "reviews": 290, "address": "Rua Augusta 12"})
+        self.assertIn(", Rua Augusta 12.", n.note)
+
+
 class BetterTest(unittest.TestCase):
     """Wunsch James: «Es sollen schon gut bewertete Restaurants sein» – unter 4.5 ★ ein besseres vorschlagen."""
 
