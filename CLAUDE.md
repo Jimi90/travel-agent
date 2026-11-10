@@ -126,7 +126,21 @@ Tailscale Funnel (`https://kompass.<tailnet>.ts.net`, Container `kompass` + `kom
 - Playwright bei 390 px, hell/dunkel. Open-Meteo und Claude sind aus der Cloud nicht erreichbar bzw. ohne Schlüssel:
   dort nur mit nachgebildeten Antworten geprüft. Docker baut nur GitHub.
 
-## Stand (07.11.2026, Version 1.17.2)
+## Stand (10.11.2026, Version 1.18.0)
+- 1.18.0: Wunsch James: Oberfläche «noch einfacher zu bedienen und wirklich professionell». Nur `index.html`:
+  (1) Reiseblatt: Sprungleiste `#tJump` (`.jump`, klebt unter der Titelleiste, Blur-Material) mit Überblick · Route ·
+  Tagesplan · Unterkünfte · Verbindungen · Mehr; Antippen scrollt zum Abschnitt (Anker `tRoute`/`tDays`/`tStays`/`tTrans`/
+  `tMore`, `scroll-margin-top` auf h2 in Blättern), beim Scrollen wird der aktuelle Abschnitt markiert (`jumpUpdate`,
+  `JUMP_LOCK` während des sanften Scrollens, ganz unten = «Mehr»). Seitenspalte am PC darum `top:112px`.
+  (2) Verbindungen als klare Zeilen (`.segrow`): Strecke + Preis in einer Zeile, darunter Zeit fett + Datum, dann
+  «Flug · Dauer · direkt · Airline», Status als farbiges Abzeichen (`.badge.okb`/`.warnb`: Google Flights/übernommen/
+  gebucht/Schätzung), «Flug übernehmen» + «Bisher im Plan: …» nur bei offenem Angebot (Antippen öffnet weiter das
+  Aktionsblatt). (3) «Neue Reise»: Segment «Vorschläge · Eigenes Ziel · Tagesausflug» (vorher zweizeilig bei 390 px;
+  `.seg button` nie umbrechen). (4) Hinweise zum Plan als Kasten mit !-Symbol (`.callout`, je Hinweis ein Absatz).
+  (5) Hotel-Fusszeile einzeilig («Booking.com · Andere Hotels · Als gebucht»), «Status von Hand ändern» mit Pfeil rechts.
+  Playwright 390 px hell/dunkel und 1440 px im Testmodus, keine JS-Fehler. In der Cloud fehlt fpdf2 (keine Installation
+  möglich): Tests mit Platzhalter-Modul, 115 von 116 grün, `test_full_flow` scheitert dort nur am PDF – auf GitHub prüfen.
+  Auf dem iPhone prüfbar: Blur der Sprungleiste, Safe Area.
 - 1.17.2: Wunsch James: bei Tagesausflügen 5–6 Vorschläge (vorher blieben nach dem Aussortieren oft nur 3).
   `daytrips.suggest`: KI wird nach `ASK` 9 Ideen gefragt, gezeigt werden höchstens `SHOW` 6 (TripAdvisor-Suchen nur für
   die, die gezeigt werden – `check()` hört bei 6 auf); bleiben weniger als `MIN_SHOW` 5, einmal nachfragen mit «Bereits
