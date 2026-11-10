@@ -68,7 +68,7 @@ select{-webkit-appearance:none;appearance:none;padding-right:24px!important;curs
 .small:active{opacity:.6}
 .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .seg{display:flex;background:rgba(118,118,128,.16);border-radius:9px;padding:2px;gap:2px}
-.seg button{flex:1;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:6px 4px;border-radius:7px;cursor:pointer;min-width:0}
+.seg button{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:0;background:transparent;color:var(--text);font:inherit;font-size:15px;padding:6px 4px;border-radius:7px;cursor:pointer;min-width:0}
 .seg button.on{background:var(--segon);box-shadow:0 3px 8px rgba(0,0,0,.12),0 3px 1px rgba(0,0,0,.04);font-weight:600}
 .pref{display:grid;grid-template-columns:110px 1fr;gap:10px;align-items:center;padding:6px 16px}
 .pref .seg button{font-size:16px;padding:5px 0}
@@ -454,6 +454,30 @@ details.pdet .costs{margin:0 0 12px}
 .sight .stip{display:flex;gap:6px;margin-top:6px;padding-top:6px;border-top:.5px solid var(--line);line-height:1.4}
 .sight .stip b{font-weight:600;white-space:nowrap}
 .callout{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;font-size:15px;line-height:1.45;color:var(--warn)}
+/* 1.18.0: Sprungleiste im Reiseblatt, Verbindungen als klare Zeilen, Hinweis-Kasten */
+.sheet h2,.sheet .anchor{scroll-margin-top:calc(env(safe-area-inset-top) + 106px)}
+.jump{position:sticky;top:calc(env(safe-area-inset-top) + 50px);z-index:4;margin:8px -16px 0;padding:8px 16px;display:flex;gap:8px;overflow-x:auto;
+  scrollbar-width:none;background:var(--bar);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 .5px 0 var(--line)}
+.jump::-webkit-scrollbar{display:none}
+.jump button{flex:none;border:0;background:rgba(118,118,128,.14);color:var(--text);font:inherit;font-size:15px;font-weight:500;padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.jump button.on{background:var(--accent);color:var(--onaccent);font-weight:600}
+.jump button:active{opacity:.6}
+.segrow{align-items:flex-start}
+.segrow.chev::after{align-self:center}
+.segtop{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.segtop .t{min-width:0}
+.segtop .price{flex:none;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.segtime{font-size:16px;margin-top:3px}.segtime b{font-weight:600;font-variant-numeric:tabular-nums}
+.segfoot{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:8px}
+.segfoot .badge{margin-left:0;vertical-align:0}
+.badge.okb{background:color-mix(in srgb,var(--ok) 15%,transparent);color:var(--ok)}
+.badge.warnb{background:color-mix(in srgb,var(--warn) 15%,transparent);color:var(--warn)}
+.segfoot .take{font-size:14px;font-weight:600;color:var(--accent)}
+.callout{color:var(--text);background:color-mix(in srgb,var(--warn) 11%,transparent)}
+.callout .cic{flex:none;width:22px;height:22px;border-radius:50%;background:var(--warn);color:#fff;font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.callout p{margin:0}.callout p+p{margin-top:6px}
+.foot>*{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more details>summary:not(:has(.cnt2))::after{margin-left:auto}
 /* Laden und Fehler (1.11.0) */
 .sk .b{background:linear-gradient(90deg,var(--card2) 0,color-mix(in srgb,var(--card2) 35%,var(--card)) 50%,var(--card2) 100%);background-size:200% 100%;animation:shim 1.3s linear infinite;border-radius:6px}
 @keyframes shim{to{background-position:-200% 0}}
@@ -493,6 +517,8 @@ details.errd .s{margin-top:4px}
   .sheet{left:var(--side);box-shadow:-1px 0 0 var(--line)}
   .sheet>.in{max-width:920px;padding:0 48px 64px}
   .topbar{margin:0 -48px;padding:14px 48px 10px;min-height:56px}
+  .jump{top:56px;margin:8px -48px 0;padding:8px 48px}
+  .sheet h2,.sheet .anchor{scroll-margin-top:118px}
   .sheet{overflow-x:hidden}
   /* Leiste über die ganze Breite des Blatts, auch wenn der Inhalt schmaler ist */
   .topbar,.topbar.solid{background:none;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
@@ -531,7 +557,7 @@ details.errd .s{margin-top:4px}
 @media (min-width: 1200px){
   #tripSheet>.in{max-width:1240px}
   .tgrid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:24px;align-items:start}
-  .tside{grid-column:2;grid-row:1;position:sticky;top:70px;max-height:calc(100vh - 80px);overflow-y:auto;scrollbar-width:none}
+  .tside{grid-column:2;grid-row:1;position:sticky;top:112px;max-height:calc(100vh - 122px);overflow-y:auto;scrollbar-width:none}
   .tside::-webkit-scrollbar{display:none}
   .tmain{grid-column:1;grid-row:1;min-width:0}
   .tmain>*:first-child{margin-top:14px}
@@ -643,7 +669,7 @@ details.errd .s{margin-top:4px}
   <div class="topbar"><button class="back" data-close="newSheet">Reisen</button></div>
   <h1>Neue Reise</h1>
   <div class="seg" id="nMode" style="margin-top:14px">
-    <button data-mode="vorschlag" class="on">Ziele vorschlagen</button><button data-mode="ziel">Ich weiss das Ziel</button><button data-mode="ausflug">Tagesausflug</button>
+    <button data-mode="vorschlag" class="on">Vorschläge</button><button data-mode="ziel">Eigenes Ziel</button><button data-mode="ausflug">Tagesausflug</button>
   </div>
   <p class="hint" id="nModeHint"></p>
   <div class="card" id="nDayCard" style="margin-top:14px" hidden>
@@ -879,6 +905,17 @@ function closeSheet(id) { $(id).classList.remove("open"); if (!document.querySel
 document.querySelectorAll("[data-close]").forEach(b => b.onclick = () => closeSheet(b.dataset.close));
 
 // ---------- Titelleiste beim Scrollen (wie iOS: grosser Titel verschwindet → kleiner Titel oben) ----------
+// Sprungleiste im Reiseblatt (1.18.0): markiert den Abschnitt, der gerade oben steht
+let JUMP_LOCK = 0;
+function jumpUpdate() {
+  const bar = $("tJump"); if (!bar || Date.now() < JUMP_LOCK) return;
+  const edge = bar.getBoundingClientRect().bottom + 24; let cur = "tTop";
+  bar.querySelectorAll("[data-jump]").forEach(b => { const el = $(b.dataset.jump); if (el && b.dataset.jump !== "tTop" && el.getBoundingClientRect().top <= edge) cur = b.dataset.jump; });
+  const sh = $("tripSheet"); if (sh.scrollTop > 0 && sh.scrollTop + sh.clientHeight >= sh.scrollHeight - 4) cur = "tMore";  // ganz unten
+  bar.querySelectorAll("[data-jump]").forEach(b => { const on = b.dataset.jump === cur;
+    if (on && !b.classList.contains("on")) bar.scrollTo({left: b.offsetLeft - bar.clientWidth / 2 + b.offsetWidth / 2, behavior: "smooth"});
+    b.classList.toggle("on", on); });
+}
 function navUpdate(scroller) {
   if (scroller && scroller.classList && scroller.classList.contains("sheet")) {
     const bar = scroller.querySelector(".topbar"), h = scroller.querySelector("h1");
@@ -894,7 +931,7 @@ function navUpdate(scroller) {
   nb.classList.toggle("on", h.getBoundingClientRect().bottom < nb.getBoundingClientRect().bottom);
 }
 window.addEventListener("scroll", () => navUpdate(null), {passive: true});
-document.addEventListener("scroll", e => { if (e.target !== document) navUpdate(e.target); }, {passive: true, capture: true});
+document.addEventListener("scroll", e => { if (e.target !== document) { navUpdate(e.target); if (e.target.id === "tripSheet") jumpUpdate(); } }, {passive: true, capture: true});
 
 // ---------- Ansichten ----------
 function show(view) {
@@ -1422,7 +1459,7 @@ function renderTrip(outcome) {
   const route = []; t.days.forEach(day => { const last = route[route.length - 1];
     if (last && last.name === day.base.name) last.nights++; else route.push({name: day.base.name, lat: day.base.lat, lon: day.base.lon, nights: 1}); });
   route.forEach((r, i) => { if (i === route.length - 1) r.nights = Math.max(0, r.nights - 1); });
-  const routeHtml = `<h2>Route</h2><div class="card">${mapHtml(route, "big") || ""}
+  const routeHtml = `<h2 id="tRoute">Route</h2><div class="card">${mapHtml(route, "big") || ""}
     ${route.map((r, i) => `<div class="row"><span class="num">${i + 1}</span><div class="grow t">${esc(r.name)}</div><span class="val">${r.nights ? r.nights + (r.nights === 1 ? " Nacht" : " Nächte") : "Abreise"}</span></div>`).join("")}</div>`;
 
   const hotelChoice = s => {
@@ -1448,9 +1485,9 @@ function renderTrip(outcome) {
       <div class="t">${esc(s.name)}</div>
       <div class="s">${esc(s.place.name)} · ${esc(fmtD(s.check_in, {day: "numeric", month: "short"}))} – ${esc(fmtD(s.check_out, {day: "numeric", month: "short"}))} · ${nightsOf(s.check_in, s.check_out)} Nächte${s.booking && s.booking.reference ? " · Ref. " + esc(s.booking.reference) : ""}</div></div>
       <span class="pr"><b>${esc(chf(s.cost))}</b><small class="${s.confirmed ? "okc" : "warnt"}">${s.confirmed ? "gebucht" : "Vorschlag"}</small></span></div>${hotelChoice(s)}
-      <div class="foot">${s.search_url ? `<a href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Booking.com ↗︎</a>` : ""}
+      <div class="foot">${s.search_url ? `<a href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Booking.com</a>` : ""}
         ${!s.confirmed && INFO.prices.available ? `<button data-price="unterkunft:${esc(s.id)}">Andere Hotels</button>` : ""}
-        <button data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht markieren"}</button></div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
+        <button data-conf="unterkunft:${esc(s.id)}:${s.confirmed ? 0 : 1}">${s.confirmed ? "Als Vorschlag" : "Als gebucht"}</button></div></div>`).join("") || `<div class="empty">Keine Unterkünfte</div>`;
 
   const C = d.costs || {}, total = Object.values(C).reduce((a, b) => a + b, 0);
   // Hinweise, die schon das Etikett «Schätzung» bzw. der Preis «inklusive» sagt, nicht wiederholen
@@ -1463,18 +1500,21 @@ function renderTrip(outcome) {
     const L = liveOf(x), ai = L ? appliedOpt(x) : -1, o = L ? L.options[ai >= 0 ? ai : 0] : null;
     const mins = o ? `${Math.floor(o.duration_min / 60)} Std. ${String(o.duration_min % 60).padStart(2, "0")} Min.` : "";
     const waiting = !L && x.mode === "flug" && x.estimated && x.origin_code && INFO.prices.available;
-    const planned = `${esc(fmtD(x.depart))} · ${esc(tm(x.depart))} – ${esc(tm(x.arrive))}${x.via.length ? " · via " + esc(x.via.join(", ")) : ""}${x.carrier ? " · " + esc(x.carrier) : ""}`;
-    return `<div class="row tap chev" data-seg="${esc(x.id)}"><span class="mic">${MODE_ICO[x.mode] || MODE_ICO.flug}</span><div class="grow">
-      <div class="t">${esc(x.origin.name)} → ${esc(x.destination.name)}</div><div class="s" style="margin-top:0">${esc(MODE[x.mode] || x.mode)}</div>
-      ${o ? `<div class="s">${esc(fmtD(o.depart))} · <b>${esc(tm(o.depart))} – ${esc(tm(o.arrive))}${plus(o.depart, o.arrive)}</b></div>
-        <div class="s">${mins} · ${o.via.length ? "via " + esc(o.via.join(", ")) : "direkt"} · ${esc(o.carrier)}${o.number ? " " + esc(o.number) : ""}</div>
-        ${ai >= 0 ? "" : `<div class="s fl-plan">Im Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${Number(x.cost) ? esc(chf(x.cost)) : "im Ticket enthalten"} · antippen zum Übernehmen</div>`}`
-        : `<div class="s">${planned}</div>`}
+    const price = o ? esc(chf(o.price)) : (Number(x.cost) ? esc(chf(x.cost)) : "inklusive");
+    const state = o ? (ai >= 0 ? ["okb", "übernommen"] : ["okb", "Google Flights"]) : x.estimated ? ["warnb", "Schätzung"] : ["okb", "gebucht"];
+    const when = o ? `<b>${esc(tm(o.depart))} – ${esc(tm(o.arrive))}${plus(o.depart, o.arrive)}</b> · ${esc(fmtD(o.depart))}`
+      : `<b>${esc(tm(x.depart))} – ${esc(tm(x.arrive))}</b> · ${esc(fmtD(x.depart))}`;
+    const meta = [MODE[x.mode] || x.mode, ...(o ? [mins, o.via.length ? "via " + o.via.join(", ") : "direkt", o.carrier + (o.number ? " " + o.number : "")]
+      : [x.via.length ? "via " + x.via.join(", ") : "", x.carrier || ""])].filter(Boolean).join(" · ");
+    return `<div class="row tap chev segrow" data-seg="${esc(x.id)}"><span class="mic">${MODE_ICO[x.mode] || MODE_ICO.flug}</span><div class="grow">
+      <div class="segtop"><div class="t">${esc(x.origin.name)} → ${esc(x.destination.name)}</div><span class="price">${price}</span></div>
+      <div class="segtime">${when}</div>
+      <div class="s">${esc(meta)}</div>
       ${x.note && !redundant(x.note) ? `<div class="s">${esc(x.note)}</div>` : ""}
       ${waiting ? `<div class="s fl-wait"><span class="spin"></span>Hole aktuelle Flüge von Google Flights …</div>` : ""}
-      ${!L && FL[x.id] && FL[x.id].error ? `<div class="s">Echte Flugdaten: ${esc(FL[x.id].error)}</div>` : ""}</div>
-      <span class="pr"><b>${o ? esc(chf(o.price)) : (Number(x.cost) ? esc(chf(x.cost)) : "inklusive")}</b>
-        <small class="${o ? "okc" : x.estimated ? "warnt" : "okc"}">${o ? (ai >= 0 ? "übernommen" : "Google Flights") : x.estimated ? "Schätzung" : "gebucht"}</small></span></div>`;
+      ${!L && FL[x.id] && FL[x.id].error ? `<div class="s">Echte Flugdaten: ${esc(FL[x.id].error)}</div>` : ""}
+      <div class="segfoot"><span class="badge ${state[0]}">${state[1]}</span>${o && ai < 0 ? `<span class="take">Flug übernehmen</span>` : ""}</div>
+      ${o && ai < 0 ? `<div class="s fl-plan">Bisher im Plan: ${esc(tm(x.depart))} – ${esc(tm(x.arrive))} · ${Number(x.cost) ? esc(chf(x.cost)) : "im Ticket enthalten"}</div>` : ""}</div></div>`;
   }).join("") || `<div class="empty">Keine Verbindungen</div>`;
 
   const hotels = t.hotel_suggestions.map(h => `<div class="row"><div class="grow"><div class="t">${esc(h.name)}</div>
@@ -1550,6 +1590,8 @@ function renderTrip(outcome) {
       <span class="tbr"><button class="tbtn" id="tPdf" aria-label="Als PDF exportieren" title="Als PDF exportieren">${ICO.share}</button>
       <button class="star" id="tFav" aria-label="Favorit">${d.favorite ? "★" : "☆"}</button></span></div>
     ${heroHtml}
+    <div class="jump" id="tJump">${[["tTop", "Überblick"], ["tRoute", "Route"], ["tDays", "Tagesplan"], ...(t.stays.length || t.days.length > 1 ? [["tStays", "Unterkünfte"]] : []), ["tTrans", "Verbindungen"], ["tMore", "Mehr"]]
+      .map(([id, l], i) => `<button data-jump="${id}" class="${i ? "" : "on"}">${l}</button>`).join("")}</div>
     <div class="tgrid"><aside class="tside">
     ${offerHtml}
     ${progressHtml}
@@ -1559,15 +1601,15 @@ function renderTrip(outcome) {
     ${liveCard(d.live_day)}
     ${actions ? `<h2>Wartet auf dich <span class="r chip">${d.actions.length}</span></h2><div class="card">${actions}</div>
       <p class="hint">Kompass bucht nie selbst. Entwurf kopieren, senden, dann «Erledigt».</p>` : ""}
-    ${d.notes.length ? `<div class="card" style="margin-top:12px"><div class="callout"><div>${d.notes.map(esc).join("<br>")}</div></div></div>` : ""}
+    ${d.notes.length ? `<div class="card" style="margin-top:12px"><div class="callout"><span class="cic">!</span><div>${d.notes.map(n => `<p>${esc(n)}</p>`).join("")}</div></div></div>` : ""}
     ${routeHtml}
     <h2 id="tDays">Tagesplan</h2>${dpick}<div class="card dayc">${days}</div>
     <p class="hint">Programmpunkt antippen: festnageln oder «fällt aus» melden.</p>
     ${t.stays.length || t.days.length > 1 ? `<h2 id="tStays">Unterkünfte</h2><div class="card">${stays}</div>` : ""}
-    <h2>Verbindungen</h2><div class="card">${trans}</div>
+    <h2 id="tTrans">Verbindungen</h2><div class="card">${trans}</div>
     ${!INFO.prices.available && t.transports.some(x => x.mode === "flug" && x.estimated) ? `<p class="hint">Echte Flugzeiten und Preise: SerpApi-Schlüssel unter Profil → KI hinterlegen.</p>` : ""}
     <p class="hint">Zeile antippen für Optionen, z. B. «Fällt aus …».</p>
-    <h2>Mehr</h2><div class="card more">
+    <h2 id="tMore">Mehr</h2><div class="card more">
     <button class="mrow" id="tPdf2"><span class="mic2">${ICO.doc}</span>Als PDF exportieren</button>
     ${hotels ? `<details><summary>Weitere Hotels <span class="cnt2">${t.hotel_suggestions.length}</span></summary>${hotels}</details>` : ""}
     ${alts ? `<details><summary>Ideen für Regentage <span class="cnt2">${t.alternatives.length}</span></summary>${alts}</details>` : ""}
@@ -1610,6 +1652,12 @@ function renderTrip(outcome) {
       [{label: "Ja, alles gebucht", fn: async () => reTrip(await api(`/api/trips/${tid}/status`, {status: "gebucht"}))}]);
   });
   drawMaps($("tripIn"));
+  q("[data-jump]").forEach(b => b.onclick = () => {
+    const sh = $("tripSheet"), el = $(b.dataset.jump);
+    JUMP_LOCK = Date.now() + 900; q("[data-jump]").forEach(x => x.classList.toggle("on", x === b));
+    if (b.dataset.jump === "tTop" || !el) sh.scrollTo({top: 0, behavior: "smooth"}); else el.scrollIntoView({behavior: "smooth", block: "start"});
+  });
+  jumpUpdate();
   q("[data-hprices]").forEach(b => b.onclick = async e => {
     e.stopPropagation(); b.disabled = true; b.innerHTML = `<span class="spin"></span>Lade …`;
     try { reTrip(await api(`/api/trips/${tid}/hotel-prices`, {stay_id: b.dataset.hprices})); toast("Preise aktualisiert"); }
@@ -1642,7 +1690,7 @@ function renderTrip(outcome) {
   });
   q("[data-day]").forEach(b => b.onclick = () => {  // anderen Tag zeigen, Tagesleiste und Tag bleiben im Blick
     OPEN_DAYS.sel = b.dataset.day; const top = $("tDays").getBoundingClientRect().top; renderTrip();
-    const sh = $("tripSheet"), nt = $("tDays").getBoundingClientRect().top; if (top < 0 || nt < 0) sh.scrollTop += nt - 70;
+    const sh = $("tripSheet"), nt = $("tDays").getBoundingClientRect().top; if (top < 0 || nt < 0) sh.scrollTop += nt - 112;
   });
   { const pk = $("dpick"), on = pk && pk.querySelector(".dp.on"); if (on) pk.scrollLeft = on.offsetLeft - pk.clientWidth / 2 + on.offsetWidth / 2; }
   q("[data-more]").forEach(b => { const n = b.previousElementSibling; if (n.scrollHeight <= n.clientHeight + 2) b.hidden = true; });  // passt schon ganz
